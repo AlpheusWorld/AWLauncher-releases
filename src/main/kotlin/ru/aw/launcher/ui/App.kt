@@ -143,6 +143,7 @@ private fun ScreenHost(state: LauncherState) {
                         Screen.PLAY, Screen.BUILDS -> PrimaryScreenLayout(state) { BuildsScreen(state) }
                         Screen.CATALOG -> PrimaryScreenLayout(state) { CatalogScreen(state) }
                         Screen.SCREENSHOTS -> ScreenshotsScreen(state)
+                        Screen.DOWNLOADS -> ru.aw.launcher.ui.screens.DownloadsScreen(state)
                         Screen.ACTIVITY -> ActivityScreen(state)
                         Screen.NOTICES -> NoticesScreen(state)
                         Screen.SETTINGS -> SettingsScreen(state)
@@ -172,8 +173,8 @@ private fun CompactNavRail(state: LauncherState) {
     val seen by state.noticesSeen.collectAsState()
     val unread = notices.filter { it.id > seen }
     BoxWithConstraints(Modifier.width(AWDimens.RailWidth).fillMaxHeight()) {
-    val short = maxHeight < 460.dp
-    val itemHeight = if (short) 40.dp else 46.dp
+    val short = maxHeight < 520.dp
+    val itemHeight = if (short) 36.dp else 46.dp
     Column(
         Modifier.width(AWDimens.RailWidth).fillMaxHeight().background(AWColors.Sidebar).padding(horizontal = 8.dp, vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(if (short) 4.dp else 8.dp),
@@ -182,6 +183,7 @@ private fun CompactNavRail(state: LauncherState) {
         NavItem("Играть", Icons.Default.PlayArrow, state.screen in setOf(Screen.PLAY, Screen.BUILDS, Screen.INSTANCE), compact = true, itemHeight = itemHeight) { state.screen = Screen.PLAY }
         NavItem("Каталог", Icons.Default.Search, state.screen == Screen.CATALOG, compact = true, itemHeight = itemHeight) { state.openCatalog() }
         NavItem("Скриншоты", AWIcons.Image, state.screen == Screen.SCREENSHOTS, compact = true, itemHeight = itemHeight) { state.screen = Screen.SCREENSHOTS }
+        NavItem("Загрузки", AWIcons.Download, state.screen == Screen.DOWNLOADS, badge = state.downloads.pendingCount, compact = true, itemHeight = itemHeight) { state.screen = Screen.DOWNLOADS }
         Spacer(Modifier.weight(1f))
         NavItem("Активность", AWIcons.Activity, state.screen == Screen.ACTIVITY, compact = true, itemHeight = itemHeight) { state.screen = Screen.ACTIVITY }
         NavItem("Уведомления", Icons.Default.Notifications, state.screen == Screen.NOTICES, badge = unread.size, badgeAlert = unread.any { it.level == NoticeLevel.ERROR }, compact = true, itemHeight = itemHeight) { state.openNotices() }

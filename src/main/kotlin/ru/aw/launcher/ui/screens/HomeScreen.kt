@@ -346,7 +346,9 @@ fun EntryMenuItems(state: LauncherState, entry: VersionEntry, close: () -> Unit,
         state.createShortcut(entry)
     })
     MenuDivider()
-    AWMenuItem("Переустановить", icon = Icons.Default.Refresh, enabled = (installed || entry.pack != null) && !state.busy, onClick = {
+    if (entry.pack == null) AWMenuItem("Скачать файлы", icon = AWIcons.Download,
+        enabled = !state.downloads.containsEntry(entry.key), onClick = { close(); state.downloadVersion(entry) })
+    AWMenuItem("Переустановить", icon = Icons.Default.Refresh, enabled = (installed || entry.pack != null) && !state.downloads.containsEntry(entry.key), onClick = {
         close()
         state.reinstall(entry)
     })

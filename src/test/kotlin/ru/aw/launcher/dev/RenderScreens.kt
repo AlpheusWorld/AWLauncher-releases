@@ -109,8 +109,9 @@ fun main(args: Array<String>) {
     PlayHistory.historyFile = File(out, "activity-preview.json").toPath().also { copy ->
         runCatching { Files.copy(Paths.root.resolve("activity.json"), copy, StandardCopyOption.REPLACE_EXISTING) }
     }
-    val preloaded = if (selectedScreens?.all { it.startsWith("skin-editor") } == true)
-        ru.aw.launcher.core.PreloadResult(ru.aw.launcher.meta.VersionManifest(), emptyMap(), emptySet())
+    val preloaded = if (selectedScreens?.all { it.startsWith("skin-editor") || it.startsWith("downloads") } == true)
+        ru.aw.launcher.core.PreloadResult(ru.aw.launcher.meta.VersionManifest(versions = listOf(
+            ru.aw.launcher.meta.ManifestVersion(id = "1.21.11", url = ""))), emptyMap(), emptySet())
     else runBlocking { Preloader.run { _, _ -> } }.copy(manifestStale = false, loaderSupportStale = false)
     Settings.update { it.copy(language = Language.RU) }
     val state = LauncherState(CoroutineScope(Dispatchers.Unconfined), preloaded)
@@ -139,6 +140,20 @@ fun main(args: Array<String>) {
             scene.close()
         }
         println("rendered ${File(out, "$name.png")}")
+    }
+
+    if (selectedScreens?.all { it.startsWith("downloads") } == true) {
+        state.downloads.enqueue("sample-active", "Fabulously Optimized · Fabric 1.21.11") { report ->
+            report.stage("Загружаю файлы сборки")
+            report.progress(ru.aw.launcher.net.DownloadProgress(17, 40, 42L * 1024 * 1024, 100L * 1024 * 1024, 8L * 1024 * 1024, "fabric-api.jar"))
+            kotlinx.coroutines.awaitCancellation()
+        }
+        state.downloads.enqueue("sample-next", "Sodium · Моя сборка") {}
+        state.downloads.enqueue("sample-third", "Файлы Minecraft · 1.21.11") {}
+        state.screen = Screen.DOWNLOADS
+        render("downloads", 1280, 780) { AWTheme(ThemeMode.DARK) { App(state, onGameStarted = {}) } }
+        render("downloads-compact", 800, 520) { AWTheme(ThemeMode.DARK) { App(state, onGameStarted = {}) } }
+        exitProcess(0)
     }
 
     fun renderSkins() {

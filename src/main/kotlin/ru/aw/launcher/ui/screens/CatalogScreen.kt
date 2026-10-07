@@ -120,7 +120,7 @@ internal class PacksModel(private val scope: CoroutineScope, source: CatalogSour
     var error by mutableStateOf<String?>(null)
 
     fun install(state: LauncherState, hit: Modrinth.SearchHit, version: Modrinth.Version) {
-        if (state.busy || resolving != null) return
+        if (resolving != null || state.downloads.contains("pack:${hit.projectId}")) return
         resolving = hit.projectId
         error = null
         scope.launch {
@@ -183,7 +183,8 @@ fun CatalogScreen(state: LauncherState) {
             hit = opened,
             initialTab = state.catalogProjectTab,
             versionVisible = { state.isVersionVisible(it) },
-            busy = state.busy || packs.resolving != null || content?.working?.isNotEmpty() == true,
+            busy = packs.resolving == opened.projectId || state.downloads.contains("pack:${opened.projectId}") ||
+                content?.working?.let { opened.projectId in it || ContentModel.ALL in it } == true,
             installedVersion = if (isPack) installedPack?.versionId else installedContent?.versionId,
             installAllowed = allowed,
             targetLabel = if (isPack) null else target?.label,
@@ -197,7 +198,9 @@ fun CatalogScreen(state: LauncherState) {
                 else if (kind != null && content != null && allowed) content.install(kind, opened, version)
             },
             onBack = { state.catalogProject = null },
-            progress = if (isPack) state.progress else content?.progress,
+            progress = state.downloads.active?.takeIf {
+                it.key == if (isPack) "pack:${opened.projectId}" else "content:${target?.key}:${opened.projectId}"
+            }?.progress,
             installError = if (isPack) packs.error else content?.error,
             installMessage = if (isPack) null else content?.message,
         )
@@ -219,7 +222,7 @@ fun CatalogScreen(state: LauncherState) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         CatalogSource.entries.forEach { provider ->
                             ChoiceChip(provider.label, selected = source == provider,
-                                enabled = !state.busy && packs.resolving == null && content?.working?.isEmpty() != false,
+                                enabled = packs.resolving == null,
                                 onClick = { state.catalogSource = provider })
                         }
                     }
@@ -267,7 +270,7 @@ private fun ColumnScope.PacksTab(state: LauncherState, model: PacksModel, onProj
 @Composable
 private fun PackRow(state: LauncherState, model: PacksModel, hit: Modrinth.SearchHit, onProject: (Boolean) -> Unit) {
     val pack = state.packs.firstOrNull { it.projectId == hit.projectId }
-    val busy = model.resolving == hit.projectId || state.installingPack == hit.projectId
+    val busy = model.resolving == hit.projectId || state.downloads.contains("pack:${hit.projectId}")
     ContentRow(
         icon = hit.iconUrl,
         title = hit.title,
@@ -281,14 +284,14 @@ private fun PackRow(state: LauncherState, model: PacksModel, hit: Modrinth.Searc
         onClick = { onProject(false) },
     ) {
         when {
-            busy -> Text("Ставлю…", style = MaterialTheme.typography.labelLarge, color = AWColors.TextMuted)
+            busy -> Text(if (state.installingPack == hit.projectId) "Ставлю…" else "В очереди", style = MaterialTheme.typography.labelLarge, color = AWColors.TextMuted)
             pack != null && pack.id in state.packUpdates ->
-                AWButton("Обновить", icon = Icons.Default.Refresh, enabled = !state.busy, onClick = { state.updatePack(pack) })
+                AWButton("Обновить", icon = Icons.Default.Refresh, enabled = !state.downloads.contains("pack:${hit.projectId}"), onClick = { state.updatePack(pack) })
             pack != null -> AWButton("Играть", icon = Icons.Default.PlayArrow, style = ButtonStyle.PRIMARY, enabled = !state.busy, onClick = {
                 state.selectEntry(state.entryFor(pack))
                 state.play()
             })
-            else -> AWButton("Установить", icon = AWIcons.Download, enabled = !state.busy && model.resolving == null, onClick = {
+            else -> AWButton("Установить", icon = AWIcons.Download, enabled = model.resolving == null, onClick = {
                 onProject(true)
             })
         }
@@ -376,7 +379,7 @@ private fun ContentHitRow(model: ContentModel, kind: ContentKind, hit: Modrinth.
     ) {
         when {
             installed -> Tag("Установлен", AWColors.Success)
-            busy -> Text("Ставлю…", style = MaterialTheme.typography.labelLarge, color = AWColors.TextMuted)
+            busy -> Text(if (model.waiting(hit.projectId)) "В очереди" else "Ставлю…", style = MaterialTheme.typography.labelLarge, color = AWColors.TextMuted)
             else -> AWButton(
                 "Установить",
                 icon = AWIcons.Download,

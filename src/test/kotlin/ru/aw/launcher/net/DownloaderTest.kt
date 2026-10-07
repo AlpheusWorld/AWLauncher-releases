@@ -2,6 +2,12 @@ package ru.aw.launcher.net
 
 import com.sun.net.httpserver.HttpServer
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeout
 import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -14,11 +20,80 @@ import java.io.IOException
 import java.net.InetSocketAddress
 import java.nio.file.Path
 import java.util.concurrent.Executors
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.io.path.exists
 import kotlin.io.path.readBytes
 
 class DownloaderTest {
+
+    @Test
+    fun `file concurrency stays bounded while network calls are cancellable`(@TempDir dir: Path) = runBlocking {
+        val entered = CompletableDeferred<Unit>()
+        val release = CountDownLatch(1)
+        val active = AtomicInteger()
+        val maximum = AtomicInteger()
+        val executor = Executors.newFixedThreadPool(8)
+        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        server.executor = executor
+        server.createContext("/file") { exchange ->
+            val count = active.incrementAndGet()
+            maximum.updateAndGet { maxOf(it, count) }
+            if (count >= 2) entered.complete(Unit)
+            try {
+                release.await(5, TimeUnit.SECONDS)
+                exchange.sendResponseHeaders(200, 32)
+                exchange.responseBody.use { it.write(ByteArray(32)) }
+            } finally { active.decrementAndGet(); exchange.close() }
+        }
+        server.start()
+        try {
+            val job = launch {
+                Downloader(concurrency = 2, maxAttempts = 1).run((0..7).map {
+                    DownloadTask("http://127.0.0.1:${server.address.port}/file", dir.resolve("$it.jar"), size = 32)
+                })
+            }
+            withTimeout(5000) { entered.await() }
+            delay(150)
+            assertEquals(2, maximum.get())
+            release.countDown()
+            withTimeout(5000) { job.join() }
+        } finally { release.countDown(); server.stop(0); executor.shutdownNow() }
+    }
+
+    @Test
+    fun `cancelling a stalled download closes its request and removes partial files`(@TempDir dir: Path) = runBlocking {
+        val received = CompletableDeferred<Unit>()
+        val release = CountDownLatch(1)
+        val executor = Executors.newSingleThreadExecutor()
+        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        server.executor = executor
+        server.createContext("/slow") { exchange ->
+            try {
+                exchange.sendResponseHeaders(200, 8192)
+                exchange.responseBody.write(ByteArray(1024))
+                exchange.responseBody.flush()
+                received.complete(Unit)
+                release.await(5, TimeUnit.SECONDS)
+            } finally { exchange.close() }
+        }
+        server.start()
+        try {
+            val target = dir.resolve("slow.jar")
+            val job = launch(Dispatchers.Default) {
+                Downloader(maxAttempts = 1).run(listOf(DownloadTask("http://127.0.0.1:${server.address.port}/slow", target, size = 8192)))
+            }
+            withTimeout(5000) { received.await() }
+            withTimeout(3000) { job.cancelAndJoin() }
+            assertFalse(target.exists())
+            assertFalse(dir.resolve("slow.jar.part").exists())
+        } finally {
+            release.countDown()
+            server.stop(0)
+            executor.shutdownNow()
+        }
+    }
 
     private val payload = ByteArray(9 * 1024 * 1024 + 321) { (it * 13 + it / 777).toByte() }
     private val sha1 = sha1Of(payload.inputStream())

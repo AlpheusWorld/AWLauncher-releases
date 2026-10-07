@@ -19,6 +19,9 @@ internal class ContentModel(
     private val scope: CoroutineScope,
     private val onChanged: () -> Unit,
     source: CatalogSource,
+    private val downloads: DownloadQueue? = null,
+    private val entryKey: String = dir.toString(),
+    private val entryTitle: String = gameVersion,
 ) {
     private var provider = source
     private val searchCache = HashMap<CatalogSource, Map<ContentKind, CatalogSearch>>()
@@ -32,7 +35,11 @@ internal class ContentModel(
     var installed by mutableStateOf<Map<ContentKind, List<InstalledItem>>>(emptyMap())
     var scanned by mutableStateOf(false)
     var working by mutableStateOf<Set<String>>(emptySet())
-    var progress by mutableStateOf<DownloadProgress?>(null)
+    private var currentProgress by mutableStateOf<DownloadProgress?>(null)
+    private var activeReport: DownloadQueue.Reporter? = null
+    var progress: DownloadProgress?
+        get() = currentProgress
+        set(value) { currentProgress = value; activeReport?.progress(value) }
     var message by mutableStateOf<String?>(null)
     var error by mutableStateOf<String?>(null)
     private var scanJob: Job? = null
@@ -43,6 +50,9 @@ internal class ContentModel(
 
     val installedProjects: Set<String> get() = installed.values.flatten().mapNotNull { it.projectId }.toSet()
     val updates: List<InstalledItem> get() = installed[ContentKind.MOD].orEmpty().filter { it.update != null }
+    fun waiting(key: String): Boolean = downloads?.items?.any {
+        it.key == "content:$entryKey:$key" && it.status == DownloadStatus.WAITING
+    } == true
 
     fun ensureScanned() {
         if (!scanned || System.currentTimeMillis() - scannedAt > 600_000) rescan()
@@ -123,7 +133,7 @@ internal class ContentModel(
         message = "Добавлено файлов: ${files.size}"
     }
 
-    fun install(kind: ContentKind, hit: Modrinth.SearchHit, version: Modrinth.Version? = null) = work(hit.projectId) {
+    fun install(kind: ContentKind, hit: Modrinth.SearchHit, version: Modrinth.Version? = null) = work(hit.projectId, "${hit.title} · $entryTitle") {
         version?.let { ModManager.requireCompatibleVersion(it, hit.projectId, gameVersion, ModManager.catalogLoaders(kind, loader)) }
         message = when (kind) {
             ContentKind.SHADER -> {
@@ -148,12 +158,12 @@ internal class ContentModel(
         }
     }
 
-    fun update(mod: InstalledItem) = work(mod.rowKey) {
+    fun update(mod: InstalledItem) = work(mod.rowKey, "${mod.title} · $entryTitle") {
         updateWithDependencies(mod)
         message = "${mod.title} обновлён до ${mod.update?.versionNumber.orEmpty()}".trimEnd()
     }
 
-    fun updateAll() = work(ALL) {
+    fun updateAll() = work(ALL, "Обновление модов · $entryTitle") {
         var pending = updates
         var done = 0
         var skipped = emptyList<String>()
@@ -235,7 +245,7 @@ internal class ContentModel(
         message = "Удалено проектов: ${editable.size}"
     }
 
-    fun updateMany(items: List<InstalledItem>) = work(ALL) {
+    fun updateMany(items: List<InstalledItem>) = work(ALL, "Обновление проектов · $entryTitle") {
         var done = 0
         val failures = ArrayList<String>()
         for (item in items.filter { it.update != null }.distinctBy { it.file }) {
@@ -266,7 +276,28 @@ internal class ContentModel(
 
     fun folder(kind: ContentKind?): Path = kind?.dir(dir) ?: dir
 
-    private fun work(key: String, block: suspend () -> Unit) {
+    private fun work(key: String, title: String? = null, block: suspend () -> Unit) {
+        if (title != null && downloads != null) {
+            if (ALL in working || (key == ALL && working.isNotEmpty())) return
+            downloads.enqueue("content:$entryKey:$key", title, entryKey,
+                onQueued = { working = working + key },
+                onFinished = { working = working - key; if (working.isEmpty()) startScan(clearError = false) },
+            ) { reporter ->
+                stopScan()
+                activeReport = reporter
+                error = null; message = null
+                reporter.stage("Загружаю")
+                try {
+                    block()
+                    installed = retainRows(scanAll(remote = false))
+                    scanned = true; scannedAt = 0
+                    onChanged()
+                } catch (e: CancellationException) { throw e }
+                catch (e: Exception) { error = e.message ?: "Не получилось"; throw e }
+                finally { progress = null; activeReport = null }
+            }
+            return
+        }
         if (working.isNotEmpty()) return
         working = working + key
         error = null

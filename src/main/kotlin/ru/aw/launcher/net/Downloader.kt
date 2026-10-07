@@ -5,10 +5,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import ru.aw.launcher.core.Log
 import ru.aw.launcher.core.VerifyCache
 import ru.aw.launcher.core.sha1Of
@@ -21,6 +25,8 @@ import java.security.MessageDigest
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
+import java.util.concurrent.ConcurrentHashMap
+import okhttp3.Call
 import kotlin.io.path.createDirectories
 import kotlin.io.path.deleteIfExists
 import kotlin.io.path.fileSize
@@ -94,6 +100,7 @@ class Downloader(
         Log.info("downloading $totalFiles files (${totalBytes / 1024 / 1024} MB)")
 
         coroutineScope {
+            val permits = Semaphore(concurrency)
             val reporter = launch {
                 var lastBytes = 0L
                 var lastAt = System.nanoTime()
@@ -114,9 +121,11 @@ class Downloader(
             try {
                 pending.map { task ->
                     async(io) {
+                        permits.withPermit {
                         current.set(task.label)
                         fetch(task) { delta -> doneBytes.addAndGet(delta) }
                         doneFiles.incrementAndGet()
+                        }
                     }
                 }.awaitAll()
             } finally {
@@ -133,6 +142,7 @@ class Downloader(
         var lastError: Throwable? = null
 
         for (attempt in 1..maxAttempts) {
+            currentCoroutineContext().ensureActive()
             val url = urls[(attempt - 1).coerceAtMost(urls.size - 1)]
             try {
                 downloadOnce(url, task, onBytes)
@@ -155,7 +165,9 @@ class Downloader(
         var counted = 0L
 
         try {
-            Http.client.newCall(Http.request(url)).execute().use { response ->
+            withCalls { register ->
+            val context = currentCoroutineContext()
+            Http.client.newCall(Http.request(url)).also(register).execute().use { response ->
                 if (!response.isSuccessful) throw IOException("HTTP ${response.code}")
                 val body = response.body ?: throw IOException("empty body")
 
@@ -165,6 +177,7 @@ class Downloader(
                 body.byteStream().use { input ->
                     Files.newOutputStream(part).buffered(BUFFER).use { output ->
                         while (true) {
+                            context.ensureActive()
                             val n = input.read(buffer)
                             if (n <= 0) break
                             output.write(buffer, 0, n)
@@ -182,11 +195,13 @@ class Downloader(
                     }
                 }
             }
+            }
 
             if (task.size > 0 && part.fileSize() != task.size) {
                 throw IOException("size mismatch: expected ${task.size}, got ${part.fileSize()}")
             }
 
+            currentCoroutineContext().ensureActive()
             Files.move(part, task.dest, StandardCopyOption.REPLACE_EXISTING)
             task.sha1?.let { VerifyCache.record(task.dest, it) }
 
@@ -199,23 +214,38 @@ class Downloader(
     }
 
     private suspend fun downloadInPieces(url: String, task: DownloadTask, onBytes: (Long) -> Unit): Boolean {
-        val source = withContext(Dispatchers.IO) { Pieces.probe(url) }
-        if (!source.ranges || source.length != task.size) return false
+        return withCalls { register ->
+        val context = currentCoroutineContext()
+        val source = Pieces.probe(url, register)
+        context.ensureActive()
+        if (!source.ranges || source.length != task.size) return@withCalls false
         val part = task.dest.resolveSibling("${task.dest.fileName}.part")
         val counted = AtomicLong()
         try {
-            Pieces.fetch(source.url, part, task.size, { n -> counted.addAndGet(n.toLong()); onBytes(n.toLong()) })
+            Pieces.fetch(source.url, part, task.size, { n -> context.ensureActive(); counted.addAndGet(n.toLong()); onBytes(n.toLong()) }, onCall = register)
             task.sha1?.let { expected ->
                 val actual = sha1Of(part)
                 if (!actual.equals(expected, ignoreCase = true)) throw IOException("sha1 mismatch: expected $expected, got $actual")
             }
+            context.ensureActive()
             Files.move(part, task.dest, StandardCopyOption.REPLACE_EXISTING)
             task.sha1?.let { VerifyCache.record(task.dest, it) }
-            return true
+            true
         } catch (e: Throwable) {
             part.deleteIfExists()
             onBytes(-counted.get())
             throw e
         }
+        }
+    }
+
+    private suspend fun <T> withCalls(block: suspend ((Call) -> Unit) -> T): T = coroutineScope {
+        val calls = ConcurrentHashMap.newKeySet<Call>()
+        val worker = async(Dispatchers.IO) {
+            try { block { call -> calls.add(call); if (!isActive) call.cancel() } }
+            catch (e: Exception) { currentCoroutineContext().ensureActive(); throw e }
+        }
+        try { worker.await() }
+        finally { calls.forEach { it.cancel() } }
     }
 }

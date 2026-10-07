@@ -66,6 +66,7 @@ fun LauncherTitleBar(
         Screen.CATALOG -> state.catalogPageTitle ?: "Каталог"
         Screen.INSTANCE -> state.instanceEntry()?.title ?: "Сборка"
         Screen.SCREENSHOTS -> "Скриншоты"
+        Screen.DOWNLOADS -> "Загрузки"
         Screen.ACTIVITY -> "Активность"
         Screen.NOTICES -> "Уведомления"
         Screen.SETTINGS -> "Настройки"
@@ -104,6 +105,7 @@ fun LauncherTitleBar(
                     Spacer(Modifier.width(12.dp))
                     Row(
                         Modifier.widthIn(max = 210.dp).background(AWColors.Surface, RoundedCornerShape(10.dp))
+                            .clickable { state.screen = Screen.DOWNLOADS }
                             .padding(horizontal = 10.dp, vertical = 6.dp),
                         horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically,
                     ) {

@@ -76,7 +76,7 @@ import ru.aw.launcher.servers.Servers
 import ru.aw.launcher.update.UpdateManifest
 import ru.aw.launcher.update.Updater
 
-enum class Screen { HOME, PLAY, BUILDS, CATALOG, INSTANCE, SCREENSHOTS, ACTIVITY, NOTICES, SETTINGS, ACCOUNTS }
+enum class Screen { HOME, PLAY, BUILDS, CATALOG, INSTANCE, SCREENSHOTS, DOWNLOADS, ACTIVITY, NOTICES, SETTINGS, ACCOUNTS }
 
 data class VersionEntry(
     val version: ManifestVersion,
@@ -231,7 +231,7 @@ class LauncherState(
         val key = entry.key
         return contentModels.getOrPut(key) {
             ContentModel(gameDirOf(entry), entry.loader, entry.id, scope,
-                onChanged = { modsChanged(entry) }, source = source)
+                onChanged = { modsChanged(entry) }, source = source, downloads = downloads, entryKey = entry.key, entryTitle = entry.title)
         }.also {
             it.useSource(source)
             if (contentModels.size > 8) contentModels.entries.firstOrNull { old -> old.key != key && old.value.working.isEmpty() && !old.value.refreshing }
@@ -255,15 +255,15 @@ class LauncherState(
     var instanceRevision by mutableStateOf(0)
         private set
 
-    var busy by mutableStateOf(false)
-        private set
-    var stage by mutableStateOf("")
-        private set
-    var progress by mutableStateOf<DownloadProgress?>(null)
-        private set
-
-    var busyEntry by mutableStateOf<VersionEntry?>(null)
-        private set
+    val downloads = DownloadQueue(scope)
+    val busy: Boolean get() = downloads.active != null
+    var stage: String
+        get() = downloads.active?.stage.orEmpty()
+        private set(value) { downloads.reportStage(value) }
+    var progress: DownloadProgress?
+        get() = downloads.active?.progress
+        private set(value) { downloads.reportProgress(value) }
+    val busyEntry: VersionEntry? get() = downloads.active?.entryKey?.let(::entryByKey)
 
     var signingIn by mutableStateOf(false)
         private set
@@ -310,8 +310,6 @@ class LauncherState(
 
     private var lastLaunch: Pair<VersionEntry, Path>? = null
 
-    private var job: Job? = null
-    private var jobToken: Any? = null
     private var pendingPlay: Boolean = false
 
     val accounts = AccountManager.accounts
@@ -526,7 +524,7 @@ class LauncherState(
         (builds.map(::entryFor) + packs.map(::entryFor)).distinctBy { it.key }
 
     fun libraryOptions(entry: VersionEntry): InstanceOptions = InstanceStore.cached(gameDirOf(entry)) ?: InstanceOptions()
-    fun libraryEntryBusy(entry: VersionEntry): Boolean = contentModels[entry.key]?.working?.isNotEmpty() == true || (busy && busyEntry?.key == entry.key)
+    fun libraryEntryBusy(entry: VersionEntry): Boolean = contentModels[entry.key]?.working?.isNotEmpty() == true || downloads.containsEntry(entry.key)
 
     fun loadLibraryMetadata() {
         if (libraryLoading) return
@@ -622,9 +620,9 @@ class LauncherState(
     fun duplicateEntry(entry: VersionEntry, name: String) {
         if (busy || buildsBusy || libraryBusy || savingInstanceSettings) return
         if (libraryEntryBusy(entry)) { fail("Дождись завершения установки или обновления контента", entry); return }
-        buildsBusy = true
         modal = null
-        startJob(null, "pack") {
+        startJob(null, "pack", "Копирование ${entry.title}") {
+            buildsBusy = true
             try {
                 stageChanged("Создаю копию ${entry.title}")
                 val copy = withContext(Dispatchers.IO) {
@@ -733,26 +731,17 @@ class LauncherState(
         if (isSelected(entry)) refreshSelectedOptions()
     }
 
-    private fun startJob(entry: VersionEntry?, what: String, block: suspend () -> Unit) {
-        if (busy) return
-        val token = Any()
-        jobToken = token
-        busy = true
-        busyEntry = entry
-        stage = ""
-        progress = null
-        job = scope.launch {
+    private fun startJob(entry: VersionEntry?, what: String, title: String = entry?.label ?: "Установка сборки",
+                         key: String = "$what:${entry?.key ?: title}", block: suspend () -> Unit) {
+        downloads.enqueue(key, title, entry?.key) {
             try {
                 block()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
-                if (jobToken === token) {
-                    Log.error("$what failed", e)
-                    fail(e.message ?: e::class.simpleName, entry, title = FAIL_TITLES[what])
-                }
-            } finally {
-                if (jobToken === token) finishJob()
+                Log.error("$what failed", e)
+                fail(e.message ?: e::class.simpleName, entry, title = FAIL_TITLES[what])
+                throw e
             }
         }
     }
@@ -762,18 +751,8 @@ class LauncherState(
         progress = null
     }
 
-    private fun finishJob() {
-        busy = false
-        busyEntry = null
-        stage = ""
-        progress = null
-        job = null
-        jobToken = null
-    }
-
     fun cancel() {
-        job?.cancel()
-        finishJob()
+        downloads.active?.let { downloads.cancel(it.id) }
     }
 
     fun gameExited(exitCode: Int) {
@@ -962,9 +941,8 @@ class LauncherState(
     }
 
     fun installPack(source: PackSource) {
-        if (busy) return
-        installingPack = source.projectId
-        startJob(packs.firstOrNull { it.id == source.id }?.let(::entryFor), "pack") {
+        startJob(packs.firstOrNull { it.id == source.id }?.let(::entryFor), "pack", source.title, "pack:${source.projectId}") {
+            installingPack = source.projectId
             try {
                 val pack = Modpacks.install(source, onStage = ::stageChanged, onProgress = { progress = it })
                 packs = withContext(Dispatchers.IO) { Modpacks.list() }
@@ -980,7 +958,6 @@ class LauncherState(
     }
 
     private fun reinstallPack(pack: Modpack) {
-        if (busy) return
         scope.launch {
             runCatching { Modpacks.reinstallSource(pack) }
                 .onSuccess { installPack(it) }
@@ -1053,7 +1030,6 @@ class LauncherState(
     }
 
     fun reinstall(entry: VersionEntry) {
-        if (busy) return
         entry.pack?.let {
             reinstallPack(it)
             return
@@ -1080,8 +1056,19 @@ class LauncherState(
         }
     }
 
+    fun downloadVersion(entry: VersionEntry) {
+        if (entry.pack != null) return
+        startJob(entry, "reinstall", "Файлы Minecraft · ${entry.label}", "prepare:${entry.key}") {
+            GameLauncher.prepare(entry.id, entry.loader, gameDir = gameDirOf(entry),
+                loaderVersion = entry.build?.loaderVersion, onStage = ::stageChanged, onProgress = { progress = it })
+            refreshInstalled()
+            instanceChanged(entry)
+            inform("Файлы ${entry.label} загружены", entry)
+        }
+    }
+
     fun delete(entry: VersionEntry, withGameDir: Boolean) {
-        if (busy && busyEntry == entry) {
+        if (downloads.containsEntry(entry.key)) {
             fail("Сначала дождитесь окончания загрузки ${entry.label}", entry)
             return
         }
@@ -1143,8 +1130,8 @@ class LauncherState(
 
     fun importMrpack(archive: Path, name: String) {
         if (busy || buildsBusy) return
-        buildsBusy = true
         startJob(null, "pack") {
+            buildsBusy = true
             try {
                 val build = Modpacks.importMrpack(
                     archive = archive,
@@ -1173,8 +1160,8 @@ class LauncherState(
             fail("${loader.label} не поддерживает Minecraft $versionId")
             return
         }
-        buildsBusy = true
         startJob(null, "pack") {
+            buildsBusy = true
             try {
                 stageChanged("Переношу $name")
                 val build = withContext(Dispatchers.IO) {
@@ -1191,8 +1178,8 @@ class LauncherState(
 
     fun importProfiles(profiles: List<ru.aw.launcher.instance.ImportProfile>) {
         if (profiles.isEmpty() || busy || buildsBusy) return
-        buildsBusy = true
         startJob(null, "pack") {
+            buildsBusy = true
             val imported = ArrayList<LocalBuild>()
             try {
                 for (profile in profiles) {
@@ -1275,7 +1262,7 @@ class LauncherState(
     }
 
     fun removeBuild(build: LocalBuild) {
-        if (busy && busyEntry?.build?.id == build.id) {
+        if (downloads.containsEntry(BUILD_KEY + build.id)) {
             fail("Сначала дождитесь окончания загрузки ${build.name}")
             return
         }
@@ -1416,6 +1403,7 @@ class LauncherState(
     }
 
     fun installUpdate(update: UpdateManifest) {
+        if (downloads.pendingCount > 0) { fail("Дождись завершения очереди загрузок или отмени задачи перед обновлением лаунчера"); return }
         if (runningGames.any { it.isAlive }) { fail("Закрой Minecraft перед обновлением лаунчера"); return }
         scope.launch {
             runCatching { Updater.install(update) }

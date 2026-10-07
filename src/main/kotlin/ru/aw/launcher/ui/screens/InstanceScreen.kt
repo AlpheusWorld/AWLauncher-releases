@@ -142,7 +142,7 @@ private fun InstanceContent(state: LauncherState, entry: VersionEntry, model: Co
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             SearchField(query, onValueChange = { query = it }, placeholder = "Поиск контента…", modifier = Modifier.weight(1f))
             AWButton("Добавить файлы", icon = AWIcons.Folder, enabled = !busy, onClick = { adding = true })
-            AWButton("Найти проекты", style = ButtonStyle.PRIMARY, enabled = !busy, onClick = {
+            AWButton("Найти проекты", style = ButtonStyle.PRIMARY, enabled = !state.buildsBusy, onClick = {
                 state.openCatalog(entry, when (kind) {
                     ContentKind.SHADER -> CatalogTab.SHADERS
                     ContentKind.RESOURCE_PACK -> CatalogTab.RESOURCE_PACKS
