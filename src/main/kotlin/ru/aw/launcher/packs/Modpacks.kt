@@ -70,6 +70,7 @@ data class Modpack(
     val versionId: String,
     val iconUrl: String? = null,
     val files: List<String> = emptyList(),
+    val customGameVersion: Boolean = false,
 )
 
 data class PackSource(
@@ -119,6 +120,15 @@ object Modpacks {
             .getOrNull()
     }
 
+    fun changeGameVersion(pack: Modpack, targetVersion: String): Modpack {
+        val dir = dirOf(pack)
+        val current = read(dir) ?: throw IOException("Сборка больше не найдена")
+        if (current.gameVersion != pack.gameVersion) throw IOException("Версия сборки уже изменилась")
+        val updated = current.copy(gameVersion = targetVersion, loaderVersion = null, customGameVersion = true)
+        dir.resolve(MANIFEST).writeAtomically(PrettyJson.encodeToString(updated))
+        return updated
+    }
+
     suspend fun source(projectId: String, slug: String, title: String, iconUrl: String?, versionId: String? = null): PackSource = withContext(Dispatchers.IO) {
         val version = if (versionId != null) {
             ContentCatalog.version(versionId).also { require(it.projectId == projectId) { "Версия относится к другому проекту" } }
@@ -135,6 +145,7 @@ object Modpacks {
     }
 
     suspend fun update(pack: Modpack): PackSource? = withContext(Dispatchers.IO) {
+        if (pack.customGameVersion) return@withContext null
         val versions = ContentCatalog.versions(pack.projectId, ModManager.loadersFor(pack.loader).take(1), pack.gameVersion)
             .filter { version -> version.files.any { ContentCatalog.isPackFile(pack.projectId, it.filename) } }
         val newest = Modrinth.pick(versions) ?: return@withContext null

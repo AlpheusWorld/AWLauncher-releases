@@ -126,6 +126,17 @@ object LocalBuilds {
         save(existing.filterNot { it.id == id })
     }
 
+    @Synchronized
+    fun changeGameVersion(id: String, expectedVersion: String, targetVersion: String): LocalBuild {
+        val existing = list()
+        val current = existing.firstOrNull { it.id == id } ?: throw IOException("Сборка больше не найдена")
+        if (current.versionId != expectedVersion) throw IOException("Версия сборки уже изменилась")
+        require(targetVersion.isNotBlank()) { "Выбери версию Minecraft" }
+        val updated = current.copy(versionId = targetVersion, loaderVersion = null)
+        save(existing.map { if (it.id == id) updated else it })
+        return updated
+    }
+
     fun dirOf(build: LocalBuild): Path {
         require(idPattern.matches(build.id)) { "Invalid local build ID" }
         return Settings.buildsDir().resolve("aw-build-${build.id}")

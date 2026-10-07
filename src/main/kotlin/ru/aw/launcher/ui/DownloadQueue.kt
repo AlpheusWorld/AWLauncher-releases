@@ -22,6 +22,7 @@ data class QueuedDownload(
     val stage: String = "",
     val progress: DownloadProgress? = null,
     val error: String? = null,
+    val cancellable: Boolean = true,
 ) {
     val pending: Boolean get() = status in setOf(DownloadStatus.WAITING, DownloadStatus.RUNNING, DownloadStatus.CANCELLING)
 }
@@ -46,6 +47,7 @@ class DownloadQueue(private val scope: CoroutineScope) {
     inner class Reporter internal constructor(private val id: Long) {
         fun stage(text: String) = update(id) { it.copy(stage = text, progress = null) }
         fun progress(value: DownloadProgress?) = update(id) { it.copy(progress = value) }
+        fun cancellable(value: Boolean) = update(id) { it.copy(cancellable = value) }
     }
 
     fun enqueue(key: String, title: String, entryKey: String? = null, onQueued: () -> Unit = {},
@@ -61,6 +63,7 @@ class DownloadQueue(private val scope: CoroutineScope) {
 
     fun cancel(id: Long): Unit = synchronized(lock) {
         val item = items.firstOrNull { it.id == id } ?: return
+        if (!item.cancellable) return
         when (item.status) {
             DownloadStatus.WAITING -> {
                 update(id) { it.copy(status = DownloadStatus.CANCELLED) }
@@ -87,7 +90,7 @@ class DownloadQueue(private val scope: CoroutineScope) {
         val item = items.firstOrNull { it.id == id && it.status in setOf(DownloadStatus.FAILED, DownloadStatus.CANCELLED) } ?: return
         if (contains(item.key)) return
         val task = tasks[id] ?: return
-        items = items.filterNot { it.id == id } + item.copy(status = DownloadStatus.WAITING, stage = "", progress = null, error = null)
+        items = items.filterNot { it.id == id } + item.copy(status = DownloadStatus.WAITING, stage = "", progress = null, error = null, cancellable = true)
         task.started()
         startNext()
     }
@@ -100,6 +103,7 @@ class DownloadQueue(private val scope: CoroutineScope) {
 
     fun reportStage(text: String) { active?.id?.let { Reporter(it).stage(text) } }
     fun reportProgress(value: DownloadProgress?) { active?.id?.let { Reporter(it).progress(value) } }
+    fun reportCancellable(value: Boolean) { active?.id?.let { Reporter(it).cancellable(value) } }
 
     private fun update(id: Long, transform: (QueuedDownload) -> QueuedDownload) = synchronized(lock) {
         items = items.map { if (it.id == id && it.pending) transform(it) else it }

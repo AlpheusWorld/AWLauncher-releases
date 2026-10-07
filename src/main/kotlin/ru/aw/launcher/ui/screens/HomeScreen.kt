@@ -324,6 +324,8 @@ fun EntryMenuItems(state: LauncherState, entry: VersionEntry, close: () -> Unit,
     AWMenuItem("Изменить иконку", enabled = !state.libraryBusy && !state.busy && !state.buildsBusy, onClick = { close(); state.editInstanceIcon(entry) })
     AWMenuItem("Изменить группу", enabled = !state.libraryBusy && !state.busy && !state.buildsBusy, onClick = { close(); state.modal = Modal.Groups(listOf(entry.key)) })
     AWMenuItem("Дублировать", enabled = hasFolder && !state.busy && !state.buildsBusy && !state.libraryBusy, onClick = { close(); state.modal = Modal.Duplicate(entry) })
+    if (entry.build != null || entry.pack != null) AWMenuItem("Изменить версию Minecraft", icon = Icons.Default.Refresh,
+        enabled = !state.libraryEntryBusy(entry), onClick = { close(); state.openMigration(entry) })
     MenuDivider()
 
     if (fromList) {
@@ -346,7 +348,7 @@ fun EntryMenuItems(state: LauncherState, entry: VersionEntry, close: () -> Unit,
         state.createShortcut(entry)
     })
     MenuDivider()
-    if (entry.pack == null) AWMenuItem("Скачать файлы", icon = AWIcons.Download,
+    if (entry.pack == null || entry.pack.customGameVersion) AWMenuItem("Скачать файлы", icon = AWIcons.Download,
         enabled = !state.downloads.containsEntry(entry.key), onClick = { close(); state.downloadVersion(entry) })
     AWMenuItem("Переустановить", icon = Icons.Default.Refresh, enabled = (installed || entry.pack != null) && !state.downloads.containsEntry(entry.key), onClick = {
         close()

@@ -99,7 +99,7 @@ private fun DownloadCard(item: QueuedDownload, position: Int, state: LauncherSta
                     AWButton("Загрузить следующим", onClick = { state.downloads.moveFirst(item.id) }, enabled = position > 1)
                     AWButton("Убрать из очереди", onClick = { state.downloads.cancel(item.id) }, icon = Icons.Default.Close)
                 }
-                DownloadStatus.RUNNING -> AWButton("Отменить", onClick = { state.downloads.cancel(item.id) }, icon = Icons.Default.Close)
+                DownloadStatus.RUNNING -> AWButton("Отменить", onClick = { state.downloads.cancel(item.id) }, enabled = item.cancellable, icon = Icons.Default.Close)
                 DownloadStatus.FAILED, DownloadStatus.CANCELLED -> AWButton("Повторить", onClick = { state.downloads.retry(item.id) }, icon = Icons.Default.Refresh)
                 else -> Unit
             }

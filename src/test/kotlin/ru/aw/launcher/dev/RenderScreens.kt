@@ -109,7 +109,7 @@ fun main(args: Array<String>) {
     PlayHistory.historyFile = File(out, "activity-preview.json").toPath().also { copy ->
         runCatching { Files.copy(Paths.root.resolve("activity.json"), copy, StandardCopyOption.REPLACE_EXISTING) }
     }
-    val preloaded = if (selectedScreens?.all { it.startsWith("skin-editor") || it.startsWith("downloads") } == true)
+    val preloaded = if (selectedScreens?.all { it.startsWith("skin-editor") || it.startsWith("downloads") || it.startsWith("migration") } == true)
         ru.aw.launcher.core.PreloadResult(ru.aw.launcher.meta.VersionManifest(versions = listOf(
             ru.aw.launcher.meta.ManifestVersion(id = "1.21.11", url = ""))), emptyMap(), emptySet())
     else runBlocking { Preloader.run { _, _ -> } }.copy(manifestStale = false, loaderSupportStale = false)
@@ -153,6 +153,22 @@ fun main(args: Array<String>) {
         state.screen = Screen.DOWNLOADS
         render("downloads", 1280, 780) { AWTheme(ThemeMode.DARK) { App(state, onGameStarted = {}) } }
         render("downloads-compact", 800, 520) { AWTheme(ThemeMode.DARK) { App(state, onGameStarted = {}) } }
+        exitProcess(0)
+    }
+
+    if (selectedScreens?.all { it.startsWith("migration") } == true) {
+        val build = LocalBuild("00000000-0000-0000-0000-000000000012", "Моя сборка", "1.20.1", LoaderKind.FABRIC)
+        val entry = state.entryFor(build)
+        val dir = Paths.root.resolve("migration-preview")
+        fun item(name: String, title: String) = ru.aw.launcher.mods.InstalledItem(dir.resolve("mods/$name"),
+            ru.aw.launcher.mods.ContentKind.MOD, true, "1".repeat(40), "example", title, "1.0", null, null)
+        val version = Modrinth.Version("preview-new", "example", versionNumber = "0.110.0+1.21.11", gameVersions = listOf("1.21.11"),
+            loaders = listOf("fabric"), files = listOf(Modrinth.VersionFile("https://cdn.modrinth.com/preview.jar", "new.jar")))
+        val ready = ru.aw.launcher.instance.MigrationPlan(dir, "1.20.1", "1.21.11", LoaderKind.FABRIC, listOf(
+            ru.aw.launcher.instance.MigrationMod(item("fabric-api.jar", "Fabric API"), version, null),
+            ru.aw.launcher.instance.MigrationMod(item("custom-mod.jar", "Мод без новой версии"), null, "На Modrinth нет версии для 1.21.11")), emptyMap())
+        render("migration", 1040, 780) { AWTheme(ThemeMode.DARK) { ru.aw.launcher.ui.dialogs.BuildMigrationDialog(state, entry, ready) } }
+        render("migration-compact", 800, 520) { AWTheme(ThemeMode.DARK) { ru.aw.launcher.ui.dialogs.BuildMigrationDialog(state, entry, ready) } }
         exitProcess(0)
     }
 

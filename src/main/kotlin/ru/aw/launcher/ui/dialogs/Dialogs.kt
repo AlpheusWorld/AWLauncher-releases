@@ -77,6 +77,7 @@ fun ModalHost(state: LauncherState) {
         is Modal.Icon -> IconEditorDialog(state, modal.entry)
         is Modal.Groups -> LibraryGroupsDialog(state, modal.entryKeys)
         is Modal.Duplicate -> DuplicateDialog(state, modal.entry)
+        is Modal.Migrate -> BuildMigrationDialog(state, modal.entry)
         is Modal.DeleteMany -> DeleteManyDialog(state, modal.entries)
         is Modal.ImportDirectory -> ru.aw.launcher.ui.screens.ImportDirectoryDialog(state, modal.directory, { state.modal = null }) {
             state.modal = null; state.importProfiles(it)

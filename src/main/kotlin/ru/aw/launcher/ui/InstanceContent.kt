@@ -50,6 +50,7 @@ internal class ContentModel(
 
     val installedProjects: Set<String> get() = installed.values.flatten().mapNotNull { it.projectId }.toSet()
     val updates: List<InstalledItem> get() = installed[ContentKind.MOD].orEmpty().filter { it.update != null }
+    val migrating: Boolean get() = downloads?.contains("migration:$entryKey") == true
     fun waiting(key: String): Boolean = downloads?.items?.any {
         it.key == "content:$entryKey:$key" && it.status == DownloadStatus.WAITING
     } == true
@@ -205,6 +206,7 @@ internal class ContentModel(
         })
 
     private fun setEnabled(items: List<InstalledItem>, enabled: Boolean) {
+        if (migrating) return
         if (working.isNotEmpty()) return
         val editable = items.distinctBy { it.rowKey }.map { item ->
             installed[item.kind].orEmpty().firstOrNull { it.rowKey == item.rowKey } ?: item
@@ -277,6 +279,7 @@ internal class ContentModel(
     fun folder(kind: ContentKind?): Path = kind?.dir(dir) ?: dir
 
     private fun work(key: String, title: String? = null, block: suspend () -> Unit) {
+        if (migrating) { error = "Дождись завершения изменения версии сборки"; return }
         if (title != null && downloads != null) {
             if (ALL in working || (key == ALL && working.isNotEmpty())) return
             downloads.enqueue("content:$entryKey:$key", title, entryKey,

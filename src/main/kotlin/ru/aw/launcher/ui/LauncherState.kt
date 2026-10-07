@@ -111,6 +111,7 @@ sealed interface Modal {
     data class Icon(val entry: VersionEntry) : Modal
     data class Groups(val entryKeys: List<String> = emptyList()) : Modal
     data class Duplicate(val entry: VersionEntry) : Modal
+    data class Migrate(val entry: VersionEntry) : Modal
     data class DeleteMany(val entries: List<VersionEntry>) : Modal
     data class ImportDirectory(val directory: Path) : Modal
     data class Settings(val entry: VersionEntry? = null, val section: Int = 0) : Modal
@@ -941,6 +942,10 @@ class LauncherState(
     }
 
     fun installPack(source: PackSource) {
+        val existing = packs.firstOrNull { it.id == source.id }
+        if (existing != null && downloads.contains("migration:${entryFor(existing).key}")) {
+            fail("Дождись завершения изменения версии сборки"); return
+        }
         startJob(packs.firstOrNull { it.id == source.id }?.let(::entryFor), "pack", source.title, "pack:${source.projectId}") {
             installingPack = source.projectId
             try {
@@ -1030,7 +1035,7 @@ class LauncherState(
     }
 
     fun reinstall(entry: VersionEntry) {
-        entry.pack?.let {
+        entry.pack?.takeUnless { it.customGameVersion }?.let {
             reinstallPack(it)
             return
         }
@@ -1057,7 +1062,7 @@ class LauncherState(
     }
 
     fun downloadVersion(entry: VersionEntry) {
-        if (entry.pack != null) return
+        if (entry.pack != null && !entry.pack.customGameVersion) return
         startJob(entry, "reinstall", "Файлы Minecraft · ${entry.label}", "prepare:${entry.key}") {
             GameLauncher.prepare(entry.id, entry.loader, gameDir = gameDirOf(entry),
                 loaderVersion = entry.build?.loaderVersion, onStage = ::stageChanged, onProgress = { progress = it })
@@ -1101,6 +1106,48 @@ class LauncherState(
                     else -> "${entry.label} удалена вместе с папкой сборки"
                 },
             )
+        }
+    }
+
+    fun openMigration(entry: VersionEntry) {
+        if (entry.build == null && entry.pack == null) return
+        if (runningGames.any { it.isAlive }) { fail("Закрой Minecraft перед изменением версии сборки"); return }
+        if (libraryEntryBusy(entry)) { fail("Дождись завершения загрузок этой сборки"); return }
+        modal = Modal.Migrate(entry)
+    }
+
+    fun migrateBuild(entry: VersionEntry, plan: ru.aw.launcher.instance.MigrationPlan, keepEnabled: Set<String>) {
+        if (libraryEntryBusy(entry)) { fail("Дождись завершения загрузок этой сборки"); return }
+        if (!loaderSupport.supports(entry.loader, plan.targetVersion) || versions.none { it.id == plan.targetVersion }) {
+            fail("Выбери доступную версию Minecraft с этим загрузчиком"); return
+        }
+        modal = null
+        startJob(entry, "pack", "Новая версия · ${entry.title}", "migration:${entry.key}") {
+            if (runningGames.any { it.isAlive }) throw IOException("Закрой Minecraft перед изменением версии сборки")
+            val current = entryByKey(entry.key) ?: throw IOException("Сборка больше не найдена")
+            if (current.id != plan.sourceVersion || gameDirOf(current).toAbsolutePath().normalize() != plan.directory)
+                throw IOException("Сборка изменилась. Проверь моды ещё раз")
+            val backup = ru.aw.launcher.instance.BuildMigration.apply(plan, keepEnabled, onStage = { text ->
+                stageChanged(text)
+                if (text == "Применяю новую версию сборки") downloads.reportCancellable(false)
+            }, onProgress = { progress = it },
+                prepareGame = { dir -> GameLauncher.prepare(plan.targetVersion, entry.loader, gameDir = dir,
+                    onStage = ::stageChanged, onProgress = { progress = it }) },
+                commitVersion = {
+                    entry.build?.let { LocalBuilds.changeGameVersion(it.id, plan.sourceVersion, plan.targetVersion) }
+                        ?: entry.pack?.let { Modpacks.changeGameVersion(it, plan.targetVersion) }
+                        ?: throw IOException("У этой версии нет отдельного профиля сборки")
+                })
+            builds = withContext(Dispatchers.IO) { LocalBuilds.list() }
+            packs = withContext(Dispatchers.IO) { Modpacks.list() }
+            contentModels.remove(entry.key)
+            entry.pack?.let { packUpdates = packUpdates - it.id }
+            val updated = entryByKey(entry.key) ?: throw IOException("Обновлённая сборка не найдена")
+            if (catalogTarget?.key == entry.key) catalogTarget = updated
+            openInstance(updated)
+            instanceChanged(updated)
+            refreshInstalled()
+            inform("${entry.title} обновлена до Minecraft ${plan.targetVersion}\nРезервные файлы: $backup", updated)
         }
     }
 

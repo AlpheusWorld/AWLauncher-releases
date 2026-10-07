@@ -186,7 +186,7 @@ fun CatalogScreen(state: LauncherState) {
             busy = packs.resolving == opened.projectId || state.downloads.contains("pack:${opened.projectId}") ||
                 content?.working?.let { opened.projectId in it || ContentModel.ALL in it } == true,
             installedVersion = if (isPack) installedPack?.versionId else installedContent?.versionId,
-            installAllowed = allowed,
+            installAllowed = allowed && content?.migrating != true,
             targetLabel = if (isPack) null else target?.label,
             compatible = { version ->
                 if (isPack) version.files.any { ContentCatalog.isPackFile(opened.projectId, it.filename) }
