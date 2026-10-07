@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<WixLocalization Culture="ru-RU" Codepage="1251" xmlns="http://schemas.microsoft.com/wix/2006/localization">
+  <String Id="AWMainFeatureTitle">AWLauncher</String>
+  <String Id="AWDowngradeError">На компьютере уже установлена более новая версия AWLauncher</String>
+  <String Id="AWDisallowUpgradeError">Сначала удали предыдущую версию AWLauncher</String>
+  <String Id="WixUICancel">Отмена</String>
+  <String Id="WixUIBack">Назад</String>
+  <String Id="WixUINext">Продолжить</String>
+  <String Id="WixUIFinish">Готово</String>
+  <String Id="WixUIYes">Да</String>
+  <String Id="WixUINo">Нет</String>
+</WixLocalization>

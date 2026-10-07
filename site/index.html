@@ -1,0 +1,828 @@
+<!doctype html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AWLauncher — лаунчер Minecraft для Windows</title>
+<meta name="description" content="AWLauncher ставит Minecraft Java Edition, подбирает загрузчик и Java, разводит сборки по отдельным папкам. Fabric, Forge, NeoForge, Quilt, каталоги Modrinth и CurseForge, 50 языков, четыре темы.">
+<meta name="theme-color" content="#111114">
+<meta name="color-scheme" content="dark light">
+<!-- ↓↓↓ АДРЕС САЙТА: после первой публикации замени три ссылки на свой домен ↓↓↓ -->
+<link rel="canonical" href="https://alpheusworld.github.io/AWLauncher/site/">
+<meta property="og:url" content="https://alpheusworld.github.io/AWLauncher/site/">
+<meta property="og:image" content="https://alpheusworld.github.io/AWLauncher/site/assets/img/aw-home-hero.png">
+<!-- ↑↑↑ АДРЕС САЙТА ↑↑↑ -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="AWLauncher — лаунчер Minecraft для Windows">
+<meta property="og:description" content="Версии, загрузчики, каталоги модов и отдельная папка для каждой сборки. Windows 10 и 11, 64-бит.">
+<meta property="og:locale" content="ru_RU">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="assets/img/icon-64.png" sizes="64x64">
+<link rel="icon" href="assets/img/icon-32.png" sizes="32x32">
+<link rel="apple-touch-icon" href="assets/img/aw-mark.png">
+<link rel="preload" href="assets/fonts/Onest-Regular.ttf" as="font" type="font/ttf" crossorigin>
+<link rel="preload" href="assets/fonts/Onest-Black.ttf" as="font" type="font/ttf" crossorigin>
+<link rel="stylesheet" href="styles.css">
+<script>
+  (function () {
+    try {
+      var saved = localStorage.getItem('aw-theme');
+      var allowed = ['light', 'dark', 'oled', 'system'];
+      if (saved && allowed.indexOf(saved) !== -1) document.documentElement.dataset.theme = saved;
+    } catch (e) {}
+  })();
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "AWLauncher",
+  "applicationCategory": "GameApplication",
+  "operatingSystem": "Windows 10, Windows 11 (64-bit)",
+  "description": "Лаунчер Minecraft Java Edition с загрузчиками, каталогами модов и отдельной папкой для каждой сборки.",
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "RUB" },
+  "softwareVersion": "1.0",
+  "downloadUrl": "https://github.com/AlpheusWorld/AWLauncher/releases/latest",
+  "inLanguage": ["ru", "en", "es"]
+}
+</script>
+</head>
+<body>
+
+<a class="skip-link" href="#main" data-i18n="a11y.skip">Перейти к содержимому</a>
+
+<div class="grain" aria-hidden="true"></div>
+<div class="aurora" aria-hidden="true">
+  <span class="aurora__orb aurora__orb--a"></span>
+  <span class="aurora__orb aurora__orb--b"></span>
+  <span class="aurora__orb aurora__orb--c"></span>
+  <span class="aurora__grid"></span>
+</div>
+
+<svg class="sprite" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <g id="i-download"><path d="M12 4v10.5"/><path d="M7.8 10.4 12 14.6l4.2-4.2"/><path d="M4.5 19.5h15"/></g>
+    <g id="i-play"><path d="M9.6 6.9 17.4 12l-7.8 5.1z"/></g>
+    <g id="i-check"><path d="M5 12.6l4.6 4.6L19 7.8"/></g>
+    <g id="i-arrow-ur"><path d="M8 16.2 16.2 8"/><path d="M9.6 8h6.6v6.6"/></g>
+    <g id="i-chevron"><path d="M7.5 10.2 12 14.7l4.5-4.5"/></g>
+    <g id="i-box"><path d="M12 3.4 20 7.9v8.2L12 20.6 4 16.1V7.9z"/><path d="M4 7.9 12 12.4l8-4.5"/><path d="M12 12.4v8.2"/></g>
+    <g id="i-folder"><path d="M4 7.6h5.3l1.7 2.1H20v8.7H4z"/></g>
+    <g id="i-shield"><path d="M12 3.4 19 6v6.1c0 4.3-3 7.1-7 8.6-4-1.5-7-4.3-7-8.6V6z"/><path d="M9.1 12.1l2.2 2.2 3.9-4.2"/></g>
+    <g id="i-cpu"><path d="M6.2 6.2h11.6v11.6H6.2z"/><path d="M9.4 9.4h5.2v5.2H9.4z"/><path d="M12 3.2v3M12 17.8v3M3.2 12h3M17.8 12h3"/></g>
+    <g id="i-layers"><path d="M12 3.6 20.6 8.4 12 13.2 3.4 8.4z"/><path d="M3.4 12.4 12 17.2l8.6-4.8"/><path d="M3.4 16.2 12 21l8.6-4.8"/></g>
+    <g id="i-globe"><circle cx="12" cy="12" r="8.4"/><path d="M3.6 12h16.8"/><path d="M12 3.6c2.9 2.6 2.9 14.2 0 16.8-2.9-2.6-2.9-14.2 0-16.8z"/></g>
+    <g id="i-palette"><path d="M12 20.4a8.4 8.4 0 1 1 8.4-8.4c0 2.2-1.8 3.1-3.2 3.1h-1.5a2 2 0 0 0-1.4 3.4c.5.7.1 1.9-2.3 1.9z"/><circle cx="8.6" cy="10.6" r="1.05"/><circle cx="12" cy="8.2" r="1.05"/><circle cx="15.4" cy="10.6" r="1.05"/></g>
+    <g id="i-presence"><path d="M7.6 17.6C6.2 16.6 5.4 15 5.4 13.4c0-3.6 2.9-6.4 6.6-6.4s6.6 2.8 6.6 6.4c0 1.6-.8 3.2-2.2 4.2"/><circle cx="9.7" cy="12.1" r="1.15"/><circle cx="14.3" cy="12.1" r="1.15"/><path d="M7.6 17.6 15 15.9"/></g>
+    <g id="i-user"><circle cx="12" cy="9.1" r="3.5"/><path d="M5.6 20c1.2-3.6 3.5-5.2 6.4-5.2s5.2 1.6 6.4 5.2"/></g>
+    <g id="i-search"><circle cx="11" cy="11" r="6.1"/><path d="M15.4 15.4 20 20"/></g>
+    <g id="i-refresh"><path d="M19.4 12a7.4 7.4 0 1 1-2.3-5.4"/><path d="M19.6 4.4v4.7h-4.7"/></g>
+    <g id="i-clock"><circle cx="12" cy="12" r="8.4"/><path d="M12 7.4V12l3.1 2"/></g>
+    <g id="i-windows"><path d="M4.6 7.3 11 6.1v5.2H4.6zM12.6 5.8l6.8-1.2v6.7h-6.8zM4.6 12.6H11V18l-6.4-1.1zM12.6 12.6h6.8v6.8l-6.8-1.2z"/></g>
+    <g id="i-external"><path d="M14.2 4.9h4.9v4.9"/><path d="M19.1 4.9 11.4 12.6"/><path d="M18 14.6V19H5V6h4.4"/></g>
+    <g id="i-close"><path d="M7.2 7.2 16.8 16.8"/><path d="M16.8 7.2 7.2 16.8"/></g>
+    <g id="i-sparkle"><path d="M12 3.8l1.5 4.5 4.5 1.5-4.5 1.5L12 15.8l-1.5-4.5L6 9.8l4.5-1.5z"/><path d="M17.6 15.4l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z"/></g>
+    <g id="i-bolt"><path d="M13.6 3.4 6.4 13.2h4.5l-1 7.4 7.2-9.8h-4.5z"/></g>
+    <g id="i-memory"><path d="M5.6 8.4h12.8v7.2H5.6z"/><path d="M8.6 8.4V5.6M12 8.4V5.6M15.4 8.4V5.6M8.6 18.4v-2.8M12 18.4v-2.8M15.4 18.4v-2.8"/></g>
+    <g id="i-key"><circle cx="9.4" cy="14.6" r="4.2"/><path d="M12.4 11.6 19 5"/><path d="M16.2 7.8l1.9 1.9"/></g>
+    <g id="i-move"><path d="M12 3.8v16.4"/><path d="M3.8 12h16.4"/><path d="M9.6 6.2 12 3.8l2.4 2.4M9.6 17.8 12 20.2l2.4-2.4M6.2 9.6 3.8 12l2.4 2.4M17.8 9.6 20.2 12l-2.4 2.4"/></g>
+    <g id="i-terminal"><path d="M4.6 7.4 9 12l-4.4 4.6"/><path d="M12.6 16.6h6.8"/></g>
+    <g id="i-apple"><path d="M12 8.7c-1.2-1.5-3.2-1.6-4.3-.3-1.4 1.6-1.3 4.5 0 6.9 1.1 2 2.5 3.3 4.3 3.3s3.2-1.3 4.3-3.3c1.3-2.4 1.4-5.3 0-6.9-1.1-1.3-3.1-1.2-4.3.3z"/><path d="M12 8.7V7.1c0-1 .8-1.8 1.8-1.8h.8"/></g>
+    <g id="i-copy"><path d="M6.2 6.2h7.6v7.6H6.2z"/><path d="M10.4 10.4h7.6v7.6h-7.6z"/></g>
+  </defs>
+</svg>
+
+<header class="nav-slot">
+  <nav class="nav" id="nav" aria-label="Основная навигация">
+    <a class="nav__brand" href="#top">
+      <img class="wm wm--onDark" src="assets/img/wordmark.png" alt="AWLauncher" width="624" height="104">
+      <img class="wm wm--onLight" src="assets/img/wordmark-light.png" alt="" aria-hidden="true" width="624" height="104">
+    </a>
+
+    <ul class="nav__links" id="navLinks">
+      <li><a href="#features" data-i18n="nav.features">Возможности</a></li>
+      <li><a href="#profiles" data-i18n="nav.profiles">Сборки</a></li>
+      <li><a href="#discord" data-i18n="nav.discord">Discord</a></li>
+      <li><a href="#themes" data-i18n="nav.themes">Темы</a></li>
+      <li><a href="#faq" data-i18n="nav.faq">Вопросы</a></li>
+    </ul>
+
+    <div class="nav__side">
+      <button class="lang" id="langToggle" type="button" aria-label="Переключить язык / Switch language">
+        <span class="lang__opt is-active" data-lang="ru">RU</span>
+        <span class="lang__opt" data-lang="en">EN</span>
+      </button>
+      <a class="btn btn--solid btn--sm" href="#download">
+        <span data-i18n="cta.downloadShort">Скачать</span>
+        <span class="btn__orb"><svg class="i" viewBox="0 0 24 24"><use href="#i-download"/></svg></span>
+      </a>
+      <button class="burger" id="burger" type="button" aria-expanded="false" aria-controls="menu">
+        <span class="burger__box" aria-hidden="true"><i></i><i></i></span>
+        <span class="sr-only" data-i18n="a11y.menu">Меню</span>
+      </button>
+    </div>
+    <span class="nav__progress" id="navProgress" aria-hidden="true"></span>
+  </nav>
+</header>
+
+<div class="menu" id="menu" hidden>
+  <div class="menu__inner">
+    <ul class="menu__list">
+      <li style="--i:0"><a href="#features" data-i18n="nav.features">Возможности</a></li>
+      <li style="--i:1"><a href="#loaders" data-i18n="nav.loaders">Загрузчики</a></li>
+      <li style="--i:2"><a href="#profiles" data-i18n="nav.profiles">Сборки</a></li>
+      <li style="--i:3"><a href="#accounts" data-i18n="nav.accounts">Аккаунты</a></li>
+      <li style="--i:4"><a href="#discord" data-i18n="nav.discord">Discord</a></li>
+      <li style="--i:5"><a href="#themes" data-i18n="nav.themes">Темы</a></li>
+      <li style="--i:6"><a href="#faq" data-i18n="nav.faq">Вопросы</a></li>
+      <li style="--i:7"><a href="#install" data-i18n="nav.install">Установка</a></li>
+    </ul>
+    <div class="menu__foot">
+      <a class="btn btn--solid" href="#download">
+        <span data-i18n="cta.download">Скачать для Windows</span>
+        <span class="btn__orb"><svg class="i" viewBox="0 0 24 24"><use href="#i-download"/></svg></span>
+      </a>
+      <button class="lang lang--menu" id="langToggleMenu" type="button" aria-label="Переключить язык / Switch language">
+        <span class="lang__opt is-active" data-lang="ru">RU</span>
+        <span class="lang__opt" data-lang="en">EN</span>
+      </button>
+      <p class="menu__note" data-i18n="menu.note">Windows 10 и 11 · 64-бит · бесплатно</p>
+    </div>
+  </div>
+</div>
+
+<main id="main">
+
+  <!-- ══ HERO ══ -->
+  <section class="hero" id="top">
+    <div class="shell hero__grid">
+      <div class="hero__copy reveal">
+        <p class="eyebrow">
+          <span class="eyebrow__dot" aria-hidden="true"></span>
+          <span data-i18n="hero.eyebrow">Windows 10 и 11 · 64-бит · бесплатно</span>
+        </p>
+        <h1 class="hero__title">
+          <span data-i18n="hero.title1">Ставит Minecraft, загрузчик и моды.</span>
+          <em data-i18n="hero.title2">Каждую сборку держит в своей папке</em>
+        </h1>
+        <p class="lead" data-i18n="hero.lead">AWLauncher скачивает нужную версию игры, сам подбирает Java, ставит загрузчик и раскладывает моды по сборкам. Если игра вылетела, показывает причину из журнала.</p>
+
+        <div class="hero__cta">
+          <a class="btn btn--solid btn--lg magnetic" href="#download">
+            <span data-i18n="cta.download">Скачать для Windows</span>
+            <span class="btn__orb"><svg class="i" viewBox="0 0 24 24"><use href="#i-download"/></svg></span>
+          </a>
+          <a class="btn btn--ghost btn--lg" href="#features">
+            <span data-i18n="cta.features">Что внутри</span>
+            <span class="btn__orb"><svg class="i" viewBox="0 0 24 24"><use href="#i-chevron"/></svg></span>
+          </a>
+        </div>
+
+        <ul class="hero__meta">
+          <li><svg class="i" viewBox="0 0 24 24"><use href="#i-shield"/></svg><span data-i18n="hero.meta1">MSI с подписью Authenticode и SHA-256</span></li>
+          <li><svg class="i" viewBox="0 0 24 24"><use href="#i-refresh"/></svg><span data-i18n="hero.meta2">Автообновление по HTTPS-фиду</span></li>
+          <li><svg class="i" viewBox="0 0 24 24"><use href="#i-user"/></svg><span data-i18n="hero.meta3">Вход через Microsoft в браузере</span></li>
+        </ul>
+      </div>
+
+      <div class="hero__stage reveal" style="--d:120ms">
+        <div class="bezel bezel--window">
+          <div class="bezel__core mock" role="img" aria-label="Окно лаунчера AWLauncher: сборка SkyForge на Fabric 1.20.1, проверка файлов и кнопка «Играть»">
+            <div class="mock__bar">
+              <span class="mock__id">
+                <img src="assets/img/icon-32.png" alt="" width="16" height="16">
+                AWLauncher
+              </span>
+              <span class="mock__win" aria-hidden="true"><i></i><i></i><i></i></span>
+            </div>
+            <div class="mock__body">
+              <div class="mock__rail" aria-hidden="true">
+                <span class="mock__railbtn is-on"><svg class="i" viewBox="0 0 24 24"><use href="#i-layers"/></svg></span>
+                <span class="mock__railbtn"><svg class="i" viewBox="0 0 24 24"><use href="#i-box"/></svg></span>
+                <span class="mock__railbtn"><svg class="i" viewBox="0 0 24 24"><use href="#i-search"/></svg></span>
+                <span class="mock__railbtn"><svg class="i" viewBox="0 0 24 24"><use href="#i-clock"/></svg></span>
+                <span class="mock__railbtn mock__railbtn--last"><svg class="i" viewBox="0 0 24 24"><use href="#i-user"/></svg></span>
+              </div>
+              <div class="mock__main">
+                <div class="mock__banner">
+                  <span class="mock__tags">
+                    <span class="tag tag--solid">1.20.1</span>
+                    <span class="tag tag--fabric">Fabric</span>
+                  </span>
+                  <strong class="mock__name">SkyForge</strong>
+                  <span class="mock__sub" data-i18n="mock.sub">148 модов · 6 ГБ памяти · Java 21</span>
+                </div>
+                <div class="mock__progress"><span id="mockBar"></span></div>
+                <ul class="mock__log" id="mockLog" aria-hidden="true"></ul>
+                <div class="mock__foot">
+                  <button class="mock__play" type="button" tabindex="-1" aria-hidden="true">
+                    <svg class="i" viewBox="0 0 24 24"><use href="#i-play"/></svg>
+                    <span data-i18n="mock.play">Играть</span>
+                  </button>
+                  <span class="mock__stat"><b>62</b> <span data-i18n="mock.fps">кадра в секунду в меню</span></span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="float-card float-card--verify">
+          <svg class="i" viewBox="0 0 24 24"><use href="#i-check"/></svg>
+          <div>
+            <strong data-i18n="float.verifyTitle">Файлы проверены</strong>
+            <span data-i18n="float.verifyText">12 480 файлов, 0 расхождений</span>
+          </div>
+        </div>
+        <div class="float-card float-card--version">
+          <svg class="i" viewBox="0 0 24 24"><use href="#i-bolt"/></svg>
+          <div>
+            <strong data-i18n="float.versionTitle">Версия подтянута</strong>
+            <span data-i18n="float.versionText">snapshot 24w45a доступен</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="shell">
+      <dl class="stats reveal">
+        <div class="stats__item"><dt data-i18n="stats.loaders">Загрузчика</dt><dd>4</dd></div>
+        <div class="stats__item"><dt data-i18n="stats.catalogs">Каталога контента</dt><dd>2</dd></div>
+        <div class="stats__item"><dt data-i18n="stats.locales">Языков интерфейса</dt><dd>50</dd></div>
+        <div class="stats__item"><dt data-i18n="stats.themes">Темы окна</dt><dd>4</dd></div>
+      </dl>
+    </div>
+  </section>
+
+  <!-- ══ MARQUEE ══ -->
+  <div class="marquee" aria-hidden="true">
+    <div class="marquee__track">
+      <span data-i18n="mq.1">Fabric</span><span data-i18n="mq.2">Forge</span><span data-i18n="mq.3">NeoForge</span><span data-i18n="mq.4">Quilt</span><span data-i18n="mq.5">Modrinth</span><span data-i18n="mq.6">CurseForge</span><span data-i18n="mq.7">Вход через Microsoft</span><span data-i18n="mq.8">Discord Rich Presence</span><span data-i18n="mq.9">Автоподбор Java</span><span data-i18n="mq.10">Снапшоты и alpha</span><span data-i18n="mq.11">Импорт .mrpack</span><span data-i18n="mq.12">Ресурспаки и шейдеры</span>
+    </div>
+  </div>
+
+  <!-- ══ FEATURES ══ -->
+  <section class="section" id="features">
+    <div class="shell">
+      <header class="section__head reveal">
+        <p class="eyebrow"><span data-i18n="features.eyebrow">Возможности</span></p>
+        <h2 class="h2" data-i18n="features.title">Версии Minecraft, загрузчики, моды и Java</h2>
+        <p class="lead lead--wide" data-i18n="features.lead">Манифесты версий, библиотеки и Java лаунчер скачивает сам. Каталоги Modrinth и CurseForge открываются внутри, а каждый профиль лежит в отдельной папке.</p>
+      </header>
+
+      <div class="bento">
+        <article class="card card--a reveal spotlight">
+          <div class="card__head">
+            <span class="card__icon"><svg class="i" viewBox="0 0 24 24"><use href="#i-layers"/></svg></span>
+            <h3 data-i18n="f1.title">Версии и загрузчики в одном списке</h3>
+          </div>
+          <p data-i18n="f1.text">Релизы, снапшоты, alpha и beta — рядом с Fabric, Forge, NeoForge и Quilt. Выбери версию и загрузчик, остальное лаунчер соберёт сам: манифест, библиотеки, ассеты, аргументы запуска.</p>
+          <ul class="chips">
+            <li class="chip chip--vanilla">Vanilla</li>
+            <li class="chip chip--fabric">Fabric</li>
+            <li class="chip chip--forge">Forge</li>
+            <li class="chip chip--neoforge">NeoForge</li>
+            <li class="chip chip--quilt">Quilt</li>
+          </ul>
+          <div class="versions" aria-hidden="true">
+            <div class="versions__row"><span>1.21.4</span><span class="versions__bar" style="--w:96%"></span><span class="versions__tag versions__tag--new" data-i18n="f1.tagNew">новая</span></div>
+            <div class="versions__row"><span>1.21.1</span><span class="versions__bar" style="--w:82%"></span><span class="versions__tag" data-i18n="f1.tagMods">под моды</span></div>
+            <div class="versions__row"><span>1.20.1</span><span class="versions__bar" style="--w:74%"></span><span class="versions__tag" data-i18n="f1.tagStable">проверенная</span></div>
+            <div class="versions__row"><span>1.16.5</span><span class="versions__bar" style="--w:58%"></span><span class="versions__tag" data-i18n="f1.tagLegacy">для старых сборок</span></div>
+            <div class="versions__row"><span>24w45a</span><span class="versions__bar" style="--w:40%"></span><span class="versions__tag" data-i18n="f1.tagSnap">снапшот</span></div>
+          </div>
+          <div class="ministats">
+            <div><b data-i18n="f1.m1v">1 200+</b><span data-i18n="f1.m1">версий в манифестах</span></div>
+            <div><b data-i18n="f1.m2v">авто</b><span data-i18n="f1.m2">библиотеки и ассеты</span></div>
+            <div><b data-i18n="f1.m3v">кэш</b><span data-i18n="f1.m3">повторный запуск без скачивания</span></div>
+          </div>
+        </article>
+
+        <article class="card card--b reveal spotlight" style="--d:80ms">
+          <div class="card__head">
+            <span class="card__icon"><svg class="i" viewBox="0 0 24 24"><use href="#i-search"/></svg></span>
+            <h3 data-i18n="f2.title">Каталоги Modrinth и CurseForge</h3>
+          </div>
+          <p data-i18n="f2.text">Поиск модов, сборок, ресурспаков и шейдеров прямо в лаунчере. Обязательные зависимости ставятся вместе с проектом, обновления — из карточки сборки.</p>
+          <ul class="ticks">
+            <li><svg class="i" viewBox="0 0 24 24"><use href="#i-check"/></svg><span data-i18n="f2.t1">Импорт сборок .mrpack и .zip с manifest.json</span></li>
+            <li><svg class="i" viewBox="0 0 24 24"><use href="#i-check"/></svg><span data-i18n="f2.t2">Выбор конкретного выпуска и версии Minecraft</span></li>
+            <li><svg class="i" viewBox="0 0 24 24"><use href="#i-check"/></svg><span data-i18n="f2.t3">Обязательный файл не скачается — сборка не встанет неполной</span></li>
+          </ul>
+        </article>
+
+        <article class="card card--c reveal spotlight" style="--d:120ms">
+          <div class="card__head">
+            <span class="card__icon"><svg class="i" viewBox="0 0 24 24"><use href="#i-cpu"/></svg></span>
+            <h3 data-i18n="f3.title">Java не надо искать руками</h3>
+          </div>
+          <p data-i18n="f3.text">Лаунчер подберёт подходящую среду под версию игры и установит её. Своя Java — тоже можно: укажи исполняемый файл или папку JDK, в том числе для отдельной сборки.</p>
+          <div class="inline-demo" aria-hidden="true">
+            <span class="inline-demo__dot"></span>
+            <span>jdk-21.0.4+7 · <b data-i18n="f3.demo">подходит для 1.20.1</b></span>
+          </div>
+        </article>
+
+        <article class="card card--d reveal spotlight" style="--d:160ms">
+          <div class="card__head">
+            <span class="card__icon"><svg class="i" viewBox="0 0 24 24"><use href="#i-shield"/></svg></span>
+            <h3 data-i18n="f4.title">Проверка файлов и понятный вылет</h3>
+          </div>
+          <p data-i18n="f4.text">Лаунчер сверяет загруженное с манифестами и читает журнал игры. Вместо «Error 1» — строка о том, чего не хватает: библиотеки, памяти или совместимой версии мода.</p>
+        </article>
+
+        <article class="card card--e reveal spotlight" style="--d:200ms">
+          <div class="card__head">
+            <span class="card__icon"><svg class="i" viewBox="0 0 24 24"><use href="#i-memory"/></svg></span>
+            <h3 data-i18n="f5.title">Память, JVM и окно</h3>
+          </div>
+          <p data-i18n="f5.text">Ползунок памяти с рекомендацией под твою машину, свои JVM-аргументы, размер окна и полный экран — общие или отдельно для каждой сборки.</p>
+          <div class="slider" aria-hidden="true"><span class="slider__fill"></span><span class="slider__knob"></span></div>
+          <div class="slider__legend"><span data-i18n="f5.min">2 ГБ</span><span class="slider__rec" data-i18n="f5.rec">рекомендуем 6 ГБ</span><span data-i18n="f5.max">16 ГБ</span></div>
+        </article>
+
+        <article class="card card--f reveal spotlight" style="--d:240ms">
+          <div class="card__head">
+            <span class="card__icon"><svg class="i" viewBox="0 0 24 24"><use href="#i-move"/></svg></span>
+            <h3 data-i18n="f6.title">Перенос из другого лаунчера</h3>
+          </div>
+          <p data-i18n="f6.text">Укажи папку профиля, .minecraft или общий каталог instances — AWLauncher распознает Prism, MultiMC, Modrinth, CurseForge и ATLauncher, скопирует миры, моды и настройки, восстановит календарь активности из логов. Исходные файлы остаются нетронутыми, учётные данные — в старом лаунчере.</p>
+          <div class="migrate" aria-hidden="true">
+            <span class="migrate__from">Prism</span>
+            <svg class="i" viewBox="0 0 24 24"><use href="#i-check"/></svg>
+            <span class="migrate__from">MultiMC</span>
+            <svg class="i" viewBox="0 0 24 24"><use href="#i-check"/></svg>
+            <span class="migrate__from">Modrinth</span>
+            <svg class="i" viewBox="0 0 24 24"><use href="#i-check"/></svg>
+            <span class="migrate__from">CurseForge</span>
+            <svg class="i" viewBox="0 0 24 24"><use href="#i-check"/></svg>
+            <span class="migrate__from">ATLauncher</span>
+            <span class="migrate__arrow" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><use href="#i-arrow-ur"/></svg></span>
+            <span class="migrate__to">AWLauncher</span>
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ LOADERS ══ -->
+  <section class="section section--tight" id="loaders">
+    <div class="shell split">
+      <div class="split__copy reveal">
+        <p class="eyebrow"><span data-i18n="loaders.eyebrow">Загрузчики</span></p>
+        <h2 class="h2" data-i18n="loaders.title">Fabric, Forge, NeoForge и Quilt</h2>
+        <p class="lead" data-i18n="loaders.lead">Загрузчик выбирается при создании сборки. Лаунчер запустит его установщик, разложит файлы по папке профиля и запишет версию загрузчика в карточку сборки.</p>
+        <div class="loader-picker" id="loaderPicker" role="tablist" aria-label="Загрузчики">
+          <button class="loader-tab is-active" data-loader="fabric" role="tab" aria-selected="true" type="button"><span class="dot"></span>Fabric</button>
+          <button class="loader-tab" data-loader="forge" role="tab" aria-selected="false" type="button"><span class="dot"></span>Forge</button>
+          <button class="loader-tab" data-loader="neoforge" role="tab" aria-selected="false" type="button"><span class="dot"></span>NeoForge</button>
+          <button class="loader-tab" data-loader="quilt" role="tab" aria-selected="false" type="button"><span class="dot"></span>Quilt</button>
+        </div>
+      </div>
+
+      <div class="split__stage reveal" style="--d:100ms">
+        <div class="bezel">
+          <div class="bezel__core loader-panel" id="loaderPanel" data-active="fabric">
+            <div class="loader-panel__top">
+              <span class="loader-panel__name" id="loaderName">Fabric</span>
+              <span class="tag" id="loaderTag">под моды и оптимизацию</span>
+            </div>
+            <p class="loader-panel__text" id="loaderText">Максимум модов на новую версию игры: Fabric успевает за снапшотами и почти не добавляет нагрузки. Оптимизационные моды и шейдеры встают без конфликтов.</p>
+            <div class="loader-panel__rows" aria-hidden="true">
+              <div class="lrow"><span class="lrow__k">loader</span><span class="lrow__v" id="rowLoader">fabric-loader-0.16.5</span></div>
+              <div class="lrow"><span class="lrow__k">minecraft</span><span class="lrow__v" id="rowMc">1.20.1</span></div>
+              <div class="lrow"><span class="lrow__k">java</span><span class="lrow__v" id="rowJava">21</span></div>
+              <div class="lrow"><span class="lrow__k">mods</span><span class="lrow__v" id="rowMods">148</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ PROFILES ══ -->
+  <section class="section" id="profiles">
+    <div class="shell split split--flip">
+      <div class="split__copy reveal">
+        <p class="eyebrow"><span data-i18n="profiles.eyebrow">Сборки</span></p>
+        <h2 class="h2" data-i18n="profiles.title">У каждой сборки своя папка, миры и настройки</h2>
+        <p class="lead" data-i18n="profiles.lead">Моды одной сборки не мешают другой. Профили можно переименовывать, дублировать вместе с мирами и объединять в группы. Иконка берётся из готовых значков и фонов или из твоего PNG, JPEG и WebP до 8 МБ.</p>
+        <ul class="ticks ticks--two">
+          <li><svg class="i" viewBox="0 0 24 24"><use href="#i-check"/></svg><span data-i18n="profiles.t1">Избранное, группы и режим «Выбрать»</span></li>
+          <li><svg class="i" viewBox="0 0 24 24"><use href="#i-check"/></svg><span data-i18n="profiles.t2">Отдельная память и Java для профиля</span></li>
+          <li><svg class="i" viewBox="0 0 24 24"><use href="#i-check"/></svg><span data-i18n="profiles.t3">Статистика запусков и календарь активности</span></li>
+          <li><svg class="i" viewBox="0 0 24 24"><use href="#i-check"/></svg><span data-i18n="profiles.t4">Перетаскивание папки или архива прямо в библиотеку</span></li>
+        </ul>
+      </div>
+
+      <div class="split__stage split__stage--cascade reveal" style="--d:100ms">
+        <article class="pcard pcard--back">
+          <span class="pcard__icon pcard__icon--sky">SF</span>
+          <div class="pcard__body">
+            <strong>SkyForge</strong>
+            <span class="pcard__meta">1.20.1 · Fabric</span>
+          </div>
+          <span class="pcard__time">184 ч</span>
+        </article>
+        <article class="pcard pcard--mid">
+          <span class="pcard__icon pcard__icon--tech">TX</span>
+          <div class="pcard__body">
+            <strong>Techverse</strong>
+            <span class="pcard__meta">1.19.2 · Forge</span>
+          </div>
+          <span class="pcard__time">76 ч</span>
+        </article>
+        <article class="pcard pcard--front">
+          <span class="pcard__icon pcard__icon--vanilla">
+            <svg class="i" viewBox="0 0 24 24"><use href="#i-box"/></svg>
+          </span>
+          <div class="pcard__body">
+            <strong>Ванилла 1.21.4</strong>
+            <span class="pcard__meta" data-i18n="profiles.cardMeta">Чистая версия · без модов</span>
+          </div>
+          <span class="pcard__play"><svg class="i" viewBox="0 0 24 24"><use href="#i-play"/></svg></span>
+        </article>
+        <div class="cascade__note">
+          <svg class="i" viewBox="0 0 24 24"><use href="#i-folder"/></svg>
+          <span data-i18n="profiles.note">.aw/profiles/skyforge → mods, worlds, config, shaderpacks</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ ACCOUNTS ══ -->
+  <section class="section section--tight" id="accounts">
+    <div class="shell">
+      <header class="section__head reveal">
+        <p class="eyebrow"><span data-i18n="accounts.eyebrow">Аккаунты и скин</span></p>
+        <h2 class="h2" data-i18n="accounts.title">Аккаунты Microsoft, офлайн-профили и скины</h2>
+      </header>
+
+      <div class="duo">
+        <article class="card reveal spotlight">
+          <div class="card__head">
+            <span class="card__icon"><svg class="i" viewBox="0 0 24 24"><use href="#i-user"/></svg></span>
+            <h3 data-i18n="acc1.title">Вход через Microsoft</h3>
+          </div>
+          <p data-i18n="acc1.text">Подтверди вход в браузере — пароль вводится только на странице Microsoft. Токены защищены Windows DPAPI, сессия продлевается сама. Офлайн-аккаунты работают на серверах с online-mode=false.</p>
+          <div class="otp" aria-hidden="true">
+            <span class="otp__label" data-i18n="acc1.code">Код для входа</span>
+            <span class="otp__code">K7QP-3M4F</span>
+          </div>
+          <ul class="ticks">
+            <li><svg class="i" viewBox="0 0 24 24"><use href="#i-check"/></svg><span data-i18n="acc1.t1">Токены лежат под защитой Windows DPAPI</span></li>
+            <li><svg class="i" viewBox="0 0 24 24"><use href="#i-check"/></svg><span data-i18n="acc1.t2">Сессия продлевается сама, вход можно отменить в разделе аккаунтов</span></li>
+            <li><svg class="i" viewBox="0 0 24 24"><use href="#i-check"/></svg><span data-i18n="acc1.t3">Пароль не попадает в лаунчер — только на страницу Microsoft</span></li>
+          </ul>
+        </article>
+
+        <article class="card reveal spotlight" style="--d:80ms">
+          <div class="card__head">
+            <span class="card__icon"><svg class="i" viewBox="0 0 24 24"><use href="#i-sparkle"/></svg></span>
+            <h3 data-i18n="acc2.title">Скин с объёмным превью</h3>
+          </div>
+          <p data-i18n="acc2.text">Загрузи PNG 64×64 или 64×32 до 1 МБ, выбери Classic или Slim и посмотри персонажа до отправки. Потяни мышью — модель повернётся.</p>
+          <div class="skinstage" id="skinstage" data-model="classic">
+            <span class="skinstage__glow" aria-hidden="true"></span>
+            <div class="skin-viewer" aria-hidden="true">
+              <div class="vox" id="vox"></div>
+              <span class="skin-viewer__shadow"></span>
+            </div>
+            <p class="skinstage__hint" aria-hidden="true">
+              <svg class="i" viewBox="0 0 24 24"><use href="#i-move"/></svg>
+              <span data-i18n="acc2.drag">Потяни, чтобы повернуть</span>
+            </p>
+            <div class="skinstage__ctl">
+              <div class="seg" role="radiogroup" aria-label="Модель скина">
+                <button class="seg__btn is-active" type="button" role="radio" aria-checked="true" data-model="classic">Classic</button>
+                <button class="seg__btn" type="button" role="radio" aria-checked="false" data-model="slim">Slim</button>
+              </div>
+              <span class="skinstage__meta">64×64 PNG · 1 МБ</span>
+            </div>
+          </div>
+          <p class="card__foot"><svg class="i" viewBox="0 0 24 24"><use href="#i-refresh"/></svg><span data-i18n="acc2.foot">Кнопка «Применить к аккаунту» отправляет скин в Minecraft Services с токеном этого аккаунта. Перед записью лаунчер проверяет UUID профиля.</span></p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ DISCORD ══ -->
+  <section class="section" id="discord">
+    <div class="shell split">
+      <div class="split__copy reveal">
+        <p class="eyebrow"><span data-i18n="discord.eyebrow">Discord Rich Presence</span></p>
+        <h2 class="h2" data-i18n="discord.title">Активность в Discord</h2>
+        <p class="lead" data-i18n="discord.lead">Лаунчер говорит с установленным Discord через локальный Windows IPC. Ни входа, ни бота, ни токенов. Режим определяется по запуску игры и её журналу, без модов.</p>
+        <ul class="ticks">
+          <li><svg class="i" viewBox="0 0 24 24"><use href="#i-check"/></svg><span data-i18n="discord.t1">Адрес сервера скрыт, пока ты его не разрешишь</span></li>
+          <li><svg class="i" viewBox="0 0 24 24"><use href="#i-check"/></svg><span data-i18n="discord.t2">Можно показывать только игру или скрыть название сборки</span></li>
+          <li><svg class="i" viewBox="0 0 24 24"><use href="#i-check"/></svg><span data-i18n="discord.t3">Локальные картинки сборок никуда не отправляются</span></li>
+          <li><svg class="i" viewBox="0 0 24 24"><use href="#i-check"/></svg><span data-i18n="discord.t4">Перезапуск Discord обрабатывается сам</span></li>
+        </ul>
+      </div>
+
+      <div class="split__stage reveal" style="--d:100ms">
+        <div class="bezel">
+          <div class="bezel__core rpc">
+            <div class="rpc__top">
+              <span class="rpc__presence"><i></i><span data-i18n="rpc.playing">В сети</span></span>
+              <span class="rpc__app">Discord</span>
+            </div>
+            <div class="rpc__card">
+              <div class="rpc__art">
+                <img src="assets/img/aw-mark.png" alt="" width="72" height="72">
+              </div>
+              <div class="rpc__info">
+                <span class="rpc__label" data-i18n="rpc.using">Играет в</span>
+                <strong class="rpc__title">Minecraft</strong>
+                <span class="rpc__line">SkyForge · 1.20.1</span>
+                <span class="rpc__line"><span class="rpc__dot"></span><span data-i18n="rpc.mode">Одиночная игра</span></span>
+                <span class="rpc__line rpc__line--time"><svg class="i" viewBox="0 0 24 24"><use href="#i-clock"/></svg><span id="rpcTimer">01:24:07</span> <span data-i18n="rpc.elapsed">в сессии</span></span>
+              </div>
+            </div>
+            <div class="rpc__btns">
+              <span class="rpc__btn" data-i18n="rpc.btnProject">Страница сборки</span>
+              <span class="rpc__btn rpc__btn--ghost" data-i18n="rpc.btnLauncher">Скачать AWLauncher</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ THEMES ══ -->
+  <section class="section" id="themes">
+    <div class="shell">
+      <header class="section__head section__head--center reveal">
+        <p class="eyebrow"><span data-i18n="themes.eyebrow">Оформление</span></p>
+        <h2 class="h2" data-i18n="themes.title">Четыре темы: светлая, тёмная, системная, OLED</h2>
+        <p class="lead" data-i18n="themes.lead">Выбор сохраняется в лаунчере. Ниже можно переключить тему самой страницы и посмотреть, чем они отличаются.</p>
+      </header>
+
+      <div class="theme-picker reveal" id="themePicker" role="radiogroup" aria-label="Тема оформления">
+        <button class="theme-btn" data-theme-value="light" role="radio" aria-checked="false" type="button">
+          <span class="theme-btn__swatch theme-btn__swatch--light" aria-hidden="true"><i></i><i></i></span>
+          <span class="theme-btn__name" data-i18n="themes.light">Светлая</span>
+          <span class="theme-btn__hint" data-i18n="themes.lightHint">мягкий зелёный на белом</span>
+        </button>
+        <button class="theme-btn" data-theme-value="dark" role="radio" aria-checked="true" type="button">
+          <span class="theme-btn__swatch theme-btn__swatch--dark" aria-hidden="true"><i></i><i></i></span>
+          <span class="theme-btn__name" data-i18n="themes.dark">Тёмная</span>
+          <span class="theme-btn__hint" data-i18n="themes.darkHint">графит и изумруд</span>
+        </button>
+        <button class="theme-btn" data-theme-value="system" role="radio" aria-checked="false" type="button">
+          <span class="theme-btn__swatch theme-btn__swatch--system" aria-hidden="true"><i></i><i></i></span>
+          <span class="theme-btn__name" data-i18n="themes.system">Системная</span>
+          <span class="theme-btn__hint" data-i18n="themes.systemHint">как в Windows</span>
+        </button>
+        <button class="theme-btn" data-theme-value="oled" role="radio" aria-checked="false" type="button">
+          <span class="theme-btn__swatch theme-btn__swatch--oled" aria-hidden="true"><i></i><i></i></span>
+          <span class="theme-btn__name" data-i18n="themes.oled">OLED</span>
+          <span class="theme-btn__hint" data-i18n="themes.oledHint">чистый чёрный без свечения</span>
+        </button>
+      </div>
+
+      <div class="locale-band reveal">
+        <div class="locale-band__head">
+          <svg class="i" viewBox="0 0 24 24"><use href="#i-globe"/></svg>
+          <strong data-i18n="locales.title">50 локалей интерфейса</strong>
+          <span data-i18n="locales.text">Русский, английский США и Великобритании, испанский Испании и Латинской Америки, португальский Бразилии и Португалии, два варианта китайского, арабский и иврит с направлением справа налево. Шрифты и переводы встроены — сеть не нужна.</span>
+        </div>
+        <div class="locale-band__scroll" aria-hidden="true">
+          <div class="locale-band__track">
+            <span>Русский</span><span>English (US)</span><span>English (UK)</span><span>Español</span><span>Español (LatAm)</span><span>Português (BR)</span><span>Português (PT)</span><span>Deutsch</span><span>Français</span><span>Italiano</span><span>Polski</span><span>Українська</span><span>Türkçe</span><span>Nederlands</span><span>Svenska</span><span>Norsk</span><span>Suomi</span><span>Dansk</span><span>Čeština</span><span>Slovenčina</span><span>Magyar</span><span>Română</span><span>Български</span><span>Ελληνικά</span><span>中文 (简体)</span><span>中文 (繁體)</span><span>日本語</span><span>한국어</span><span>ไทย</span><span>Tiếng Việt</span><span>Indonesia</span><span>Bahasa Melayu</span><span>हिन्दी</span><span>বাংলা</span><span>فارسی</span><span>العربية</span><span>עברית</span><span>ქართული</span><span>Հայերեն</span><span>Íslenska</span><span>Bosanski</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ FAQ ══ -->
+  <section class="section" id="faq">
+    <div class="shell shell--narrow">
+      <header class="section__head reveal">
+        <p class="eyebrow"><span data-i18n="faq.eyebrow">Вопросы</span></p>
+        <h2 class="h2" data-i18n="faq.title">Частые вопросы</h2>
+      </header>
+
+      <div class="faq" id="faq">
+        <div class="faq__item reveal">
+          <button class="faq__q" type="button" aria-expanded="false">
+            <span data-i18n="faq.q1">Нужна ли лицензия Minecraft?</span>
+            <span class="faq__mark" aria-hidden="true"><i></i><i></i></span>
+          </button>
+          <div class="faq__a"><div><p data-i18n="faq.a1">Для официальных серверов — да, вход через Microsoft. Офлайн-аккаунт подойдёт для серверов с online-mode=false и одиночной игры.</p></div></div>
+        </div>
+        <div class="faq__item reveal">
+          <button class="faq__q" type="button" aria-expanded="false">
+            <span data-i18n="faq.q2">Куда лаунчер пишет файлы?</span>
+            <span class="faq__mark" aria-hidden="true"><i></i><i></i></span>
+          </button>
+          <div class="faq__a"><div><p data-i18n="faq.a2">В папку .aw: аккаунты, настройки, игровые папки и сборки. Каждый профиль хранит внутри свои моды, миры, ресурспаки, шейдеры и конфиги, поэтому сборки не пересекаются.</p></div></div>
+        </div>
+        <div class="faq__item reveal">
+          <button class="faq__q" type="button" aria-expanded="false">
+            <span data-i18n="faq.q3">Как перенести сборки из другого лаунчера?</span>
+            <span class="faq__mark" aria-hidden="true"><i></i><i></i></span>
+          </button>
+          <div class="faq__a"><div><p data-i18n="faq.a3">«Новая сборка» → импорт из папки. Укажи профиль, .minecraft или общий каталог instances — AWLauncher определит Prism, MultiMC, Modrinth, CurseForge или ATLauncher и скопирует содержимое. Статистика времени и логи подхватятся, часы не удвоятся.</p></div></div>
+        </div>
+        <div class="faq__item reveal">
+          <button class="faq__q" type="button" aria-expanded="false">
+            <span data-i18n="faq.q4">Что с каталогом CurseForge?</span>
+            <span class="faq__mark" aria-hidden="true"><i></i><i></i></span>
+          </button>
+          <div class="faq__a"><div><p data-i18n="faq.a4">Нужен официальный API-ключ AlpheusWorld: он задаётся в окружении AW_CURSEFORGE_API_KEY или файлом в профиле пользователя и уходит в API заголовком, а не в ссылке. Без ключа CurseForge-каталог молчит, Modrinth работает как обычно.</p></div></div>
+        </div>
+        <div class="faq__item reveal">
+          <button class="faq__q" type="button" aria-expanded="false">
+            <span data-i18n="faq.q5">Игра вылетает — куда смотреть?</span>
+            <span class="faq__mark" aria-hidden="true"><i></i><i></i></span>
+          </button>
+          <div class="faq__a"><div><p data-i18n="faq.a5">В журнал сборки: лаунчер разбирает вывод игры и подсказывает причину. Сначала проверь файлы профиля и объём памяти — это две самые частые причины.</p></div></div>
+        </div>
+        <div class="faq__item reveal">
+          <button class="faq__q" type="button" aria-expanded="false">
+            <span data-i18n="faq.q6">Сколько памяти выделять?</span>
+            <span class="faq__mark" aria-hidden="true"><i></i><i></i></span>
+          </button>
+          <div class="faq__a"><div><p data-i18n="faq.a6">Лаунчер предложит значение под твою машину. Для крупных сборочных профилей с сотней модов обычно хватает 4–8 ГБ; выставлять всю память компьютера не стоит.</p></div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ INSTALL ══ -->
+  <section class="section" id="install">
+    <div class="shell">
+      <header class="section__head reveal">
+        <p class="eyebrow"><span data-i18n="install.eyebrow">Установка</span></p>
+        <h2 class="h2" data-i18n="install.title">Выбери свою систему</h2>
+        <p class="lead lead--wide" data-i18n="install.lead">Подписанный установщик выходит для Windows. На Linux и macOS лаунчер собирается из исходников командой Gradle — готовых пакетов пока нет.</p>
+      </header>
+
+      <div class="os-tabs reveal" id="osTabs" role="tablist" aria-label="Операционная система">
+        <button class="os-tab is-active" type="button" role="tab" aria-selected="true" data-os="windows">
+          <svg class="i" viewBox="0 0 24 24"><use href="#i-windows"/></svg>
+          <span>Windows</span>
+          <em data-i18n="os.win.tag">установщик</em>
+        </button>
+        <button class="os-tab" type="button" role="tab" aria-selected="false" data-os="linux">
+          <svg class="i" viewBox="0 0 24 24"><use href="#i-terminal"/></svg>
+          <span>Linux</span>
+          <em data-i18n="os.src.tag">из исходников</em>
+        </button>
+        <button class="os-tab" type="button" role="tab" aria-selected="false" data-os="macos">
+          <svg class="i" viewBox="0 0 24 24"><use href="#i-apple"/></svg>
+          <span>macOS</span>
+          <em data-i18n="os.src.tag">из исходников</em>
+        </button>
+      </div>
+
+      <div class="os-grid">
+        <ol class="os-steps" id="osSteps">
+          <li class="os-step">
+            <span class="os-step__num">01</span>
+            <h3 id="osStep1T">Скачай установщик и запусти</h3>
+            <p id="osStep1P">Компактное тёмное окно спросит папку и ярлык. Установку ведёт Windows Installer: прогресс, отмена и откат работают штатно, докачивать ничего не нужно.</p>
+          </li>
+          <li class="os-step">
+            <span class="os-step__num">02</span>
+            <h3 id="osStep2T">Войди в аккаунт</h3>
+            <p id="osStep2P">«Аккаунты» → «Войти через Microsoft» и подтверждение в браузере. Для серверов с online-mode=false хватит офлайн-профиля.</p>
+          </li>
+          <li class="os-step">
+            <span class="os-step__num">03</span>
+            <h3 id="osStep3T">Создай сборку</h3>
+            <p id="osStep3P">Выбери версию и загрузчик, поставь моды из каталога — и жми «Играть». Данные лаунчера живут в папке .aw.</p>
+          </li>
+        </ol>
+
+        <aside class="bezel os-card reveal" style="--d:80ms">
+          <div class="bezel__core os-card__core">
+            <div class="os-card__top">
+              <span class="tag tag--soft" id="osBadge">Windows 10 и 11 · 64-бит</span>
+              <span class="os-card__icon"><svg class="i" viewBox="0 0 24 24"><use href="#i-windows" id="osIconUse"/></svg></span>
+            </div>
+            <h3 class="os-card__file" id="osFile">AWLauncher-x.x.x.msi</h3>
+            <div class="os-card__rows" id="osRows">
+              <div class="lrow"><span class="lrow__k">формат</span><span class="lrow__v">MSI (Windows Installer)</span></div>
+              <div class="lrow"><span class="lrow__k">размер</span><span class="lrow__v">~45 МБ</span></div>
+              <div class="lrow"><span class="lrow__k">подпись</span><span class="lrow__v">Authenticode + SHA-256</span></div>
+              <div class="lrow"><span class="lrow__k">Java</span><span class="lrow__v">ставится лаунчером</span></div>
+            </div>
+            <div class="os-card__cmd" id="osCmd" hidden>
+              <pre><code id="osCmdText"></code></pre>
+              <button class="code-copy" id="osCmdCopy" type="button">
+                <svg class="i" viewBox="0 0 24 24"><use href="#i-copy"/></svg>
+                <span id="osCmdCopyLabel" data-i18n="os.copy">Копировать</span>
+              </button>
+            </div>
+            <a class="btn btn--solid os-card__btn" id="osBtn" href="https://github.com/AlpheusWorld/AWLauncher/releases/latest" rel="noopener">
+              <span id="osBtnLabel">Скачать .msi</span>
+              <span class="btn__orb"><svg class="i" viewBox="0 0 24 24"><use href="#i-download" id="osBtnIcon"/></svg></span>
+            </a>
+            <p class="os-card__note" id="osNote">Обновление приходит из лаунчера: update.json содержит SHA-256 сборки. Релизы приватного репозитория доступны участникам организации AlpheusWorld.</p>
+          </div>
+        </aside>
+      </div>
+
+      <div class="reqs reveal">
+        <div class="reqs__col">
+          <h4><svg class="i" viewBox="0 0 24 24"><use href="#i-cpu"/></svg><span data-i18n="reqs.title">Что понадобится</span></h4>
+          <ul>
+            <li data-i18n="reqs.r1">Windows 10 или 11, 64-бит — для готового установщика</li>
+            <li data-i18n="reqs.r2">JDK 21 — чтобы собрать лаунчер из исходников на Linux и macOS</li>
+            <li data-i18n="reqs.r3">Java для игры лаунчер ставит сам, искать вручную не нужно</li>
+            <li data-i18n="reqs.r4">Доступ к организации AlpheusWorld: репозиторий приватный</li>
+          </ul>
+        </div>
+        <div class="reqs__col">
+          <h4><svg class="i" viewBox="0 0 24 24"><use href="#i-shield"/></svg><span data-i18n="reqs.title2">Как проверяется релиз</span></h4>
+          <ul>
+            <li data-i18n="reqs.v1">MSI и EXE подписываются Authenticode, подпись проверяется до публикации</li>
+            <li data-i18n="reqs.v2">update.json содержит SHA-256 дистрибутива</li>
+            <li data-i18n="reqs.v3">Обновление приходит с HTTPS-фида, релизы приватного репозитория — участникам организации AlpheusWorld</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ DOWNLOAD ══ -->
+  <section class="section" id="download">
+    <div class="shell">
+      <div class="dl reveal">
+        <div class="dl__glow" aria-hidden="true"></div>
+        <div class="dl__inner">
+          <p class="eyebrow eyebrow--onDark"><span data-i18n="dl.eyebrow">Релиз для Windows</span></p>
+          <h2 class="h2 h2--dark" data-i18n="dl.title">Скачать AWLauncher</h2>
+          <p class="lead lead--dark" data-i18n="dl.lead">Установщик .msi для Windows 10 и 11 (64-бит) с подписью Authenticode. Для Linux и macOS лаунчер собирается из исходников — команды в разделе «Установка».</p>
+          <div class="dl__row">
+            <a class="btn btn--accent btn--lg magnetic" href="https://github.com/AlpheusWorld/AWLauncher/releases/latest" rel="noopener">
+              <span data-i18n="dl.btn">Скачать .msi</span>
+              <span class="btn__orb"><svg class="i" viewBox="0 0 24 24"><use href="#i-download"/></svg></span>
+            </a>
+            <a class="btn btn--outline btn--lg" href="https://github.com/AlpheusWorld/AWLauncher" rel="noopener">
+              <span data-i18n="dl.repo">Репозиторий на GitHub</span>
+              <span class="btn__orb"><svg class="i" viewBox="0 0 24 24"><use href="#i-external"/></svg></span>
+            </a>
+          </div>
+          <ul class="dl__facts">
+            <li><b>Windows 10/11</b> · x64</li>
+            <li><b data-i18n="dl.fact1b">~45 МБ</b> · <span data-i18n="dl.fact2">установщик без докачек</span></li>
+            <li data-i18n="dl.fact3">Данные в папке .aw</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <div class="shell foot__grid">
+    <div class="foot__brand">
+      <img class="wm wm--onDark" src="assets/img/wordmark.png" alt="AWLauncher" width="624" height="104">
+      <img class="wm wm--onLight" src="assets/img/wordmark-light.png" alt="" aria-hidden="true" width="624" height="104">
+      <p data-i18n="foot.tagline">Лаунчер Minecraft Java Edition для Windows: версии, загрузчики, каталоги модов и отдельная папка для каждой сборки.</p>
+      <p class="foot__note" data-i18n="foot.note">Проект не связан с Mojang Studios и Microsoft. Minecraft — торговая марка Mojang Studios.</p>
+    </div>
+    <nav class="foot__col" aria-label="Возможности">
+      <h4 data-i18n="foot.colProduct">Продукт</h4>
+      <ul>
+        <li><a href="#features" data-i18n="nav.features">Возможности</a></li>
+        <li><a href="#loaders" data-i18n="nav.loaders">Загрузчики</a></li>
+        <li><a href="#profiles" data-i18n="nav.profiles">Сборки</a></li>
+        <li><a href="#accounts" data-i18n="nav.accounts">Аккаунты</a></li>
+      </ul>
+    </nav>
+    <nav class="foot__col" aria-label="Подробности">
+      <h4 data-i18n="foot.colMore">Подробности</h4>
+      <ul>
+        <li><a href="#discord" data-i18n="nav.discord">Discord</a></li>
+        <li><a href="#themes" data-i18n="nav.themes">Темы</a></li>
+        <li><a href="#faq" data-i18n="nav.faq">Вопросы</a></li>
+        <li><a href="#install" data-i18n="nav.install">Установка</a></li>
+      </ul>
+    </nav>
+    <nav class="foot__col" aria-label="Ссылки">
+      <h4 data-i18n="foot.colLinks">Ссылки</h4>
+      <ul>
+        <li><a href="https://github.com/AlpheusWorld/AWLauncher/releases/latest" rel="noopener" data-i18n="foot.releases">Релизы</a></li>
+        <li><a href="https://github.com/AlpheusWorld/AWLauncher" rel="noopener" data-i18n="foot.repo">Репозиторий</a></li>
+        <li><a href="https://github.com/AlpheusWorld/AWLauncher/blob/main/README.md" rel="noopener" data-i18n="foot.readme">Документация</a></li>
+        <li><a href="https://github.com/RaphiMC/MinecraftAuth" rel="noopener" data-i18n="foot.auth">MinecraftAuth</a></li>
+      </ul>
+    </nav>
+  </div>
+  <div class="shell foot__bottom">
+    <span data-i18n="foot.rights">© 2026 AlpheusWorld. Шрифты Onest и Noto — SIL OFL, лицензии внутри сборки.</span>
+    <a class="foot__up" href="#top">
+      <span data-i18n="foot.up">Наверх</span>
+      <svg class="i" viewBox="0 0 24 24"><use href="#i-arrow-ur"/></svg>
+    </a>
+  </div>
+</footer>
+
+<script src="script.js"></script>
+</body>
+</html>

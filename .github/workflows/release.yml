@@ -1,0 +1,122 @@
+name: Verified Windows release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    env:
+      AW_MS_CLIENT_ID: ${{ vars.AW_MS_CLIENT_ID }}
+      AW_SIGNER_THUMBPRINT: ${{ vars.AW_SIGNER_THUMBPRINT }}
+      AW_UPDATE_URL: ${{ vars.AW_UPDATE_URL }}
+      AW_DISCORD_APP_ID: ${{ vars.AW_DISCORD_APP_ID }}
+      AW_CURSEFORGE_API_KEY: ${{ secrets.AW_CURSEFORGE_API_KEY }}
+      WINDOWS_SIGNING_CERTIFICATE_BASE64: ${{ secrets.WINDOWS_SIGNING_CERTIFICATE_BASE64 }}
+      WINDOWS_SIGNING_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_SIGNING_CERTIFICATE_PASSWORD }}
+      AW_UPDATE_SIGNING_PRIVATE_KEY: ${{ secrets.AW_UPDATE_SIGNING_PRIVATE_KEY }}
+      AW_PUBLIC_RELEASE_TOKEN: ${{ secrets.AW_PUBLIC_RELEASE_TOKEN }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up release uploader
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+
+      - name: Validate release credentials and version
+        shell: pwsh
+        run: |
+          foreach ($name in @('AW_UPDATE_SIGNING_PRIVATE_KEY')) {
+            if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($name))) {
+              throw "Missing GitHub Actions variable or secret: $name"
+            }
+          }
+          $projectVersion = [regex]::Match((Get-Content 'build.gradle.kts' -Raw), '(?m)^version = "([^"]+)"').Groups[1].Value
+          $tagVersion = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME -replace '^v', '' } else { $projectVersion }
+          if ($tagVersion -ne $projectVersion) {
+            throw "Release tag $tagVersion must match build.gradle.kts version $projectVersion"
+          }
+
+      - name: Verify launcher and update integrity
+        run: .\gradlew.bat test -PnoDeploy --no-daemon
+
+      - name: Build Windows installers
+        run: .\gradlew.bat validateReleaseConfiguration packageDistributionForCurrentOS -PnoDeploy --no-daemon
+
+      - name: Sign and verify MSI and EXE
+        if: env.WINDOWS_SIGNING_CERTIFICATE_BASE64 != ''
+        shell: pwsh
+        run: |
+          $certPath = Join-Path $env:RUNNER_TEMP 'awlauncher-signing.pfx'
+          [IO.File]::WriteAllBytes($certPath, [Convert]::FromBase64String($env:WINDOWS_SIGNING_CERTIFICATE_BASE64))
+          $sdkRoot = Join-Path ([Environment]::GetFolderPath('ProgramFilesX86')) 'Windows Kits\10\bin'
+          $signTool = Get-ChildItem $sdkRoot -Filter signtool.exe -Recurse -ErrorAction Stop |
+            Where-Object { $_.FullName -match '\\x64\\signtool\.exe$' } |
+            Sort-Object FullName -Descending |
+            Select-Object -First 1
+          if (-not $signTool) { throw 'Windows SDK signtool.exe was not found' }
+
+          $packages = Get-ChildItem 'build/compose/binaries' -Recurse -File |
+            Where-Object { $_.Name -like 'AWLauncher-*' -and $_.Extension -in @('.msi', '.exe') }
+          if (-not $packages) { throw 'No AWLauncher MSI or EXE packages were produced' }
+          $expectedThumbprint = $env:AW_SIGNER_THUMBPRINT.Replace(' ', '').ToUpperInvariant()
+
+          foreach ($package in $packages) {
+            & $signTool.FullName sign /f $certPath /p $env:WINDOWS_SIGNING_CERTIFICATE_PASSWORD /fd SHA256 /tr 'http://timestamp.digicert.com' /td SHA256 $package.FullName
+            if ($LASTEXITCODE -ne 0) { throw "Authenticode signing failed for $($package.Name)" }
+            & $signTool.FullName verify /pa /all /v $package.FullName
+            if ($LASTEXITCODE -ne 0) { throw "Authenticode verification failed for $($package.Name)" }
+
+            $signature = Get-AuthenticodeSignature -LiteralPath $package.FullName
+            if ($signature.Status.ToString() -ne 'Valid' -or $signature.SignerCertificate.Thumbprint.Replace(' ', '').ToUpperInvariant() -ne $expectedThumbprint) {
+              throw "Unexpected signing certificate on $($package.Name)"
+            }
+          }
+
+      - name: Prepare signed public release bundle
+        shell: pwsh
+        run: |
+          $version = [regex]::Match((Get-Content 'build.gradle.kts' -Raw), '(?m)^version = "([^"]+)"').Groups[1].Value
+          $notes = Join-Path $PWD "releases/$version.md"
+          .\tools\prepare_release_sources.ps1 -Version $version
+          .\tools\publish_release.ps1 -Version $version -Artifacts 'build/compose/binaries/main' -Notes $notes -PrepareOnly
+
+      - name: Retain verified release assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: public-release
+          path: |
+            build/publication/v*/*.exe
+            build/publication/v*/*.msi
+            build/publication/v*/*.json
+            build/publication/v*/*.sig
+            build/publication/v*/*.txt
+            build/publication/v*/*.zip
+            build/publication/v*/*.tar.gz
+            build/publication/v*/*.part??
+            build/publication/v*/*.md
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish public release with repository-scoped credentials
+        if: env.AW_PUBLIC_RELEASE_TOKEN != '' || github.repository == 'AlpheusWorld/AWLauncher-releases'
+        shell: pwsh
+        run: |
+          $version = [regex]::Match((Get-Content 'build.gradle.kts' -Raw), '(?m)^version = "([^"]+)"').Groups[1].Value
+          .\tools\publish_release.ps1 -Version $version -Artifacts 'build/compose/binaries/main' -Notes "releases/$version.md"

@@ -4,7 +4,7 @@
 <p align="center">
   <a href="https://github.com/AlpheusWorld/AWLauncher-releases/releases/latest"><img alt="Последний релиз" src="https://img.shields.io/github/v/release/AlpheusWorld/AWLauncher-releases?color=2bc67c&label=версия"></a>
   <img alt="Windows 10 и 11" src="https://img.shields.io/badge/Windows-10%20%2F%2011%20%C2%B7%20x64-16191d">
-  <a href="APPLICATION_LICENSE.md"><img alt="Бесплатный лаунчер" src="https://img.shields.io/badge/использование-бесплатно-2bc67c"></a>
+  <a href="LICENSE"><img alt="Лицензия MIT" src="https://img.shields.io/badge/лицензия-MIT-2bc67c"></a>
 </p>
 <p align="center">
   <a href="https://github.com/AlpheusWorld/AWLauncher-releases/releases/latest/download/AWLauncher-Setup.exe"><strong>Скачать для Windows</strong></a>
@@ -14,7 +14,7 @@
 
 ## Minecraft под тебя
 
-AWLauncher помогает создавать и переносить сборки, управлять модами и запускать Minecraft Java. Этот репозиторий содержит официальные дистрибутивы, описания обновлений и материалы поддержки.
+AWLauncher — лаунчер Minecraft Java с открытым исходным кодом под MIT. Здесь находятся код приложения, тесты, файлы сборки, официальные релизы и материалы поддержки.
 
 | Возможность | Что можно делать |
 | --- | --- |
@@ -49,6 +49,24 @@ AWLauncher помогает создавать и переносить сбор�
 
 ## Лицензии и независимость
 
-Условия использования приложения: [APPLICATION_LICENSE.md](APPLICATION_LICENSE.md). Документация этого репозитория распространяется по [MIT](LICENSE). Сторонние библиотеки и Java сохраняют собственные лицензии; их уведомления и необходимые исходники сопровождают дистрибутивы.
+Исходный код и дистрибутивы AWLauncher распространяются по [MIT](LICENSE): можно использовать, изменять и распространять код, включая коммерческое использование, сохраняя лицензию и уведомление об авторстве. Подробнее о сторонних компонентах — в [APPLICATION_LICENSE.md](APPLICATION_LICENSE.md). Библиотеки, шрифты и Java сохраняют собственные лицензии; их уведомления и необходимые исходники сопровождают дистрибутивы.
 
 AWLauncher — независимый проект AlpheusWorld. Он не является официальным продуктом Mojang или Microsoft и не связан с ними. Minecraft и связанные товарные знаки принадлежат их правообладателям. Для лицензионного входа требуется собственный аккаунт с Minecraft Java.
+
+## Сборка из исходников
+
+Нужны Windows x64, Git и JDK 21. Gradle включён в проект.
+
+```powershell
+git clone https://github.com/AlpheusWorld/AWLauncher-releases.git
+cd AWLauncher-releases
+$env:JAVA_HOME = 'C:/Program Files/Java/jdk-21'
+.\gradlew.bat test -PnoDeploy
+.\gradlew.bat run -PnoDeploy
+```
+
+Для установщиков выполни `.\gradlew.bat packageDistributionForCurrentOS -PnoDeploy`. Укажи свой путь к JDK в `JAVA_HOME`. Параметр `-PnoDeploy` сохраняет установленную копию лаунчера.
+
+Код приложения находится в `src/main`, тесты — в `src/test`, ресурсы установщика — в `branding/installer`. Изменения можно предложить через pull request; GitHub Actions проверяет тесты и сборку.
+
+`.gitignore` содержит общие правила для участников проекта: исключает сборки, кэши, данные IDE и локальные секреты. Сам файл хранится в Git, чтобы эти правила действовали у всех.

@@ -1,0 +1,354 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi"
+     xmlns:util="http://schemas.microsoft.com/wix/UtilExtension">
+
+  <?ifdef JpIsSystemWide ?>
+    <?define JpInstallScope="perMachine"?>
+  <?else?>
+    <?define JpInstallScope="perUser"?>
+  <?endif?>
+
+  <?define JpProductLanguage=1033 ?>
+  <?define JpInstallerVersion=200 ?>
+  <?define JpCompressedMsi=yes ?>
+
+  <?include $(var.JpConfigDir)/overrides.wxi ?>
+
+  <!-- A downloaded older installer must never replace a newer launcher. -->
+  <?ifdef JpAllowDowngrades ?>
+    <?undef JpAllowDowngrades ?>
+  <?endif?>
+
+  <?ifdef JpAllowUpgrades ?>
+    <?define JpUpgradeVersionOnlyDetectUpgrade="no"?>
+  <?else?>
+    <?define JpUpgradeVersionOnlyDetectUpgrade="yes"?>
+  <?endif?>
+  <?ifdef JpAllowDowngrades ?>
+    <?define JpUpgradeVersionOnlyDetectDowngrade="no"?>
+  <?else?>
+    <?define JpUpgradeVersionOnlyDetectDowngrade="yes"?>
+  <?endif?>
+
+  <Product
+    Id="$(var.JpProductCode)"
+    Name="$(var.JpAppName)"
+    Language="$(var.JpProductLanguage)"
+    Version="$(var.JpAppVersion)"
+    Manufacturer="$(var.JpAppVendor)"
+    UpgradeCode="$(var.JpProductUpgradeCode)">
+
+    <Package
+      Description="$(var.JpAppDescription)"
+      Manufacturer="$(var.JpAppVendor)"
+      InstallerVersion="$(var.JpInstallerVersion)"
+      Compressed="$(var.JpCompressedMsi)"
+      InstallScope="$(var.JpInstallScope)" Platform="x64"
+    />
+
+    <Media Id="1" Cabinet="Data.cab" EmbedCab="yes" />
+
+    <Upgrade Id="$(var.JpProductUpgradeCode)">
+      <UpgradeVersion
+        OnlyDetect="$(var.JpUpgradeVersionOnlyDetectUpgrade)"
+        Property="JP_UPGRADABLE_FOUND"
+        Maximum="$(var.JpAppVersion)"
+        MigrateFeatures="yes"
+        IncludeMaximum="$(var.JpUpgradeVersionOnlyDetectUpgrade)" />
+      <?if $(var.JpAppVersion) = "1.0.1" OR $(var.JpAppVersion) = "1.0.2" OR $(var.JpAppVersion) = "1.0.3" ?>
+      <!-- One-time version reset: only the previous 1.6.7 package may migrate down. -->
+      <UpgradeVersion
+        OnlyDetect="yes"
+        Property="JP_DOWNGRADABLE_FOUND"
+        Minimum="$(var.JpAppVersion)"
+        Maximum="1.6.7"
+        IncludeMinimum="yes"
+        IncludeMaximum="no" />
+      <UpgradeVersion
+        OnlyDetect="no"
+        Property="AW_LEGACY_VERSION_FOUND"
+        Minimum="1.6.7"
+        Maximum="1.6.7"
+        IncludeMinimum="yes"
+        IncludeMaximum="yes"
+        MigrateFeatures="yes" />
+      <UpgradeVersion
+        OnlyDetect="yes"
+        Property="AW_NEWER_VERSION_FOUND"
+        Minimum="1.6.7"
+        IncludeMinimum="no" />
+      <?else?>
+      <UpgradeVersion
+        OnlyDetect="$(var.JpUpgradeVersionOnlyDetectDowngrade)"
+        Property="JP_DOWNGRADABLE_FOUND"
+        Minimum="$(var.JpAppVersion)"
+        MigrateFeatures="yes"
+        IncludeMinimum="$(var.JpUpgradeVersionOnlyDetectDowngrade)" />
+      <?endif?>
+    </Upgrade>
+
+    <?ifndef JpAllowUpgrades ?>
+    <CustomAction Id="JpDisallowUpgrade" Error="!(loc.AWDisallowUpgradeError)" />
+    <?endif?>
+    <?ifndef JpAllowDowngrades ?>
+    <CustomAction Id="JpDisallowDowngrade" Error="!(loc.AWDowngradeError)" />
+    <?endif?>
+
+    <Binary Id="JpCaDll" SourceFile="wixhelper.dll"/>
+
+    <CustomAction Id="JpFindRelatedProducts" BinaryKey="JpCaDll" DllEntry="FindRelatedProductsEx" />
+
+    <!-- Standard required root -->
+    <Directory Id="TARGETDIR" Name="SourceDir"/>
+
+    <Feature Id="DefaultFeature" Title="!(loc.AWMainFeatureTitle)" Level="1">
+      <ComponentGroupRef Id="Shortcuts"/>
+      <ComponentGroupRef Id="Files"/>
+      <ComponentGroupRef Id="FileAssociations"/>
+    </Feature>
+
+    <CustomAction Id="JpSetARPINSTALLLOCATION" Property="ARPINSTALLLOCATION" Value="[INSTALLDIR]" />
+    <CustomAction Id="JpSetARPCOMMENTS" Property="ARPCOMMENTS" Value="$(var.JpAppDescription)" />
+    <CustomAction Id="JpSetARPCONTACT" Property="ARPCONTACT" Value="$(var.JpAppVendor)" />
+    <CustomAction Id="JpSetARPSIZE" Property="ARPSIZE" Value="$(var.JpAppSizeKb)" />
+
+    <?ifdef JpHelpURL ?>
+      <CustomAction Id="JpSetARPHELPLINK" Property="ARPHELPLINK" Value="$(var.JpHelpURL)" />
+    <?endif?>
+
+    <?ifdef JpAboutURL ?>
+      <CustomAction Id="JpSetARPURLINFOABOUT" Property="ARPURLINFOABOUT" Value="$(var.JpAboutURL)" />
+    <?endif?>
+
+    <?ifdef JpUpdateURL ?>
+      <CustomAction Id="JpSetARPURLUPDATEINFO" Property="ARPURLUPDATEINFO" Value="$(var.JpUpdateURL)" />
+    <?endif?>
+
+    <?ifdef JpIcon ?>
+    <Property Id="ARPPRODUCTICON" Value="JpARPPRODUCTICON"/>
+    <Icon Id="JpARPPRODUCTICON" SourceFile="$(var.JpIcon)"/>
+    <?endif?>
+
+    <UIRef Id="AWInstallerUI"/>
+
+    <InstallExecuteSequence>
+      <Custom Action="JpSetARPINSTALLLOCATION" After="CostFinalize">Not Installed</Custom>
+      <Custom Action="JpSetARPCOMMENTS" After="CostFinalize">Not Installed</Custom>
+      <Custom Action="JpSetARPCONTACT" After="CostFinalize">Not Installed</Custom>
+      <Custom Action="JpSetARPSIZE" After="CostFinalize">Not Installed</Custom>
+      <?ifdef JpHelpURL ?>
+        <Custom Action="JpSetARPHELPLINK" After="CostFinalize">Not Installed</Custom>
+      <?endif?>
+      <?ifdef JpAboutURL ?>
+        <Custom Action="JpSetARPURLINFOABOUT" After="CostFinalize">Not Installed</Custom>
+      <?endif?>
+      <?ifdef JpUpdateURL ?>
+        <Custom Action="JpSetARPURLUPDATEINFO" After="CostFinalize">Not Installed</Custom>
+      <?endif?>
+
+      <?ifndef JpAllowUpgrades ?>
+      <Custom Action="JpDisallowUpgrade" After="JpFindRelatedProducts">JP_UPGRADABLE_FOUND</Custom>
+      <?endif?>
+      <?ifndef JpAllowDowngrades ?>
+      <Custom Action="JpDisallowDowngrade" After="JpFindRelatedProducts">JP_DOWNGRADABLE_FOUND OR AW_NEWER_VERSION_FOUND</Custom>
+      <?endif?>
+      <RemoveExistingProducts Before="CostInitialize"/>
+      <Custom Action="JpFindRelatedProducts" After="FindRelatedProducts"/>
+    </InstallExecuteSequence>
+
+    <InstallUISequence>
+      <Custom Action="JpFindRelatedProducts" After="FindRelatedProducts"/>
+    </InstallUISequence>
+
+  </Product>
+  <Fragment>
+    <Binary Id="AWBackground" SourceFile="$(var.AWInstallerAssets)/background.bmp" />
+    <WixVariable Id="WixUIDialogBmp" Value="$(var.AWInstallerAssets)/dialog.bmp" />
+    <WixVariable Id="WixUIBannerBmp" Value="$(var.AWInstallerAssets)/banner.bmp" />
+    <Property Id="AW_ACTION_LABEL" Value="Установить" />
+    <Property Id="AW_ACTION_TITLE" Value="Всё готово к установке" />
+    <Property Id="AW_LAUNCH" Value="1" />
+    <CustomAction Id="AWLaunch" Directory="INSTALLDIR" ExeCommand="&quot;[INSTALLDIR]AWLauncher.exe&quot;" Return="asyncNoWait" Impersonate="yes" />
+
+    <!-- Native directory checks and MSI transactions preserve installation safety. -->
+    <UI Id="AWInstallerUI">
+      <TextStyle Id="WixUI_Font_Normal" FaceName="Segoe UI" Size="9" Red="26" Green="43" Blue="34" />
+      <TextStyle Id="WixUI_Font_Bigger" FaceName="Segoe UI" Size="18" Bold="yes" />
+      <TextStyle Id="WixUI_Font_Title" FaceName="Segoe UI" Size="12" Bold="yes" />
+      <TextStyle Id="AWHeader" FaceName="Segoe UI" Size="24" Bold="yes" Red="23" Green="37" Blue="29" />
+      <TextStyle Id="AWTitle" FaceName="Segoe UI" Size="12" Bold="yes" Red="23" Green="37" Blue="29" />
+      <TextStyle Id="AWBody" FaceName="Segoe UI" Size="10" Red="83" Green="100" Blue="91" />
+      <TextStyle Id="AWKicker" FaceName="Segoe UI" Size="9" Bold="yes" Red="21" Green="154" Blue="91" />
+      <Property Id="DefaultUIFont" Value="WixUI_Font_Normal" />
+      <Property Id="WixUI_Mode" Value="InstallDir" />
+      <Property Id="AW_INSTALLDIR" Value="INSTALLDIR" />
+      <Property Id="ARPNOMODIFY" Value="1" />
+      <DialogRef Id="BrowseDlg" />
+      <DialogRef Id="DiskCostDlg" />
+      <DialogRef Id="ErrorDlg" />
+      <DialogRef Id="FilesInUse" />
+      <DialogRef Id="MsiRMFilesInUse" />
+      <DialogRef Id="PrepareDlg" />
+      <DialogRef Id="InstallDirNotEmptyDlg" />
+
+      <Publish Dialog="AWWelcomeDlg" Control="Next" Event="NewDialog" Value="AWInstallDirDlg">NOT Installed</Publish>
+      <Publish Dialog="AWWelcomeDlg" Control="Next" Event="NewDialog" Value="AWVerifyReadyDlg" Order="10">Installed AND PATCH</Publish>
+      <Publish Dialog="AWInstallDirDlg" Control="Back" Event="NewDialog" Value="AWWelcomeDlg">1</Publish>
+      <Publish Dialog="AWInstallDirDlg" Control="Next" Event="SetTargetPath" Value="[AW_INSTALLDIR]" Order="1">1</Publish>
+      <Publish Dialog="AWInstallDirDlg" Control="Next" Event="NewDialog" Value="AWVerifyReadyDlg" Order="4">1</Publish>
+      <Publish Dialog="AWInstallDirDlg" Control="ChangeFolder" Property="_BrowseProperty" Value="[AW_INSTALLDIR]" Order="1">1</Publish>
+      <Publish Dialog="AWInstallDirDlg" Control="ChangeFolder" Event="SpawnDialog" Value="BrowseDlg" Order="2">1</Publish>
+      <Publish Dialog="AWVerifyReadyDlg" Control="Back" Event="NewDialog" Value="AWInstallDirDlg" Order="1">NOT Installed</Publish>
+      <Publish Dialog="AWVerifyReadyDlg" Control="Back" Event="NewDialog" Value="AWMaintenanceTypeDlg" Order="2">Installed AND NOT PATCH</Publish>
+      <Publish Dialog="AWVerifyReadyDlg" Control="Back" Event="NewDialog" Value="AWWelcomeDlg" Order="2">Installed AND PATCH</Publish>
+      <Publish Dialog="AWMaintenanceWelcomeDlg" Control="Next" Event="NewDialog" Value="AWMaintenanceTypeDlg">1</Publish>
+      <Publish Dialog="AWMaintenanceTypeDlg" Control="Back" Event="NewDialog" Value="AWMaintenanceWelcomeDlg">1</Publish>
+      <Publish Dialog="AWMaintenanceTypeDlg" Control="RepairButton" Event="NewDialog" Value="AWVerifyReadyDlg" Order="10">1</Publish>
+      <Publish Dialog="AWMaintenanceTypeDlg" Control="RemoveButton" Event="NewDialog" Value="AWVerifyReadyDlg" Order="10">1</Publish>
+      <Publish Dialog="AWExitDialog" Control="Finish" Event="DoAction" Value="AWLaunch" Order="1">AW_LAUNCH = "1" AND NOT Installed AND NOT REMOVE = "ALL"</Publish>
+      <Publish Dialog="AWExitDialog" Control="Finish" Event="EndDialog" Value="Return" Order="999">1</Publish>
+
+      <Dialog Id="AWWelcomeDlg" Width="560" Height="360" Title="AWLauncher — установка" NoMinimize="yes">
+        <Control Id="Background" Type="Bitmap" X="0" Y="0" Width="560" Height="360" TabSkip="yes" Text="AWBackground" />
+        <Control Id="Kicker" Type="Text" X="220" Y="34" Width="310" Height="16" Transparent="yes" NoPrefix="yes" Text="{\AWKicker}AWLAUNCHER · [ProductVersion]" />
+        <Control Id="Title" Type="Text" X="220" Y="64" Width="310" Height="64" Transparent="yes" NoPrefix="yes" Text="{\AWHeader}Твой Minecraft.&#13;&#10;В одном месте." />
+        <Control Id="Description" Type="Text" X="220" Y="138" Width="310" Height="32" Transparent="yes" NoPrefix="yes" Text="{\AWBody}Установи лаунчер и собери игру под себя" />
+        <Control Id="FeatureOne" Type="Text" X="220" Y="184" Width="310" Height="18" Transparent="yes" NoPrefix="yes" Text="{\AWTitle}Любимые сборки и моды" />
+        <Control Id="FeatureOneText" Type="Text" X="220" Y="205" Width="310" Height="27" Transparent="yes" NoPrefix="yes" Text="{\AWBody}Modrinth, CurseForge и свои профили" />
+        <Control Id="FeatureTwo" Type="Text" X="220" Y="248" Width="310" Height="18" Transparent="yes" NoPrefix="yes" Text="{\AWTitle}Всё готово для игры" />
+        <Control Id="FeatureTwoText" Type="Text" X="220" Y="269" Width="310" Height="27" Transparent="yes" NoPrefix="yes" Text="{\AWBody}Java и нужные файлы лаунчер скачает сам" />
+        <Control Id="Cancel" Type="PushButton" X="348" Y="323" Width="78" Height="25" Cancel="yes" Text="Отмена">
+          <Publish Event="SpawnDialog" Value="CancelDlg">1</Publish>
+        </Control>
+        <Control Id="Next" Type="PushButton" X="438" Y="323" Width="94" Height="25" Default="yes" Text="Продолжить">
+          <Publish Property="WixUI_InstallMode" Value="Update">Installed AND PATCH</Publish>
+        </Control>
+      </Dialog>
+
+      <Dialog Id="AWInstallDirDlg" Width="560" Height="360" Title="AWLauncher — папка установки" NoMinimize="yes">
+        <Control Id="Background" Type="Bitmap" X="0" Y="0" Width="560" Height="360" TabSkip="yes" Text="AWBackground" />
+        <Control Id="Kicker" Type="Text" X="220" Y="34" Width="310" Height="16" Transparent="yes" Text="{\AWKicker}01 / НАСТРОЙКА" />
+        <Control Id="Title" Type="Text" X="220" Y="64" Width="310" Height="44" Transparent="yes" Text="{\AWHeader}Где поселимся?" />
+        <Control Id="Description" Type="Text" X="220" Y="118" Width="310" Height="40" Transparent="yes" Text="{\AWBody}Оставь предложенную папку или выбери другую" />
+        <Control Id="FolderLabel" Type="Text" X="220" Y="170" Width="310" Height="20" Transparent="yes" Text="{\AWTitle}Папка лаунчера" />
+        <Control Id="Folder" Type="PathEdit" X="220" Y="198" Width="312" Height="23" Property="AW_INSTALLDIR" Indirect="yes" />
+        <Control Id="ChangeFolder" Type="PushButton" X="220" Y="232" Width="100" Height="25" Text="Выбрать папку" />
+        <Control Id="Hint" Type="Text" X="220" Y="273" Width="312" Height="27" Transparent="yes" Text="{\AWBody}Установка доступна только текущему пользователю" />
+        <Control Id="Back" Type="PushButton" X="220" Y="323" Width="76" Height="25" Text="Назад" />
+        <Control Id="Cancel" Type="PushButton" X="348" Y="323" Width="78" Height="25" Cancel="yes" Text="Отмена"><Publish Event="SpawnDialog" Value="CancelDlg">1</Publish></Control>
+        <Control Id="Next" Type="PushButton" X="438" Y="323" Width="94" Height="25" Default="yes" Text="Продолжить" />
+      </Dialog>
+
+      <Dialog Id="AWVerifyReadyDlg" Width="560" Height="360" Title="AWLauncher — подтверждение" NoMinimize="yes" TrackDiskSpace="yes">
+        <Control Id="Background" Type="Bitmap" X="0" Y="0" Width="560" Height="360" TabSkip="yes" Text="AWBackground" />
+        <Control Id="Kicker" Type="Text" X="220" Y="34" Width="310" Height="16" Transparent="yes" Text="{\AWKicker}02 / ПОДТВЕРЖДЕНИЕ" />
+        <Control Id="Title" Type="Text" X="220" Y="64" Width="310" Height="72" Transparent="yes" Text="{\AWHeader}[AW_ACTION_TITLE]" />
+        <Control Id="FolderLabel" Type="Text" X="220" Y="154" Width="310" Height="20" Transparent="yes" Text="{\AWTitle}AWLauncher [ProductVersion]" />
+        <Control Id="Folder" Type="Text" X="220" Y="184" Width="310" Height="45" Transparent="yes" NoPrefix="yes" Text="{\AWBody}[INSTALLDIR]" />
+        <Control Id="Hint" Type="Text" X="220" Y="249" Width="310" Height="46" Transparent="yes" Text="{\AWBody}Игровые профили и настройки хранятся отдельно и сохранятся при обновлении или удалении лаунчера" />
+        <Control Id="Back" Type="PushButton" X="220" Y="323" Width="76" Height="25" Text="Назад" />
+        <Control Id="Cancel" Type="PushButton" X="348" Y="323" Width="78" Height="25" Cancel="yes" Text="Отмена"><Publish Event="SpawnDialog" Value="CancelDlg">1</Publish></Control>
+        <Control Id="Install" Type="PushButton" X="438" Y="323" Width="94" Height="25" Default="yes" Text="[AW_ACTION_LABEL]">
+          <Publish Event="ReinstallMode" Value="ecmus" Order="1">WixUI_InstallMode = "Repair" AND OutOfDiskSpace &lt;&gt; 1</Publish>
+          <Publish Event="Reinstall" Value="All" Order="2">WixUI_InstallMode = "Repair" AND OutOfDiskSpace &lt;&gt; 1</Publish>
+          <Publish Event="Remove" Value="All" Order="3">WixUI_InstallMode = "Remove"</Publish>
+          <Publish Event="SpawnDialog" Value="OutOfDiskDlg" Order="4">OutOfDiskSpace = 1 AND NOT WixUI_InstallMode = "Remove"</Publish>
+          <Publish Event="EndDialog" Value="Return" Order="5">OutOfDiskSpace &lt;&gt; 1 OR WixUI_InstallMode = "Remove"</Publish>
+        </Control>
+      </Dialog>
+
+      <Dialog Id="AWProgressDlg" Width="560" Height="360" Title="AWLauncher — установка" Modeless="yes" NoMinimize="yes">
+        <Control Id="Background" Type="Bitmap" X="0" Y="0" Width="560" Height="360" TabSkip="yes" Text="AWBackground" />
+        <Control Id="Kicker" Type="Text" X="220" Y="34" Width="310" Height="16" Transparent="yes" Text="{\AWKicker}03 / ФАЙЛЫ ЛАУНЧЕРА" />
+        <Control Id="Title" Type="Text" X="220" Y="64" Width="310" Height="44" Transparent="yes" Text="{\AWHeader}Ещё немного" />
+        <Control Id="Description" Type="Text" X="220" Y="123" Width="310" Height="40" Transparent="yes" Text="{\AWBody}Подготавливаем файлы. Дождись завершения" />
+        <Control Id="ProgressBar" Type="ProgressBar" X="220" Y="182" Width="312" Height="12" ProgressBlocks="no"><Subscribe Event="SetProgress" Attribute="Progress" /></Control>
+        <Control Id="ActionText" Type="Text" X="220" Y="210" Width="310" Height="48" Transparent="yes"><Subscribe Event="ActionText" Attribute="Text" /></Control>
+        <Control Id="Hint" Type="Text" X="220" Y="277" Width="310" Height="26" Transparent="yes" Text="{\AWBody}Игровые сборки можно настроить после установки" />
+        <Control Id="Cancel" Type="PushButton" X="438" Y="323" Width="94" Height="25" Cancel="yes" Text="Отмена"><Publish Event="SpawnDialog" Value="CancelDlg">1</Publish></Control>
+      </Dialog>
+
+      <Dialog Id="AWExitDialog" Width="560" Height="360" Title="AWLauncher — готово" NoMinimize="yes">
+        <Control Id="Background" Type="Bitmap" X="0" Y="0" Width="560" Height="360" TabSkip="yes" Text="AWBackground" />
+        <Control Id="Kicker" Type="Text" X="220" Y="34" Width="310" Height="16" Transparent="yes" Text="{\AWKicker}ГОТОВО" />
+        <Control Id="Title" Type="Text" X="220" Y="64" Width="310" Height="72" Transparent="yes" Text="{\AWHeader}Можно начинать&#13;&#10;приключение">
+          <Condition Action="hide">REMOVE = "ALL"</Condition>
+        </Control>
+        <Control Id="RemovedTitle" Type="Text" X="220" Y="64" Width="310" Height="72" Transparent="yes" Hidden="yes" Text="{\AWHeader}Лаунчер удалён">
+          <Condition Action="show">REMOVE = "ALL"</Condition>
+        </Control>
+        <Control Id="Description" Type="Text" X="220" Y="157" Width="310" Height="44" Transparent="yes" Text="{\AWBody}Выбери версию Minecraft, добавь моды и создай свою первую сборку">
+          <Condition Action="hide">REMOVE = "ALL"</Condition>
+        </Control>
+        <Control Id="RemovedDescription" Type="Text" X="220" Y="157" Width="310" Height="44" Transparent="yes" Hidden="yes" Text="{\AWBody}Игровые профили, миры и настройки остались в папке данных">
+          <Condition Action="show">REMOVE = "ALL"</Condition>
+        </Control>
+        <Control Id="Launch" Type="CheckBox" X="220" Y="237" Width="310" Height="22" Property="AW_LAUNCH" CheckBoxValue="1" Text="Запустить AWLauncher" Hidden="yes">
+          <Condition Action="show">NOT Installed AND NOT REMOVE = "ALL"</Condition>
+        </Control>
+        <Control Id="Finish" Type="PushButton" X="438" Y="323" Width="94" Height="25" Default="yes" Cancel="yes" Text="Готово" />
+      </Dialog>
+
+      <Dialog Id="AWMaintenanceWelcomeDlg" Width="560" Height="360" Title="AWLauncher — обслуживание" NoMinimize="yes">
+        <Control Id="Background" Type="Bitmap" X="0" Y="0" Width="560" Height="360" TabSkip="yes" Text="AWBackground" />
+        <Control Id="Kicker" Type="Text" X="220" Y="34" Width="310" Height="16" Transparent="yes" Text="{\AWKicker}AWLAUNCHER · [ProductVersion]" />
+        <Control Id="Title" Type="Text" X="220" Y="64" Width="310" Height="72" Transparent="yes" Text="{\AWHeader}Уже знакомы" />
+        <Control Id="Description" Type="Text" X="220" Y="157" Width="310" Height="65" Transparent="yes" Text="{\AWBody}Лаунчер уже установлен. Можно восстановить его файлы или удалить приложение, сохранив игровые профили" />
+        <Control Id="Cancel" Type="PushButton" X="348" Y="323" Width="78" Height="25" Cancel="yes" Text="Отмена"><Publish Event="SpawnDialog" Value="CancelDlg">1</Publish></Control>
+        <Control Id="Next" Type="PushButton" X="438" Y="323" Width="94" Height="25" Default="yes" Text="Продолжить" />
+      </Dialog>
+
+      <Dialog Id="AWMaintenanceTypeDlg" Width="560" Height="360" Title="AWLauncher — обслуживание" NoMinimize="yes">
+        <Control Id="Background" Type="Bitmap" X="0" Y="0" Width="560" Height="360" TabSkip="yes" Text="AWBackground" />
+        <Control Id="Kicker" Type="Text" X="220" Y="34" Width="310" Height="16" Transparent="yes" Text="{\AWKicker}ОБСЛУЖИВАНИЕ" />
+        <Control Id="Title" Type="Text" X="220" Y="64" Width="310" Height="60" Transparent="yes" Text="{\AWHeader}Что нужно сделать?" />
+        <Control Id="RepairButton" Type="PushButton" X="220" Y="152" Width="310" Height="30" Default="yes" Text="Восстановить файлы">
+          <Condition Action="disable">ARPNOREPAIR</Condition>
+          <Publish Property="WixUI_InstallMode" Value="Repair" Order="1">1</Publish>
+          <Publish Property="AW_ACTION_LABEL" Value="Восстановить" Order="2">1</Publish>
+          <Publish Property="AW_ACTION_TITLE" Value="Восстановим лаунчер" Order="3">1</Publish>
+        </Control>
+        <Control Id="RepairHint" Type="Text" X="220" Y="190" Width="310" Height="30" Transparent="yes" Text="{\AWBody}Вернуть недостающие файлы приложения" />
+        <Control Id="RemoveButton" Type="PushButton" X="220" Y="234" Width="310" Height="30" Text="Удалить лаунчер">
+          <Condition Action="disable">ARPNOREMOVE</Condition>
+          <Publish Property="WixUI_InstallMode" Value="Remove" Order="1">1</Publish>
+          <Publish Property="AW_ACTION_LABEL" Value="Удалить" Order="2">1</Publish>
+          <Publish Property="AW_ACTION_TITLE" Value="Удаление лаунчера" Order="3">1</Publish>
+        </Control>
+        <Control Id="RemoveHint" Type="Text" X="220" Y="273" Width="310" Height="27" Transparent="yes" Text="{\AWBody}Игровые профили останутся на компьютере" />
+        <Control Id="Back" Type="PushButton" X="220" Y="323" Width="76" Height="25" Text="Назад" />
+        <Control Id="Cancel" Type="PushButton" X="438" Y="323" Width="94" Height="25" Cancel="yes" Text="Отмена"><Publish Event="SpawnDialog" Value="CancelDlg">1</Publish></Control>
+      </Dialog>
+
+      <Dialog Id="AWFatalError" Width="560" Height="360" Title="AWLauncher — ошибка установки" NoMinimize="yes">
+        <Control Id="Background" Type="Bitmap" X="0" Y="0" Width="560" Height="360" TabSkip="yes" Text="AWBackground" />
+        <Control Id="Title" Type="Text" X="220" Y="64" Width="310" Height="80" Transparent="yes" Text="{\AWHeader}Не удалось&#13;&#10;завершить установку" />
+        <Control Id="Description" Type="Text" X="220" Y="165" Width="310" Height="90" Transparent="yes" Text="{\AWBody}Закрой лаунчер, проверь свободное место и доступ к выбранной папке, затем попробуй снова" />
+        <Control Id="Finish" Type="PushButton" X="438" Y="323" Width="94" Height="25" Default="yes" Cancel="yes" Text="Закрыть"><Publish Event="EndDialog" Value="Exit">1</Publish></Control>
+      </Dialog>
+
+      <Dialog Id="AWUserExit" Width="560" Height="360" Title="AWLauncher — установка отменена" NoMinimize="yes">
+        <Control Id="Background" Type="Bitmap" X="0" Y="0" Width="560" Height="360" TabSkip="yes" Text="AWBackground" />
+        <Control Id="Title" Type="Text" X="220" Y="64" Width="310" Height="80" Transparent="yes" Text="{\AWHeader}Установка отменена" />
+        <Control Id="Description" Type="Text" X="220" Y="165" Width="310" Height="80" Transparent="yes" Text="{\AWBody}Можно вернуться к установке в любое время — просто открой этот файл снова" />
+        <Control Id="Finish" Type="PushButton" X="438" Y="323" Width="94" Height="25" Default="yes" Cancel="yes" Text="Закрыть"><Publish Event="EndDialog" Value="Exit">1</Publish></Control>
+      </Dialog>
+
+      <InstallUISequence>
+        <Show Dialog="AWWelcomeDlg" Before="AWProgressDlg">NOT Installed OR PATCH</Show>
+        <Show Dialog="AWMaintenanceWelcomeDlg" Before="AWProgressDlg">Installed AND NOT RESUME AND NOT Preselected AND NOT PATCH</Show>
+        <Show Dialog="AWProgressDlg" Before="ExecuteAction" />
+        <Show Dialog="AWExitDialog" OnExit="success" />
+        <Show Dialog="AWFatalError" OnExit="error" />
+        <Show Dialog="AWUserExit" OnExit="cancel" />
+      </InstallUISequence>
+      <AdminUISequence>
+        <Show Dialog="AWExitDialog" OnExit="success" />
+        <Show Dialog="AWFatalError" OnExit="error" />
+        <Show Dialog="AWUserExit" OnExit="cancel" />
+      </AdminUISequence>
+    </UI>
+    <UIRef Id="WixUI_Common" />
+    <UIRef Id="WixUI_ErrorProgressText" />
+  </Fragment>
+</Wix>

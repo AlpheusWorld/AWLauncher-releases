@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Fragment>
+    <CustomAction Id="JpCheckInstallDir" BinaryKey="JpCaDll" DllEntry="CheckInstallDir" />
+    <UI>
+      <Dialog Id="InstallDirNotEmptyDlg" Width="330" Height="120" Title="AWLauncher — папка уже используется" NoMinimize="yes">
+        <Control Id="Text" Type="Text" X="24" Y="20" Width="282" Height="54" Text="В выбранной папке уже есть файлы. Установить AWLauncher сюда? Файлы с совпадающими именами могут быть заменены" />
+        <Control Id="Yes" Type="PushButton" X="150" Y="86" Width="74" Height="23" Text="Продолжить">
+          <Publish Event="NewDialog" Value="AWVerifyReadyDlg">1</Publish>
+        </Control>
+        <Control Id="No" Type="PushButton" X="234" Y="86" Width="74" Height="23" Default="yes" Cancel="yes" Text="Назад">
+          <Publish Event="NewDialog" Value="AWInstallDirDlg">1</Publish>
+        </Control>
+      </Dialog>
+      <Publish Dialog="AWInstallDirDlg" Control="Next" Event="DoAction" Value="JpCheckInstallDir" Order="3">1</Publish>
+      <Publish Dialog="AWInstallDirDlg" Control="Next" Event="NewDialog" Value="InstallDirNotEmptyDlg" Order="5">INSTALLDIR_VALID = "0"</Publish>
+      <Publish Dialog="AWInstallDirDlg" Control="Next" Event="NewDialog" Value="AWVerifyReadyDlg" Order="5">INSTALLDIR_VALID = "1"</Publish>
+    </UI>
+  </Fragment>
+</Wix>
