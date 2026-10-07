@@ -1,0 +1,37 @@
+name: Ошибка в лаунчере
+description: Помогите воспроизвести и исправить проблему
+title: "[Ошибка] "
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Версия AWLauncher
+      placeholder: Например, 1.0.2
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Версия Windows
+      placeholder: Например, Windows 11, 64-бит
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Что произошло
+      description: Опишите проблему и ожидаемый результат
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Как повторить
+      placeholder: "1. Открыл сборку\n2. Нажал…"
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Журнал или снимок экрана
+      description: Удалите личные данные перед публикацией; файлы аккаунтов и токены не нужны

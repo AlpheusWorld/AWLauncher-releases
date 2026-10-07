@@ -1,0 +1,8 @@
+*.exe
+*.msi
+*.zip
+*.tar.gz
+*.key
+*.pfx
+*.pem
+.env
