@@ -83,7 +83,6 @@ fun ModalHost(state: LauncherState) {
             state.modal = null; state.importProfiles(it)
         }
         is Modal.Settings -> Unit
-        is Modal.Skin -> SkinDialog(state, modal.accountUuid)
     }
 }
 

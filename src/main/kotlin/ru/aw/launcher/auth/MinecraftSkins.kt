@@ -131,5 +131,11 @@ internal class MinecraftSkins(http: OkHttpClient = Http.client) {
             val bytes = ByteArrayOutputStream().also { ImageIO.write(image, "png", it) }.toByteArray()
             return decode(bytes)
         }
+
+        fun modelOf(image: BufferedImage): SkinModel {
+            if (image.height == 32) return SkinModel.CLASSIC
+            return if ((20 until 32).all { y -> (54 until 56).all { x -> image.getRGB(x, y) ushr 24 == 0 } })
+                SkinModel.SLIM else SkinModel.CLASSIC
+        }
     }
 }

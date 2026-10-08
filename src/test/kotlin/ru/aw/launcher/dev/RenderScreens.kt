@@ -2,6 +2,7 @@ package ru.aw.launcher.dev
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -109,7 +110,7 @@ fun main(args: Array<String>) {
     PlayHistory.historyFile = File(out, "activity-preview.json").toPath().also { copy ->
         runCatching { Files.copy(Paths.root.resolve("activity.json"), copy, StandardCopyOption.REPLACE_EXISTING) }
     }
-    val preloaded = if (selectedScreens?.all { it.startsWith("skin-editor") || it.startsWith("downloads") || it.startsWith("migration") || it.startsWith("settings-redesign") || it.startsWith("accounts-redesign") } == true)
+    val preloaded = if (selectedScreens?.all { it.startsWith("skin-editor") || it.startsWith("skin-selector") || it.startsWith("downloads") || it.startsWith("migration") || it.startsWith("settings-redesign") || it.startsWith("accounts-redesign") } == true)
         ru.aw.launcher.core.PreloadResult(ru.aw.launcher.meta.VersionManifest(versions = listOf(
             ru.aw.launcher.meta.ManifestVersion(id = "1.21.11", url = ""))), emptyMap(), emptySet())
     else runBlocking { Preloader.run { _, _ -> } }.copy(manifestStale = false, loaderSupportStale = false)
@@ -200,17 +201,44 @@ fun main(args: Array<String>) {
         val skinAccount = ru.aw.launcher.auth.Account("00000000000000000000000000000009", "SkinPreview", ru.aw.launcher.auth.AccountType.MICROSOFT,
             capes=listOf(ru.aw.launcher.auth.MinecraftCape("cape-preview",capeUrl,"ACTIVE","AW Preview")),capeId="cape-preview")
         AccountManager.upsert(skinAccount)
+        state.screen = Screen.SKINS
+        val editorPreview: @Composable () -> Unit = {
+            ru.aw.launcher.ui.dialogs.SkinEditorDialog(
+                ru.aw.launcher.ui.dialogs.SkinDraft(sampleSkin, ru.aw.launcher.auth.SkinModel.CLASSIC, "cape-preview", "Мой скин",
+                    ru.aw.launcher.auth.SavedSkin("00000000-0000-0000-0000-000000000011", "Мой скин", ru.aw.launcher.auth.SkinModel.CLASSIC)),
+                skinAccount.capes, false, null, {}, { _, _, _, _ -> })
+        }
         for (language in listOf(Language.RU, Language.EN)) {
             Settings.update { it.copy(language = language) }
-            render("skin-editor-${language.tag}", 1040, 720) { AWTheme(ThemeMode.OLED) { ru.aw.launcher.ui.dialogs.SkinDialog(state, skinAccount.uuid, preview = sampleSkin) } }
+            render("skin-editor-${language.tag}", 1040, 720) { AWTheme(ThemeMode.OLED) { editorPreview() } }
         }
         Settings.update { it.copy(language = Language.RU) }
-        render("skin-editor-small",600,540) { AWTheme(ThemeMode.OLED) { ru.aw.launcher.ui.dialogs.SkinDialog(state,skinAccount.uuid,preview=sampleSkin) } }
-        render("skin-editor-capes",1040,720) { AWTheme(ThemeMode.OLED) { ru.aw.launcher.ui.dialogs.SkinDialog(state,skinAccount.uuid,preview=sampleSkin,initialTab=1) } }
-        render("skin-editor-capes-small",600,540) { AWTheme(ThemeMode.OLED) { ru.aw.launcher.ui.dialogs.SkinDialog(state,skinAccount.uuid,preview=sampleSkin,initialTab=1) } }
+        val skinLibrary = ru.aw.launcher.auth.SkinLibrary()
+        if (selectedScreens?.any { it.startsWith("skin-selector") } == true) runBlocking {
+            if (skinLibrary.list().isEmpty()) {
+                skinLibrary.save(sampleSkin,"Выживание",ru.aw.launcher.auth.SkinModel.CLASSIC,"cape-preview")
+                val alex = File(out,"skin-fixture-alex.png").takeIf { it.isFile }?.let(javax.imageio.ImageIO::read)
+                alex?.let { skinLibrary.save(ru.aw.launcher.auth.MinecraftSkins.fromImage(it),"Творческий",ru.aw.launcher.auth.SkinModel.SLIM,null) }
+            }
+        }
+        render("skin-selector",1280,780) { AWTheme(ThemeMode.DARK) {
+            Column(Modifier.fillMaxSize().background(ru.aw.launcher.ui.theme.AWColors.Background)) {
+                ru.aw.launcher.ui.LauncherTitleBar(state)
+                ru.aw.launcher.ui.screens.SkinsScreen(state, preview=sampleSkin)
+            }
+        } }
+        render("skin-selector-small",600,540) { AWTheme(ThemeMode.DARK) {
+            Column(Modifier.fillMaxSize().background(ru.aw.launcher.ui.theme.AWColors.Background)) {
+                ru.aw.launcher.ui.LauncherTitleBar(state)
+                ru.aw.launcher.ui.screens.SkinsScreen(state, preview=sampleSkin)
+            }
+        } }
+        render("skin-editor-small",600,540) { AWTheme(ThemeMode.OLED) { editorPreview() } }
+        render("skin-editor-capes",1040,720) { AWTheme(ThemeMode.OLED) { editorPreview() } }
+        render("skin-editor-capes-small",600,540) { AWTheme(ThemeMode.OLED) { editorPreview() } }
         Settings.update { it.copy(language = Language.RU) }
     }
-    if (selectedScreens?.all { it.startsWith("skin-editor") } == true) { renderSkins(); exitProcess(0) }
+    if (selectedScreens?.all { it.startsWith("skin-editor") || it.startsWith("skin-selector") } == true) { renderSkins(); exitProcess(0) }
 
     if (selectedScreens?.all { it.startsWith("settings-redesign") || it.startsWith("accounts-redesign") } == true) {
         val selected = ru.aw.launcher.auth.Account("00000000000000000000000000000010", "MinecraftPlayer", ru.aw.launcher.auth.AccountType.MICROSOFT,

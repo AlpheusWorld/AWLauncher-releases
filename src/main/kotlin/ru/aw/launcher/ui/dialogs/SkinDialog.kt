@@ -34,141 +34,88 @@ import androidx.compose.ui.unit.*
 import kotlinx.coroutines.*
 import ru.aw.launcher.auth.*
 import ru.aw.launcher.core.I18n
-import ru.aw.launcher.core.Settings
-import ru.aw.launcher.ui.LauncherState
 import ru.aw.launcher.ui.SkinHeads
 import ru.aw.launcher.ui.SkinPreview
 import ru.aw.launcher.ui.components.*
 import ru.aw.launcher.ui.components.LocalizedText as Text
 import ru.aw.launcher.ui.theme.AWColors
 import java.awt.image.BufferedImage
-import javax.swing.JFileChooser
-import javax.swing.filechooser.FileNameExtensionFilter
+import java.awt.FileDialog
+import java.awt.Frame
+
+
+internal data class SkinDraft(val image: SkinImage, val model: SkinModel, val capeId: String?, val name: String, val saved: SavedSkin? = null)
+
+internal fun chooseSkinFile(): java.nio.file.Path? = FileDialog(null as Frame?, I18n.text("Выбрать PNG скина"), FileDialog.LOAD).let { dialog ->
+    try {
+        dialog.file = "*.png"
+        dialog.isVisible = true
+        dialog.files.firstOrNull()?.toPath()
+    } finally { dialog.dispose() }
+}
 
 @Composable
 @OptIn(ExperimentalLayoutApi::class)
-internal fun SkinDialog(state: LauncherState, uuid: String, preview: SkinImage? = null, initialTab: Int = 0) {
-    val accounts by state.accounts.collectAsState()
-    val account = accounts.firstOrNull { it.uuid == uuid } ?: return
+internal fun SkinEditorDialog(draft: SkinDraft, capes: List<MinecraftCape>, saving: Boolean, error: String?,
+                              onDismiss: () -> Unit, onSave: (SkinImage, String, SkinModel, String?) -> Unit) {
     val scope = rememberCoroutineScope()
-    var draft by remember(uuid) { mutableStateOf(preview) }
-    var texture by remember(uuid) { mutableStateOf<BufferedImage?>(null) }
-    var model by remember(uuid) { mutableStateOf(account.skinModel) }
-    var filename by remember(uuid) { mutableStateOf<String?>(null) }
-    var error by remember(uuid) { mutableStateOf<String?>(null) }
-    var loading by remember(uuid) { mutableStateOf(preview == null) }
-    var retry by remember(uuid) { mutableStateOf(0) }
-    var selectedCape by remember(uuid) { mutableStateOf(account.capeId) }
-    var capeTexture by remember(uuid) { mutableStateOf<BufferedImage?>(null) }
-    var appearanceTab by remember(uuid) { mutableIntStateOf(initialTab.coerceIn(0, 1)) }
-    val saving = state.skinWorkingUuid == uuid
-    val skinChanged = draft != null || (texture != null && model != account.skinModel)
-    val capeChanged = selectedCape != account.capeId
-    val apply: () -> Unit = {
-        scope.launch {
-            loading = true; error = null
-            try {
-                val image = draft ?: texture?.let { withContext(Dispatchers.IO) { MinecraftSkins.fromImage(it) } }
-                if (!skinChanged || image != null) state.applySkin(uuid, image, model,
-                    capeId = selectedCape, changeCape = capeChanged, changeSkin = skinChanged)
-            } catch (failure: CancellationException) { throw failure }
-            catch (failure: Exception) { error = failure.message ?: "Не удалось прочитать PNG скина" }
-            finally { loading = false }
-        }
+    var image by remember(draft) { mutableStateOf(draft.image) }
+    var name by remember(draft) { mutableStateOf(draft.name) }
+    var model by remember(draft) { mutableStateOf(draft.model) }
+    var capeId by remember(draft) { mutableStateOf(draft.capeId?.takeIf { id -> capes.any { it.id == id } }) }
+    var localError by remember(draft) { mutableStateOf<String?>(null) }
+    var reading by remember { mutableStateOf(false) }
+    val cape by produceState<BufferedImage?>(null, capeId, capes) {
+        value = capes.firstOrNull { it.id == capeId }?.let { SkinHeads.capeTexture(it) }
     }
-    LaunchedEffect(uuid, retry) {
-        if (preview != null) return@LaunchedEffect
-        loading = true
-        error = null
-        try {
-            val current = AccountManager.skinProfile(uuid)
-            selectedCape = current.capeId
-            if (draft == null) { model = current.skinModel; texture = SkinHeads.texture(current) }
-        } catch (failure: CancellationException) { throw failure }
-        catch (failure: Exception) { error = failure.message ?: "Не удалось загрузить скин" }
-        finally { loading = false }
-    }
-    LaunchedEffect(selectedCape, account.capes) {
-        capeTexture = null
-        capeTexture = account.capes.firstOrNull { it.id == selectedCape }?.let { SkinHeads.capeTexture(it) }
-    }
-    AWDialog("Скин и плащ Minecraft", subtitle = account.name, width = 860.dp, scrollable = true,
-        onDismiss = { if (!saving) state.modal = null }, actions = {
-            AWButton("Закрыть", enabled = !saving, onClick = { state.modal = null })
-            AWButton(if (saving) "Применяю…" else "Сохранить изменения", style = ButtonStyle.PRIMARY,
-                enabled = (skinChanged || capeChanged) && !loading && !saving, onClick = apply)
+    AWDialog(if (draft.saved == null) "Добавление скина" else "Редактирование скина", width = 760.dp, scrollable = true,
+        onDismiss = { if (!saving && !reading) onDismiss() }, actions = {
+            AWButton("Отменить", enabled = !saving && !reading, onClick = onDismiss)
+            AWButton(if (saving) "Сохраняю…" else if (draft.saved == null) "Добавить скин" else "Сохранить",
+                style = ButtonStyle.PRIMARY, enabled = !saving && !reading && name.isNotBlank(),
+                onClick = { onSave(image, name, model, capeId) })
         }) {
-        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            BoxWithConstraints(Modifier.fillMaxWidth()) {
-                val narrow = maxWidth < 620.dp
-                val previewHeight = if (narrow) 150.dp else 410.dp
-                val controls: @Composable (Modifier) -> Unit = { controlsModifier ->
-                    Column(controlsModifier, verticalArrangement = Arrangement.spacedBy(14.dp)) {
-
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            ChoiceChip("Скин", selected = appearanceTab == 0, onClick = { appearanceTab = 0 })
-                            ChoiceChip("Плащ", selected = appearanceTab == 1, onClick = { appearanceTab = 1 })
-                            WithTooltip("Обновить профиль") {
-                                IconButton(onClick = { retry++ }, enabled = !loading && !saving, modifier = Modifier.size(40.dp)) {
-                                    Icon(Icons.Default.Refresh, "Обновить профиль", tint = AWColors.TextMuted)
-                                }
-                            }
-                        }
-                        if (appearanceTab == 0) {
-                            Text("Модель персонажа", color = AWColors.Text, style = MaterialTheme.typography.titleSmall)
-                            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                SkinModel.entries.forEach { variant -> ChoiceChip(variant.label, selected = model == variant, enabled = !loading && !saving,
-                                    onClick = { model = variant }) }
-                            }
-                            Text(if (model == SkinModel.SLIM) "Тонкие руки · 3 пикселя" else "Классические руки · 4 пикселя", color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall)
-                            HorizontalDivider(color = AWColors.Outline)
-                            AWButton("Выбрать PNG", icon = AWIcons.Folder, enabled = !loading && !saving, onClick = {
-                                val chooser = JFileChooser().apply {
-                                    dialogTitle = I18n.text("Выбрать PNG скина")
-                                    locale = Settings.current.language.locale
-                                    isAcceptAllFileFilterUsed = false
-                                    fileFilter = FileNameExtensionFilter("PNG", "png")
-                                }
-                                if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
-                                    val path = chooser.selectedFile.toPath()
-                                    scope.launch {
-                                        loading = true; error = null
-                                        try { draft = withContext(Dispatchers.IO) { MinecraftSkins.read(path) }; filename = path.fileName.toString() }
-                                        catch (failure: CancellationException) { throw failure }
-                                        catch (failure: Exception) { error = failure.message ?: "Не удалось прочитать PNG скина" }
-                                        finally { loading = false }
-                                    }
-                                }
-                            })
-                            filename?.let { Text(it, translate = false, color = AWColors.TextSoft, style = MaterialTheme.typography.bodySmall, maxLines = 2) }
-                            AWButton("Вернуть стандартный скин", enabled = !loading && !saving, onClick = { state.applySkin(uuid, null, model) })
-                            Text("PNG 64×64 или 64×32 · до 1 МБ", color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall)
-                        } else {
-                            Text("Плащ", color = AWColors.Text, style = MaterialTheme.typography.titleSmall)
-                            Text("Плащи этого аккаунта", color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall)
-                            LazyVerticalGrid(columns = GridCells.Adaptive(92.dp), modifier = Modifier.fillMaxWidth().heightIn(max = 250.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                item("none") { CapeOption(null, selectedCape == null, !loading && !saving) { selectedCape = null } }
-                                items(account.capes, key = { it.id }) { cape -> CapeOption(cape, selectedCape == cape.id, !loading && !saving) { selectedCape = cape.id } }
-                            }
-                            if (!loading && account.capes.isEmpty()) Text("У этого аккаунта пока нет плащей", color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall)
-                        }
-
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            val compact = maxWidth < 540.dp
+            val controls: @Composable (Modifier) -> Unit = { modifier ->
+                Column(modifier, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Text("Название", color = AWColors.Text, style = MaterialTheme.typography.titleSmall)
+                    AWTextField(name, onValueChange = { name = it.take(80) }, placeholder = "Название скина", modifier = Modifier.fillMaxWidth())
+                    Text("Текстура", color = AWColors.Text, style = MaterialTheme.typography.titleSmall)
+                    AWButton("Заменить текстуру", icon = AWIcons.Folder, enabled = !saving && !reading, onClick = {
+                        chooseSkinFile()?.let { path -> scope.launch {
+                            reading = true; localError = null
+                            try {
+                                image = withContext(Dispatchers.IO) { MinecraftSkins.read(path) }
+                                model = MinecraftSkins.modelOf(image.image)
+                            } catch (failure: CancellationException) { throw failure }
+                            catch (failure: Exception) { localError = failure.message ?: "Не удалось прочитать PNG скина" }
+                            finally { reading = false }
+                        } }
+                    })
+                    Text("Модель рук", color = AWColors.Text, style = MaterialTheme.typography.titleSmall)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        ChoiceChip("Широкие", model == SkinModel.CLASSIC, enabled = !saving, onClick = { model = SkinModel.CLASSIC })
+                        ChoiceChip("Тонкие", model == SkinModel.SLIM, enabled = !saving, onClick = { model = SkinModel.SLIM })
                     }
-                }
-                if (narrow) Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    SkinPreview(draft?.image ?: texture, model, Modifier.fillMaxWidth().height(previewHeight), loading,
-                        cape = capeTexture, showBack = appearanceTab == 1)
-                    controls(Modifier.fillMaxWidth())
-                } else Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(24.dp), verticalAlignment = Alignment.Top) {
-                    SkinPreview(draft?.image ?: texture, model, Modifier.width(330.dp).height(previewHeight), loading,
-                        cape = capeTexture, showBack = appearanceTab == 1)
-                    controls(Modifier.weight(1f).height(previewHeight).verticalScroll(rememberScrollState()))
+                    Text("Плащ", color = AWColors.Text, style = MaterialTheme.typography.titleSmall)
+                    LazyVerticalGrid(GridCells.Adaptive(72.dp), Modifier.fillMaxWidth().heightIn(max = 220.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        item("none") { CapeOption(null, capeId == null, !saving) { capeId = null } }
+                        items(capes, key = { it.id }) { cape -> CapeOption(cape, capeId == cape.id, !saving) { capeId = cape.id } }
+                    }
+                    if (capes.isEmpty()) Text("У этого аккаунта пока нет плащей", color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall)
                 }
             }
-            (error ?: state.skinError)?.let { Text(it, color = AWColors.Danger, style = MaterialTheme.typography.bodySmall) }
-            Text("После сохранения может потребоваться повторный вход в игру", color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall)
+            if (compact) Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                SkinPreview(image.image, model, Modifier.fillMaxWidth().height(150.dp), reading, cape = cape)
+                controls(Modifier.fillMaxWidth())
+            } else Row(horizontalArrangement = Arrangement.spacedBy(24.dp), verticalAlignment = Alignment.CenterVertically) {
+                SkinPreview(image.image, model, Modifier.width(256.dp).height(400.dp), reading, cape = cape)
+                controls(Modifier.weight(1f).heightIn(max = 450.dp).verticalScroll(rememberScrollState()))
+            }
         }
+        (localError ?: error)?.let { Text(it, color = AWColors.Danger, style = MaterialTheme.typography.bodySmall) }
     }
 }
 

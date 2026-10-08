@@ -30,6 +30,23 @@ class LauncherStateTest {
     @TempDir lateinit var temp: Path
 
     @Test
+    fun `skin selector opens the requested account without switching the launch account`() {
+        val state = LauncherState(scope, preload(emptySet()))
+        val launchAccount = state.selectedAccount.value
+        val editing = ru.aw.launcher.auth.Account("00000000000000000000000000000013", "AppearanceTest", ru.aw.launcher.auth.AccountType.MICROSOFT)
+        state.screen = Screen.ACTIVITY
+        state.openSkinEditor(editing)
+        assertEquals(Screen.SKINS, state.screen)
+        assertEquals(editing.uuid, state.skinAccountUuid)
+        assertEquals(launchAccount, state.selectedAccount.value)
+        assertNull(state.modal)
+        state.navigateBack()
+        assertEquals(Screen.ACTIVITY, state.screen)
+        state.openSkinEditor(ru.aw.launcher.auth.Account.offline("OfflineTest"))
+        assertEquals(Screen.ACTIVITY, state.screen)
+    }
+
+    @Test
     fun `settings open as overlays without replacing the current page or its history`() {
         val state = LauncherState(scope, preload(emptySet()))
         state.screen = Screen.ACTIVITY

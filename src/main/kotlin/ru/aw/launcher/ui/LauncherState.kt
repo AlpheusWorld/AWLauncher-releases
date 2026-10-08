@@ -76,7 +76,7 @@ import ru.aw.launcher.servers.Servers
 import ru.aw.launcher.update.UpdateManifest
 import ru.aw.launcher.update.Updater
 
-enum class Screen { HOME, PLAY, BUILDS, CATALOG, INSTANCE, SCREENSHOTS, DOWNLOADS, ACTIVITY, NOTICES, SETTINGS, ACCOUNTS }
+enum class Screen { HOME, PLAY, BUILDS, CATALOG, INSTANCE, SCREENSHOTS, SKINS, DOWNLOADS, ACTIVITY, NOTICES, SETTINGS, ACCOUNTS }
 
 data class VersionEntry(
     val version: ManifestVersion,
@@ -115,7 +115,6 @@ sealed interface Modal {
     data class DeleteMany(val entries: List<VersionEntry>) : Modal
     data class ImportDirectory(val directory: Path) : Modal
     data class Settings(val entry: VersionEntry? = null, val section: Int = 0) : Modal
-    data class Skin(val accountUuid: String) : Modal
 }
 
 sealed interface PingState {
@@ -1505,15 +1504,19 @@ class LauncherState(
         private set
     var skinError by mutableStateOf<String?>(null)
         private set
+    var skinAccountUuid by mutableStateOf<String?>(null)
+        private set
 
     fun openSkinEditor(account: Account) {
         if (account.isOffline || skinWorkingUuid != null) return
         skinError = null
-        modal = Modal.Skin(account.uuid)
+        skinAccountUuid = account.uuid
+        screen = Screen.SKINS
     }
 
     internal fun applySkin(uuid: String, image: SkinImage?, model: SkinModel,
-                           capeId: String? = null, changeCape: Boolean = false, changeSkin: Boolean = true) {
+                           capeId: String? = null, changeCape: Boolean = false, changeSkin: Boolean = true,
+                           onApplied: ((Account) -> Unit)? = null) {
         if (skinWorkingUuid != null) return
         skinWorkingUuid = uuid
         skinError = null
@@ -1523,7 +1526,7 @@ class LauncherState(
                     else AccountManager.accounts.value.firstOrNull { it.uuid == uuid }
                         ?: throw ru.aw.launcher.auth.AuthException("Аккаунт был удалён из лаунчера")
                 if (changeCape) updated = AccountManager.changeCape(uuid, capeId)
-                if ((modal as? Modal.Skin)?.accountUuid == uuid) modal = null
+                onApplied?.invoke(updated)
                 inform("Внешний вид ${updated.name} изменён в профиле Minecraft")
             } catch (error: CancellationException) { throw error }
             catch (error: Exception) { skinError = error.message ?: "Не удалось изменить скин или плащ" }

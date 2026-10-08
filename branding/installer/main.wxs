@@ -55,7 +55,7 @@
         Maximum="$(var.JpAppVersion)"
         MigrateFeatures="yes"
         IncludeMaximum="$(var.JpUpgradeVersionOnlyDetectUpgrade)" />
-      <?if $(var.JpAppVersion) = "1.0.1" OR $(var.JpAppVersion) = "1.0.2" OR $(var.JpAppVersion) = "1.0.3" OR $(var.JpAppVersion) = "1.0.4" OR $(var.JpAppVersion) = "1.0.5" OR $(var.JpAppVersion) = "1.0.6" OR $(var.JpAppVersion) = "1.0.7" ?>
+      <?if $(var.JpAppVersion) = "1.0.1" OR $(var.JpAppVersion) = "1.0.2" OR $(var.JpAppVersion) = "1.0.3" OR $(var.JpAppVersion) = "1.0.4" OR $(var.JpAppVersion) = "1.0.5" OR $(var.JpAppVersion) = "1.0.6" OR $(var.JpAppVersion) = "1.0.7" OR $(var.JpAppVersion) = "1.0.8" ?>
       <!-- One-time version reset: only the previous 1.6.7 package may migrate down. -->
       <UpgradeVersion
         OnlyDetect="yes"

@@ -58,6 +58,12 @@ object SkinHeads {
         runCatching { account.skinUrl?.let(::downloadSkin) ?: defaultSkin(account) }.getOrNull()
     }
 
+    internal suspend fun texture(url: String): BufferedImage? = withContext(Dispatchers.IO) {
+        val uri = runCatching { java.net.URI(url) }.getOrNull() ?: return@withContext null
+        if (uri.scheme != "https" || uri.host != "textures.minecraft.net" || uri.userInfo != null) return@withContext null
+        runCatching { downloadSkin(url) }.getOrNull()?.takeIf { it.width == 64 && it.height in listOf(32, 64) }
+    }
+
     suspend fun capeTexture(cape: MinecraftCape): BufferedImage? = withContext(Dispatchers.IO) {
         val uri = runCatching { java.net.URI(cape.url) }.getOrNull() ?: return@withContext null
         if (uri.scheme !in listOf("http", "https") || uri.host != "textures.minecraft.net" || uri.userInfo != null) return@withContext null
