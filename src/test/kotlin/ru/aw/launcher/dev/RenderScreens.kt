@@ -110,7 +110,7 @@ fun main(args: Array<String>) {
     PlayHistory.historyFile = File(out, "activity-preview.json").toPath().also { copy ->
         runCatching { Files.copy(Paths.root.resolve("activity.json"), copy, StandardCopyOption.REPLACE_EXISTING) }
     }
-    val preloaded = if (selectedScreens?.all { it.startsWith("skin-editor") || it.startsWith("skin-selector") || it.startsWith("downloads") || it.startsWith("migration") || it.startsWith("settings-redesign") || it.startsWith("accounts-redesign") } == true)
+    val preloaded = if (selectedScreens?.all { it.startsWith("skin-editor") || it.startsWith("skin-selector") || it.startsWith("skin-events") || it.startsWith("downloads") || it.startsWith("migration") || it.startsWith("settings-redesign") || it.startsWith("accounts-redesign") } == true)
         ru.aw.launcher.core.PreloadResult(ru.aw.launcher.meta.VersionManifest(versions = listOf(
             ru.aw.launcher.meta.ManifestVersion(id = "1.21.11", url = ""))), emptyMap(), emptySet())
     else runBlocking { Preloader.run { _, _ -> } }.copy(manifestStale = false, loaderSupportStale = false)
@@ -221,6 +221,25 @@ fun main(args: Array<String>) {
                 alex?.let { skinLibrary.save(ru.aw.launcher.auth.MinecraftSkins.fromImage(it),"Творческий",ru.aw.launcher.auth.SkinModel.SLIM,null) }
             }
         }
+        if (selectedScreens?.any { it.startsWith("skin-events") } == true) runBlocking {
+            for (skin in ru.aw.launcher.auth.SkinCatalog.presets) {
+                val texture = checkNotNull(ru.aw.launcher.ui.SkinHeads.texture(skin)) { "Texture unavailable: ${skin.name}" }
+                check(texture.width == 64 && texture.height in listOf(32,64))
+            }
+            println("verified ${ru.aw.launcher.auth.SkinCatalog.presets.size} Minecraft catalog textures through launcher loader")
+        }
+        render("skin-events-minecon",1280,780) { AWTheme(ThemeMode.DARK) {
+            Column(Modifier.fillMaxSize().background(ru.aw.launcher.ui.theme.AWColors.Background)) {
+                ru.aw.launcher.ui.LauncherTitleBar(state)
+                ru.aw.launcher.ui.screens.SkinsScreen(state, preview=sampleSkin, initialQuery="MINECON")
+            }
+        } }
+        render("skin-events-dungeons",1280,780) { AWTheme(ThemeMode.DARK) {
+            Column(Modifier.fillMaxSize().background(ru.aw.launcher.ui.theme.AWColors.Background)) {
+                ru.aw.launcher.ui.LauncherTitleBar(state)
+                ru.aw.launcher.ui.screens.SkinsScreen(state, preview=sampleSkin, initialQuery="Dungeons II")
+            }
+        } }
         render("skin-selector",1280,780) { AWTheme(ThemeMode.DARK) {
             Column(Modifier.fillMaxSize().background(ru.aw.launcher.ui.theme.AWColors.Background)) {
                 ru.aw.launcher.ui.LauncherTitleBar(state)
@@ -238,7 +257,7 @@ fun main(args: Array<String>) {
         render("skin-editor-capes-small",600,540) { AWTheme(ThemeMode.OLED) { editorPreview() } }
         Settings.update { it.copy(language = Language.RU) }
     }
-    if (selectedScreens?.all { it.startsWith("skin-editor") || it.startsWith("skin-selector") } == true) { renderSkins(); exitProcess(0) }
+    if (selectedScreens?.all { it.startsWith("skin-editor") || it.startsWith("skin-selector") || it.startsWith("skin-events") } == true) { renderSkins(); exitProcess(0) }
 
     if (selectedScreens?.all { it.startsWith("settings-redesign") || it.startsWith("accounts-redesign") } == true) {
         val selected = ru.aw.launcher.auth.Account("00000000000000000000000000000010", "MinecraftPlayer", ru.aw.launcher.auth.AccountType.MICROSOFT,

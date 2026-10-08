@@ -26,9 +26,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import ru.aw.launcher.auth.Account
 import ru.aw.launcher.auth.MinecraftCape
+import ru.aw.launcher.auth.MinecraftSkins
+import ru.aw.launcher.auth.SkinPreset
 import ru.aw.launcher.core.Log
 import ru.aw.launcher.core.Paths
 import ru.aw.launcher.core.sha1Of
+import ru.aw.launcher.core.toHex
 import ru.aw.launcher.core.writeAtomically
 import ru.aw.launcher.net.Http
 import ru.aw.launcher.ui.theme.AWColors
@@ -37,6 +40,12 @@ import java.nio.file.Files
 import java.io.ByteArrayInputStream
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.TimeUnit
+import java.security.MessageDigest
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import okhttp3.OkHttpClient
+import ru.aw.launcher.launch.ArgumentBuilder
 import java.util.zip.ZipFile
 import javax.imageio.ImageIO
 import kotlin.io.path.exists
@@ -49,6 +58,16 @@ import kotlin.io.path.readBytes
 object SkinHeads {
 
     private val cache = ConcurrentHashMap<String, ImageBitmap>()
+    private val archiveLocks = ConcurrentHashMap<String, Mutex>()
+    private val archiveClient by lazy {
+        Http.client.newBuilder().callTimeout(30, TimeUnit.SECONDS).addNetworkInterceptor { chain ->
+            // Minecraft's public download site serves these browser downloads by user agent.
+            val request = chain.request().newBuilder()
+                .header("User-Agent", "Mozilla/5.0 (compatible; AWLauncher/${ArgumentBuilder.LAUNCHER_VERSION})")
+                .header("Referer", "https://www.minecraft.net/").build()
+            chain.proceed(request)
+        }.build()
+    }
 
     private val DEFAULT_NAMES = listOf("alex", "ari", "efe", "kai", "makena", "noor", "steve", "sunny", "zuri")
 
@@ -62,6 +81,39 @@ object SkinHeads {
         val uri = runCatching { java.net.URI(url) }.getOrNull() ?: return@withContext null
         if (uri.scheme != "https" || uri.host != "textures.minecraft.net" || uri.userInfo != null) return@withContext null
         runCatching { downloadSkin(url) }.getOrNull()?.takeIf { it.width == 64 && it.height in listOf(32, 64) }
+    }
+
+    internal suspend fun texture(preset: SkinPreset): BufferedImage? =
+        preset.textureUrl?.let { texture(it) } ?: archiveTexture(preset)
+
+    internal suspend fun archiveTexture(preset: SkinPreset, client: OkHttpClient = archiveClient,
+                                        directory: java.nio.file.Path = Paths.cache.resolve("skin-packs")): BufferedImage = withContext(Dispatchers.IO) {
+        preset.validate()
+        val url = requireNotNull(preset.archiveUrl)
+        val file = directory.resolve(sha1Of(url.byteInputStream()) + ".zip")
+        archiveLocks.computeIfAbsent(file.toString()) { Mutex() }.withLock {
+            fun read(): BufferedImage {
+                val bytes = ZipFile(file.toFile()).use { zip ->
+                    val entry = requireNotNull(zip.getEntry(preset.member)) { "В наборе отсутствует выбранный скин" }
+                    zip.getInputStream(entry).use { it.readNBytes(1024 * 1024 + 1) }
+                }
+                require(bytes.size <= 1024 * 1024) { "PNG скина должен быть не больше 1 МБ" }
+                require(MessageDigest.getInstance("SHA-256").digest(bytes).toHex() == preset.sha256) { "Текстура набора изменилась — требуется обновление каталога" }
+                return MinecraftSkins.decode(bytes).image
+            }
+            if (Files.exists(file)) {
+                try { return@withLock read() }
+                catch (_: Exception) { Files.deleteIfExists(file) }
+            }
+            val bytes = client.newCall(Http.request(url)).execute().use { response ->
+                if (!response.isSuccessful) throw java.io.IOException("Не удалось загрузить набор скинов: HTTP ${response.code}")
+                response.body?.byteStream()?.use { it.readNBytes(16 * 1024 * 1024 + 1) }
+                    ?: throw java.io.IOException("Не удалось загрузить набор скинов")
+            }
+            require(bytes.size <= 16 * 1024 * 1024) { "Набор скинов слишком большой" }
+            file.writeAtomically(bytes)
+            try { read() } catch (failure: Exception) { Files.deleteIfExists(file); throw failure }
+        }
     }
 
     suspend fun capeTexture(cape: MinecraftCape): BufferedImage? = withContext(Dispatchers.IO) {

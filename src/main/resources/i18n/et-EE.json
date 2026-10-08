@@ -1002,5 +1002,12 @@
   "Войти": "Sign in",
   "Выбрано": "Selected",
   "Сбросить": "Reset",
-  "Редактировать": "Edit"
+  "Редактировать": "Edit",
+  "Поиск скинов или набора…": "Search skins or packs…",
+  "Скины не найдены": "No skins found",
+  "В наборе отсутствует выбранный скин": "The selected skin is missing from this pack",
+  "Текстура набора изменилась — требуется обновление каталога": "The pack texture changed — update the skin catalog",
+  "Не удалось загрузить набор скинов": "Could not download the skin pack",
+  "Не удалось загрузить набор скинов: HTTP {0}": "Could not download the skin pack: HTTP {0}",
+  "Набор скинов слишком большой": "The skin pack is too large"
 }

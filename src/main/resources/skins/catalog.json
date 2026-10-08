@@ -1,0 +1,564 @@
+[
+  {
+    "name": "Steve",
+    "section": "Стандартные скины",
+    "model": "CLASSIC",
+    "hash": "31f477eb1a7beee631c2ca64d06f8f68fa93a3386d04452ab27f43acdf1b60cb"
+  },
+  {
+    "name": "Alex",
+    "section": "Стандартные скины",
+    "model": "SLIM",
+    "hash": "46acd06e8483b176e8ea39fc12fe105eb3a2a4970f5100057e9d84d4b60bdfa7"
+  },
+  {
+    "name": "Ari",
+    "section": "Стандартные скины",
+    "model": "CLASSIC",
+    "hash": "4c05ab9e07b3505dc3ec11370c3bdce5570ad2fb2b562e9b9dd9cf271f81aa44"
+  },
+  {
+    "name": "Efe",
+    "section": "Стандартные скины",
+    "model": "SLIM",
+    "hash": "fece7017b1bb13926d1158864b283b8b930271f80a90482f174cca6a17e88236"
+  },
+  {
+    "name": "Kai",
+    "section": "Стандартные скины",
+    "model": "CLASSIC",
+    "hash": "e5cdc3243b2153ab28a159861be643a4fc1e3c17d291cdd3e57a7f370ad676f3"
+  },
+  {
+    "name": "Makena",
+    "section": "Стандартные скины",
+    "model": "SLIM",
+    "hash": "7cb3ba52ddd5cc82c0b050c3f920f87da36add80165846f479079663805433db"
+  },
+  {
+    "name": "Noor",
+    "section": "Стандартные скины",
+    "model": "SLIM",
+    "hash": "6c160fbd16adbc4bff2409e70180d911002aebcfa811eb6ec3d1040761aea6dd"
+  },
+  {
+    "name": "Sunny",
+    "section": "Стандартные скины",
+    "model": "CLASSIC",
+    "hash": "a3bd16079f764cd541e072e888fe43885e711f98658323db0f9a6045da91ee7a"
+  },
+  {
+    "name": "Zuri",
+    "section": "Стандартные скины",
+    "model": "CLASSIC",
+    "hash": "f5dddb41dcafef616e959c2817808e0be741c89ffbfed39134a13e75b811863d"
+  },
+  {
+    "name": "Globe Alex",
+    "section": "MINECON Earth 2017",
+    "model": "CLASSIC",
+    "hash": "6c25523e7dabfcaf0dbe32d90fd0c001d5d57ac66206a0595defe9be5947ff08"
+  },
+  {
+    "name": "Party Alex",
+    "section": "MINECON Earth 2017",
+    "model": "SLIM",
+    "hash": "66206c8f51d13d2d31c54696a58a3e8bcd1e5e7db9888d331d0753129324e4f1"
+  },
+  {
+    "name": "Cardboard Cosplayer",
+    "section": "MINECON Earth 2017",
+    "model": "CLASSIC",
+    "hash": "6acf91326bd116ce889e461ddb57e92ace07a8367dbd2d191075078fccc3c727"
+  },
+  {
+    "name": "Creeper Cosplayer",
+    "section": "MINECON Earth 2017",
+    "model": "CLASSIC",
+    "hash": "b9f7facdca2bf4772fa168e1c3cf7b020124eb1fc82118307d426da1b88c32c5"
+  },
+  {
+    "name": "Creeper Piñata Cosplayer",
+    "section": "MINECON Earth 2017",
+    "model": "CLASSIC",
+    "hash": "b7393199a84eb9e932efa8dda6829423875eb65af76cb82912ade62f93996b9c"
+  },
+  {
+    "name": "Sheep Cosplayer",
+    "section": "MINECON Earth 2017",
+    "model": "CLASSIC",
+    "hash": "7cbe449d9d37c111a07a902e322d3869d98790c48f1fa16a24bcbe2d8d73808b"
+  },
+  {
+    "name": "Cake Steve",
+    "section": "MINECON Earth 2017",
+    "model": "CLASSIC",
+    "hash": "b182ad5783a343be3e202ac35902270a8d31042fdfd48b849fc99a55a1b60a91"
+  },
+  {
+    "name": "Party Steve",
+    "section": "MINECON Earth 2017",
+    "model": "CLASSIC",
+    "hash": "c05e396bbf744082122f77b7277af390d11d2d4e93dd2f8c67942ca9626db24d"
+  },
+  {
+    "name": "Barn Builder",
+    "section": "Builders & Biomes",
+    "model": "CLASSIC",
+    "hash": "2007b66a99ae905c81f339e2a0a4bf4b99e9454a485d5164e3e1051c3036ad70"
+  },
+  {
+    "name": "Bee-Friender",
+    "section": "Builders & Biomes",
+    "model": "CLASSIC",
+    "hash": "59f2872323bf515aa8d84c00931fbf8170b2cec5138961527c09ffcd06ca4ab2"
+  },
+  {
+    "name": "Bee-Friender (Alternate)",
+    "section": "Builders & Biomes",
+    "model": "CLASSIC",
+    "hash": "7cd85127cbc710a1c9a53c6bb3474f59995c222b9d8c57b293993cc2d8a225aa"
+  },
+  {
+    "name": "Buff Butcher",
+    "section": "Builders & Biomes",
+    "model": "CLASSIC",
+    "hash": "5e4e09eccbce11e701c51bb64b102d688a6ac4018c725dd2b780210aee101b31"
+  },
+  {
+    "name": "Buff Butcher (Alternate)",
+    "section": "Builders & Biomes",
+    "model": "CLASSIC",
+    "hash": "d66ed86ce96a1b63c30f1baac762f638717930866474ac4fce697cdbd0bd6fbb"
+  },
+  {
+    "name": "Homestead Healer",
+    "section": "Builders & Biomes",
+    "model": "CLASSIC",
+    "hash": "b9e9d1b51b4be289b9525d4decd798cb7912e920bac8846a2df70e9ff4f0b1d8"
+  },
+  {
+    "name": "Pig Whisperer",
+    "section": "Builders & Biomes",
+    "model": "CLASSIC",
+    "hash": "83e283ab33558baa2cd0184d2e85f090c795a797bdbcb2cc47230c27f23fe9b1"
+  },
+  {
+    "name": "Pig Whisperer (Alternate)",
+    "section": "Builders & Biomes",
+    "model": "CLASSIC",
+    "hash": "e1fc44f1d69fd2864df7b80618a38af4170d4800f2df4fbde81c17b74b2a818b"
+  },
+  {
+    "name": "Ranch Ranger",
+    "section": "Builders & Biomes",
+    "model": "CLASSIC",
+    "hash": "25dc6421d47cad8e2bdf93f56fae9ab06fcfe218c8645c1775ae2e4563c065ad"
+  },
+  {
+    "name": "Snowfeather",
+    "section": "Striding Hero",
+    "model": "CLASSIC",
+    "hash": "721c05483a435d4362047ccb62e075ef5f001aa63a7e0e2afe03e60759bab91d"
+  },
+  {
+    "name": "Stray",
+    "section": "Striding Hero",
+    "model": "CLASSIC",
+    "hash": "b914cf5106aaa82409fdd9213fbdb1479b4d65aecc5d5e22b1f25e5744c4c4f7"
+  },
+  {
+    "name": "Strider",
+    "section": "Striding Hero",
+    "model": "CLASSIC",
+    "hash": "5eb077c54ecfc7e760c36add887b68859d7a3160d331580ff859f7353d959151"
+  },
+  {
+    "name": "Villager 1",
+    "section": "Striding Hero",
+    "model": "CLASSIC",
+    "hash": "b271a744ef479018927575952621b110b9c11f62730a95729af7e8591cf8dbf6"
+  },
+  {
+    "name": "Villager 2",
+    "section": "Striding Hero",
+    "model": "CLASSIC",
+    "hash": "748923629fed7c6ec9462016b4480fa3cff8c16e82ee6fe26d4b707f4de10060"
+  },
+  {
+    "name": "Wither Skeleton",
+    "section": "Striding Hero",
+    "model": "CLASSIC",
+    "hash": "3d996abc69ea70a20442855e429bf44b45111f9818d0f8c46272e12d12bec218"
+  },
+  {
+    "name": "Pale Lumberjack",
+    "section": "The Garden Awakens",
+    "model": "CLASSIC",
+    "hash": "6f8fc677cdcd4c6eed67d90c08d23162abc3a3a85357c7636fdf80d874aa857f"
+  },
+  {
+    "name": "Creaking",
+    "section": "The Garden Awakens",
+    "model": "CLASSIC",
+    "hash": "9a0af2b1fd9659480d43132db95cd7d459d1a66480fe42150e132d03b9731573"
+  },
+  {
+    "name": "Ghast Pilot",
+    "section": "Chase the Skies",
+    "model": "CLASSIC",
+    "hash": "8409954698b6c7741460fdd85d6ec6a5e0a9ad04ade7e2c72c913f02936a607d"
+  },
+  {
+    "name": "Ghast Swimmer",
+    "section": "Chase the Skies",
+    "model": "CLASSIC",
+    "hash": "e12d98dab548e92cad7ac80f92d8fefbb9ca7a1af94aa4f428daf6ef723aa8e0"
+  },
+  {
+    "name": "Copper Chemist",
+    "section": "The Copper Age",
+    "model": "CLASSIC",
+    "hash": "33aef79a4ca986a2971057d35046e71dce326b645353e6f92d56e1c4bb3b0073"
+  },
+  {
+    "name": "Copper Welder",
+    "section": "The Copper Age",
+    "model": "CLASSIC",
+    "hash": "514b10ff7bc50dd01b5438632815b9e27cfe54064d1a28ef6014f3309d278b38"
+  },
+  {
+    "name": "Zombie Horse Onesie",
+    "section": "Mounts of Mayhem",
+    "model": "CLASSIC",
+    "hash": "e0bae80c765f9ef3c3050dd72ea4d4bc53ae00e39c8a376a886d419abdc5dd84"
+  },
+  {
+    "name": "Baby Bee",
+    "section": "Tiny Takeover",
+    "model": "CLASSIC",
+    "archiveUrl": "https://www.minecraft.net/content/dam/minecraftnet/games/minecraft/software/Java_Skins.zip",
+    "member": "Java_Skins/baby_bee_skin.png",
+    "sha256": "890044fb07cbca79bb9ffec4d2f15cdd1053e4b554e9a02469e9d0b271f3fdfa"
+  },
+  {
+    "name": "Baby Axolotl",
+    "section": "Tiny Takeover",
+    "model": "CLASSIC",
+    "archiveUrl": "https://www.minecraft.net/content/dam/minecraftnet/games/minecraft/software/Java_Skins.zip",
+    "member": "Java_Skins/baby_axolotl_skin.png",
+    "sha256": "8d0484011053097a9809f14c0301166981369b3a660150afea1e753ae7e54685"
+  },
+  {
+    "name": "Brawler",
+    "section": "Chaos Cubed",
+    "model": "CLASSIC",
+    "archiveUrl": "https://www.minecraft.net/content/dam/minecraftnet/games/minecraft/software/summer-drop-2026-java-skins.zip",
+    "member": "skin_brawler.png",
+    "sha256": "995513cc5aebd9c1af08738f233d553e24fd2ca95a31bfa7c57dc4e86841b35b"
+  },
+  {
+    "name": "Builder",
+    "section": "Chaos Cubed",
+    "model": "CLASSIC",
+    "archiveUrl": "https://www.minecraft.net/content/dam/minecraftnet/games/minecraft/software/summer-drop-2026-java-skins.zip",
+    "member": "skin_builder.png",
+    "sha256": "500010a1c7bd59c7889f114bc1385357e4e07f15a2dbff826af7b8b66ffca662"
+  },
+  {
+    "name": "Rancher",
+    "section": "Chaos Cubed",
+    "model": "CLASSIC",
+    "archiveUrl": "https://www.minecraft.net/content/dam/minecraftnet/games/minecraft/software/summer-drop-2026-java-skins.zip",
+    "member": "skin_rancher.png",
+    "sha256": "5932e69e76bef20df5c836fdcd1528cdb832c2b0c3f165229532f29eceaf81a6"
+  },
+  {
+    "name": "Christina",
+    "section": "Dungeons Hero",
+    "model": "SLIM",
+    "archiveUrl": "https://www.minecraft.net/content/dam/minecraftnet/games/minecraft/software/Dungeons%20Hero%20Skin%20Pack.zip",
+    "member": "D1_Skins/Christina.png",
+    "sha256": "36731836bd2270487a8d614d3fdd1074264852f0826bb9607ebab0e3fd3c6345"
+  },
+  {
+    "name": "Dani",
+    "section": "Dungeons Hero",
+    "model": "SLIM",
+    "archiveUrl": "https://www.minecraft.net/content/dam/minecraftnet/games/minecraft/software/Dungeons%20Hero%20Skin%20Pack.zip",
+    "member": "D1_Skins/Dani.png",
+    "sha256": "310666ae1d0e2387d1ef13678522840658db95f3cb07bdbc14913077876a1417"
+  },
+  {
+    "name": "Fishy",
+    "section": "Dungeons Hero",
+    "model": "SLIM",
+    "archiveUrl": "https://www.minecraft.net/content/dam/minecraftnet/games/minecraft/software/Dungeons%20Hero%20Skin%20Pack.zip",
+    "member": "D1_Skins/Fishy.png",
+    "sha256": "c6684222a28e006df7a8388c6e5b7748d07a13205af69f63d3fe73626997fb70"
+  },
+  {
+    "name": "Hal",
+    "section": "Dungeons Hero",
+    "model": "CLASSIC",
+    "archiveUrl": "https://www.minecraft.net/content/dam/minecraftnet/games/minecraft/software/Dungeons%20Hero%20Skin%20Pack.zip",
+    "member": "D1_Skins/Hal.png",
+    "sha256": "dc8ab4bcd3b3c22b272a55b386438f79fde249140ba3f96a0ba037e0c2f8de18"
+  },
+  {
+    "name": "Hedwig",
+    "section": "Dungeons Hero",
+    "model": "CLASSIC",
+    "archiveUrl": "https://www.minecraft.net/content/dam/minecraftnet/games/minecraft/software/Dungeons%20Hero%20Skin%20Pack.zip",
+    "member": "D1_Skins/Hedwig.png",
+    "sha256": "1476ada0f58abf2a4403436d5a438f2899cc8329edbc2c9367e0a25c7b5a84ee"
+  },
+  {
+    "name": "Hex",
+    "section": "Dungeons Hero",
+    "model": "CLASSIC",
+    "archiveUrl": "https://www.minecraft.net/content/dam/minecraftnet/games/minecraft/software/Dungeons%20Hero%20Skin%20Pack.zip",
+    "member": "D1_Skins/Hex.png",
+    "sha256": "b63f57134f50657152521b956675d289a4386fd63901ee82f6502c64ab5d3126"
+  },
+  {
+    "name": "Jellyfish Girl",
+    "section": "Dungeons Hero",
+    "model": "SLIM",
+    "archiveUrl": "https://www.minecraft.net/content/dam/minecraftnet/games/minecraft/software/Dungeons%20Hero%20Skin%20Pack.zip",
+    "member": "D1_Skins/JellyfishGirl.png",
+    "sha256": "09d9925c4e96189306b052a6731e9a12b22c80e733c0a253ff46a36c7baf12d5"
+  },
+  {
+    "name": "Loge",
+    "section": "Dungeons Hero",
+    "model": "SLIM",
+    "archiveUrl": "https://www.minecraft.net/content/dam/minecraftnet/games/minecraft/software/Dungeons%20Hero%20Skin%20Pack.zip",
+    "member": "D1_Skins/Loge.png",
+    "sha256": "dcee4db7732ede19b023beab73f827dfade83b22d7713a86365f8e53de565dd1"
+  },
+  {
+    "name": "Paw Prints",
+    "section": "Dungeons Hero",
+    "model": "SLIM",
+    "archiveUrl": "https://www.minecraft.net/content/dam/minecraftnet/games/minecraft/software/Dungeons%20Hero%20Skin%20Pack.zip",
+    "member": "D1_Skins/PawPrints.png",
+    "sha256": "4f69302d0838a460b5cbf28d24768f0e0647168e08be634995f4c94bae3d3a6b"
+  },
+  {
+    "name": "Penguin Onesie",
+    "section": "Dungeons Hero",
+    "model": "SLIM",
+    "archiveUrl": "https://www.minecraft.net/content/dam/minecraftnet/games/minecraft/software/Dungeons%20Hero%20Skin%20Pack.zip",
+    "member": "D1_Skins/PenguinOnesie.png",
+    "sha256": "74c2a9c8373bcdc5194c7984720aed44e2f878a262f2e115e31cf9aa52731678"
+  },
+  {
+    "name": "Pig Onesie",
+    "section": "Dungeons Hero",
+    "model": "SLIM",
+    "archiveUrl": "https://www.minecraft.net/content/dam/minecraftnet/games/minecraft/software/Dungeons%20Hero%20Skin%20Pack.zip",
+    "member": "D1_Skins/PigOnesie.png",
+    "sha256": "65f34902a90d1ba5f75f3c309fc36ed115bedafdc188992f786ac73503f4253c"
+  },
+  {
+    "name": "Tim",
+    "section": "Dungeons Hero",
+    "model": "SLIM",
+    "archiveUrl": "https://www.minecraft.net/content/dam/minecraftnet/games/minecraft/software/Dungeons%20Hero%20Skin%20Pack.zip",
+    "member": "D1_Skins/Tim.png",
+    "sha256": "89eed2e95729d5356cef723fbbb263d4fdf3e1517897bead75ddd1d149357fce"
+  },
+  {
+    "name": "Valorie",
+    "section": "Dungeons Hero",
+    "model": "CLASSIC",
+    "archiveUrl": "https://www.minecraft.net/content/dam/minecraftnet/games/minecraft/software/Dungeons%20Hero%20Skin%20Pack.zip",
+    "member": "D1_Skins/Valorie.png",
+    "sha256": "5952c848467ccb4d2b92922cdf617e9c3bf79357c798657ed94c98b2c3f9ef3e"
+  },
+  {
+    "name": "Darian",
+    "section": "Dungeons II Hero",
+    "model": "SLIM",
+    "archiveUrl": "https://www.minecraft.net/content/dam/minecraftnet/games/minecraft/software/Dungeons%20II%20Hero%20Skin%20Pack.zip",
+    "member": "D2_Skins/Darian.png",
+    "sha256": "77522b3928478b59abdd563e80a3c8f5db4a07c704c9e513b5f5e6dc0e64e72c"
+  },
+  {
+    "name": "Edson",
+    "section": "Dungeons II Hero",
+    "model": "SLIM",
+    "archiveUrl": "https://www.minecraft.net/content/dam/minecraftnet/games/minecraft/software/Dungeons%20II%20Hero%20Skin%20Pack.zip",
+    "member": "D2_Skins/Edson.png",
+    "sha256": "a5d0eaa19eea5d9e662e7520fee7216b0a5a59e78640af3c4c30a2dfa462e6bf"
+  },
+  {
+    "name": "Eshe",
+    "section": "Dungeons II Hero",
+    "model": "SLIM",
+    "archiveUrl": "https://www.minecraft.net/content/dam/minecraftnet/games/minecraft/software/Dungeons%20II%20Hero%20Skin%20Pack.zip",
+    "member": "D2_Skins/Eshe.png",
+    "sha256": "3dadaceb47d8852fff985707d2f392ec66568efda15045b57d04cbad0ab715f7"
+  },
+  {
+    "name": "Esperanza",
+    "section": "Dungeons II Hero",
+    "model": "SLIM",
+    "archiveUrl": "https://www.minecraft.net/content/dam/minecraftnet/games/minecraft/software/Dungeons%20II%20Hero%20Skin%20Pack.zip",
+    "member": "D2_Skins/Esperanza.png",
+    "sha256": "a266b030b3da519ea22be29cf872a44bdf601d2047ae6ee6ae6623546abce54b"
+  },
+  {
+    "name": "Flores",
+    "section": "Dungeons II Hero",
+    "model": "SLIM",
+    "archiveUrl": "https://www.minecraft.net/content/dam/minecraftnet/games/minecraft/software/Dungeons%20II%20Hero%20Skin%20Pack.zip",
+    "member": "D2_Skins/Flores.png",
+    "sha256": "2edcb60259e05b3c409541658579359a00b576990f8d2e0039c0b9f6e801e6b4"
+  },
+  {
+    "name": "Gaston",
+    "section": "Dungeons II Hero",
+    "model": "SLIM",
+    "archiveUrl": "https://www.minecraft.net/content/dam/minecraftnet/games/minecraft/software/Dungeons%20II%20Hero%20Skin%20Pack.zip",
+    "member": "D2_Skins/Gaston.png",
+    "sha256": "54f244872ab053e55b95a634fbd25e11733818395aec51e650f98327f42409b1"
+  },
+  {
+    "name": "Greta",
+    "section": "Dungeons II Hero",
+    "model": "SLIM",
+    "archiveUrl": "https://www.minecraft.net/content/dam/minecraftnet/games/minecraft/software/Dungeons%20II%20Hero%20Skin%20Pack.zip",
+    "member": "D2_Skins/Greta.png",
+    "sha256": "5aec43f14d118bdbe3a077686f12d17c508a9bdc7de1397ee9f18e49811d6e0a"
+  },
+  {
+    "name": "Gubbis",
+    "section": "Dungeons II Hero",
+    "model": "SLIM",
+    "archiveUrl": "https://www.minecraft.net/content/dam/minecraftnet/games/minecraft/software/Dungeons%20II%20Hero%20Skin%20Pack.zip",
+    "member": "D2_Skins/Gubbis.png",
+    "sha256": "fa68cfec19bbb5c8cbfb4800ee90b2939bde29545be69d7cff7a5af70030600a"
+  },
+  {
+    "name": "Javier",
+    "section": "Dungeons II Hero",
+    "model": "SLIM",
+    "archiveUrl": "https://www.minecraft.net/content/dam/minecraftnet/games/minecraft/software/Dungeons%20II%20Hero%20Skin%20Pack.zip",
+    "member": "D2_Skins/Javier.png",
+    "sha256": "47c51370bb266bef1221a84ae80c9f668afce952f775c95a92a645a8106ae381"
+  },
+  {
+    "name": "Kellen",
+    "section": "Dungeons II Hero",
+    "model": "SLIM",
+    "archiveUrl": "https://www.minecraft.net/content/dam/minecraftnet/games/minecraft/software/Dungeons%20II%20Hero%20Skin%20Pack.zip",
+    "member": "D2_Skins/Kellen.png",
+    "sha256": "d3ca6cf388f9211bcb116c9e957db034a8e1400624d09cf261e8902e5cc8fa90"
+  },
+  {
+    "name": "Mats",
+    "section": "Dungeons II Hero",
+    "model": "SLIM",
+    "archiveUrl": "https://www.minecraft.net/content/dam/minecraftnet/games/minecraft/software/Dungeons%20II%20Hero%20Skin%20Pack.zip",
+    "member": "D2_Skins/Mats.png",
+    "sha256": "bc245f3e5a59433c9b1bfac148ffbb4cc34652ab6fdbbb267a6ffbee56d3e953"
+  },
+  {
+    "name": "Nuru",
+    "section": "Dungeons II Hero",
+    "model": "SLIM",
+    "archiveUrl": "https://www.minecraft.net/content/dam/minecraftnet/games/minecraft/software/Dungeons%20II%20Hero%20Skin%20Pack.zip",
+    "member": "D2_Skins/Nuru.png",
+    "sha256": "5a681ae62b1a180d103f26af5e3a79e75f668687f3e2459c79ab77aa5c7c1f03"
+  },
+  {
+    "name": "Pim",
+    "section": "Dungeons II Hero",
+    "model": "SLIM",
+    "archiveUrl": "https://www.minecraft.net/content/dam/minecraftnet/games/minecraft/software/Dungeons%20II%20Hero%20Skin%20Pack.zip",
+    "member": "D2_Skins/Pim.png",
+    "sha256": "8152361b026a1a290be3f4879ba2cf36109d8bdca6e0de4be0332b069e334516"
+  },
+  {
+    "name": "Qamar",
+    "section": "Dungeons II Hero",
+    "model": "SLIM",
+    "archiveUrl": "https://www.minecraft.net/content/dam/minecraftnet/games/minecraft/software/Dungeons%20II%20Hero%20Skin%20Pack.zip",
+    "member": "D2_Skins/Qamar.png",
+    "sha256": "b997695a898aa6497f792f730553e9fdfcca7aac0aeac907043d1e79f2da4cdf"
+  },
+  {
+    "name": "Raven",
+    "section": "Dungeons II Hero",
+    "model": "SLIM",
+    "archiveUrl": "https://www.minecraft.net/content/dam/minecraftnet/games/minecraft/software/Dungeons%20II%20Hero%20Skin%20Pack.zip",
+    "member": "D2_Skins/Raven.png",
+    "sha256": "fa29361fb2d3198bb3ff7c5f47552f2eee9f3ce5d8fedc3d2c87786f53cb0277"
+  },
+  {
+    "name": "Ren",
+    "section": "Dungeons II Hero",
+    "model": "SLIM",
+    "archiveUrl": "https://www.minecraft.net/content/dam/minecraftnet/games/minecraft/software/Dungeons%20II%20Hero%20Skin%20Pack.zip",
+    "member": "D2_Skins/Ren.png",
+    "sha256": "153889fa7e3e97eef69cd34dfd22abefa9d49794b52b5cbc37ea4c6dd95a410f"
+  },
+  {
+    "name": "Riggs",
+    "section": "Dungeons II Hero",
+    "model": "SLIM",
+    "archiveUrl": "https://www.minecraft.net/content/dam/minecraftnet/games/minecraft/software/Dungeons%20II%20Hero%20Skin%20Pack.zip",
+    "member": "D2_Skins/Riggs.png",
+    "sha256": "8b9464ff312c021c272033a0dc77f0915b03df168e2f29b9c5f2f215e236be74"
+  },
+  {
+    "name": "Stella",
+    "section": "Dungeons II Hero",
+    "model": "SLIM",
+    "archiveUrl": "https://www.minecraft.net/content/dam/minecraftnet/games/minecraft/software/Dungeons%20II%20Hero%20Skin%20Pack.zip",
+    "member": "D2_Skins/Stella.png",
+    "sha256": "072b42d05eec038f87dffbbed9b1acdd875fe548012a3d08e27ef8ed9daa01fd"
+  },
+  {
+    "name": "Tula",
+    "section": "Dungeons II Hero",
+    "model": "SLIM",
+    "archiveUrl": "https://www.minecraft.net/content/dam/minecraftnet/games/minecraft/software/Dungeons%20II%20Hero%20Skin%20Pack.zip",
+    "member": "D2_Skins/Tula.png",
+    "sha256": "2a5a8452b2f1ebb87edf5b69c88096e5dbb322948cb6ff16aa37bd8cd1a4bda4"
+  },
+  {
+    "name": "Valorie",
+    "section": "Dungeons II Hero",
+    "model": "SLIM",
+    "archiveUrl": "https://www.minecraft.net/content/dam/minecraftnet/games/minecraft/software/Dungeons%20II%20Hero%20Skin%20Pack.zip",
+    "member": "D2_Skins/Valorie.png",
+    "sha256": "97d8c39dcdb48ab6b1efc7949b77b542b130ea6f5fc14b48e63b2877ac9afe1c"
+  },
+  {
+    "name": "Violet",
+    "section": "Dungeons II Hero",
+    "model": "SLIM",
+    "archiveUrl": "https://www.minecraft.net/content/dam/minecraftnet/games/minecraft/software/Dungeons%20II%20Hero%20Skin%20Pack.zip",
+    "member": "D2_Skins/Violet.png",
+    "sha256": "245113f4eecfd2258b0dfa95f936278c4821a754d60fe643d1ef1d1f9162022e"
+  },
+  {
+    "name": "Big Foot",
+    "section": "Wilderness Bound",
+    "model": "SLIM",
+    "archiveUrl": "https://www.minecraft.net/content/dam/minecraftnet/games/minecraft/software/FallGameDrop_26_BigfootSkinpack.zip",
+    "member": "Content/skin_pack/Bigfoot.png",
+    "sha256": "72d5dcde3bb9fc775b4ed72911564b760c2865be383c8ded6d38e258b85efb39"
+  },
+  {
+    "name": "Mushroom Forager",
+    "section": "Wilderness Bound",
+    "model": "CLASSIC",
+    "archiveUrl": "https://www.minecraft.net/content/dam/minecraftnet/games/minecraft/software/FallGameDrop_26_MushroomForagerSkinpack.zip",
+    "member": "Content/skin_pack/Mushroom_Forager.png",
+    "sha256": "d34d94e146925c8a79e319279df2b31407e853eaf475a4e51d044b093fbf0852"
+  }
+]

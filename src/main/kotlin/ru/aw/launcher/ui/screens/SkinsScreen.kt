@@ -39,25 +39,8 @@ import ru.aw.launcher.ui.theme.*
 import java.io.ByteArrayInputStream
 import javax.imageio.ImageIO
 
-private data class DefaultSkin(val name: String, val hash: String, val model: SkinModel) {
-    val url get() = "https://textures.minecraft.net/texture/$hash"
-}
-
-// Public texture identifiers of the nine standard Minecraft Java characters.
-private val defaultSkins = listOf(
-    DefaultSkin("Steve", "31f477eb1a7beee631c2ca64d06f8f68fa93a3386d04452ab27f43acdf1b60cb", SkinModel.CLASSIC),
-    DefaultSkin("Alex", "46acd06e8483b176e8ea39fc12fe105eb3a2a4970f5100057e9d84d4b60bdfa7", SkinModel.SLIM),
-    DefaultSkin("Ari", "4c05ab9e07b3505dc3ec11370c3bdce5570ad2fb2b562e9b9dd9cf271f81aa44", SkinModel.CLASSIC),
-    DefaultSkin("Efe", "fece7017b1bb13926d1158864b283b8b930271f80a90482f174cca6a17e88236", SkinModel.SLIM),
-    DefaultSkin("Kai", "e5cdc3243b2153ab28a159861be643a4fc1e3c17d291cdd3e57a7f370ad676f3", SkinModel.CLASSIC),
-    DefaultSkin("Makena", "7cb3ba52ddd5cc82c0b050c3f920f87da36add80165846f479079663805433db", SkinModel.SLIM),
-    DefaultSkin("Noor", "6c160fbd16adbc4bff2409e70180d911002aebcfa811eb6ec3d1040761aea6dd", SkinModel.SLIM),
-    DefaultSkin("Sunny", "a3bd16079f764cd541e072e888fe43885e711f98658323db0f9a6045da91ee7a", SkinModel.CLASSIC),
-    DefaultSkin("Zuri", "f5dddb41dcafef616e959c2817808e0be741c89ffbfed39134a13e75b811863d", SkinModel.CLASSIC),
-)
-
 @Composable
-internal fun SkinsScreen(state: LauncherState, preview: SkinImage? = null) {
+internal fun SkinsScreen(state: LauncherState, preview: SkinImage? = null, initialQuery: String = "") {
     val accounts by state.accounts.collectAsState()
     val selectedAccount by state.selectedAccount.collectAsState()
     val licensed = accounts.filterNot { it.isOffline }
@@ -81,7 +64,10 @@ internal fun SkinsScreen(state: LauncherState, preview: SkinImage? = null) {
     var deleting by remember { mutableStateOf<SavedSkin?>(null) }
     var accountsOpen by remember { mutableStateOf(false) }
     var savedOpen by remember { mutableStateOf(true) }
-    var defaultsOpen by remember { mutableStateOf(true) }
+    var query by remember { mutableStateOf(initialQuery) }
+    val openSections = remember { mutableStateMapOf("Стандартные скины" to true) }
+    val presets = SkinCatalog.presets
+    val matchingSaved = saved.filter { query.isBlank() || it.name.contains(query.trim(), true) }
     val working = saving || state.skinWorkingUuid != null
     LaunchedEffect(state.skinAccountUuid) { state.skinAccountUuid?.let { accountId = it } }
 
@@ -96,7 +82,7 @@ internal fun SkinsScreen(state: LauncherState, preview: SkinImage? = null) {
             current = preview ?: account?.let { SkinHeads.texture(it) }?.let(MinecraftSkins::fromImage)
             val refreshed = if (preview == null && account != null) AccountManager.skinProfile(account.uuid) else account
             current = preview ?: refreshed?.let { SkinHeads.texture(it) }?.let(MinecraftSkins::fromImage)
-                ?: SkinHeads.texture(defaultSkins.first().url)?.let(MinecraftSkins::fromImage)
+                ?: SkinHeads.texture(presets.first())?.let(MinecraftSkins::fromImage)
             currentModel = refreshed?.skinModel ?: SkinModel.CLASSIC
             currentCape = refreshed?.capeId
             if (choice == "current") { model = currentModel; capeId = currentCape }
@@ -108,7 +94,7 @@ internal fun SkinsScreen(state: LauncherState, preview: SkinImage? = null) {
         value = null
         try {
             value = if (choice == "current") current else saved.firstOrNull { it.id == choice }?.let { library.image(it) }
-                ?: defaultSkins.firstOrNull { it.name == choice }?.let { SkinHeads.texture(it.url)?.let(MinecraftSkins::fromImage) }
+                ?: presets.firstOrNull { it.id == choice }?.let { SkinHeads.texture(it)?.let(MinecraftSkins::fromImage) }
             if (value == null && !loading) error = "Не удалось загрузить скин"
         } catch (failure: CancellationException) { throw failure }
         catch (failure: Exception) { error = failure.message ?: "Не удалось загрузить скин" }
@@ -119,7 +105,7 @@ internal fun SkinsScreen(state: LauncherState, preview: SkinImage? = null) {
     val skinChanged = picked != null && (current == null || !picked!!.png.contentEquals(current!!.png) || model != currentModel)
     val pending = skinChanged || capeId != currentCape
     val selectedSaved = saved.firstOrNull { it.id == choice }
-    val selectedName = selectedSaved?.name ?: defaultSkins.firstOrNull { it.name == choice }?.name ?: "Текущий скин"
+    val selectedName = selectedSaved?.name ?: presets.firstOrNull { it.id == choice }?.name ?: "Текущий скин"
     fun edit() { picked?.let { editor = SkinDraft(it, model, capeId, selectedName, selectedSaved) } }
     fun add(path: java.nio.file.Path) { scope.launch {
         error = null
@@ -184,16 +170,19 @@ internal fun SkinsScreen(state: LauncherState, preview: SkinImage? = null) {
                     val bounds = remember { mutableStateMapOf<String, Rect>() }
                     var dragged by remember { mutableStateOf<String?>(null) }
                     var dragOffset by remember { mutableStateOf(Offset.Zero) }
-                    Box(modifier) {
+                    Column(modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        AWTextField(query, onValueChange = { query = it; openSections.clear() }, placeholder = "Поиск скинов или набора…", modifier = Modifier.fillMaxWidth(), clearable = true)
+                        Box(Modifier.weight(1f).fillMaxWidth()) {
                         LazyVerticalGrid(GridCells.Fixed(columns), state = grid, modifier = Modifier.fillMaxSize().padding(end = 12.dp),
                             horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             if (compact) item("preview", span = { GridItemSpan(maxLineSpan) }) {
                                 previewContent(Modifier.fillMaxWidth().height(330.dp))
                             }
-                            item("saved-heading", span = { GridItemSpan(maxLineSpan) }) {
+                            if (query.isBlank() || matchingSaved.isNotEmpty()) item("saved-heading", span = { GridItemSpan(maxLineSpan) }) {
                                 SkinSectionTitle("Сохранённые скины", savedOpen) { savedOpen = !savedOpen }
                             }
                             if (savedOpen) {
+                                if (query.isBlank()) {
                                 item("add") {
                                     Column(Modifier.fillMaxWidth().aspectRatio(31f / 40f).clip(RoundedCornerShape(20.dp)).background(AWColors.Surface)
                                         .clickable(enabled = !working) { chooseSkinFile()?.let(::add) }, verticalArrangement = Arrangement.Center,
@@ -217,7 +206,9 @@ internal fun SkinsScreen(state: LauncherState, preview: SkinImage? = null) {
                                             })
                                         })
                                 }
-                                itemsIndexed(saved, key = { _, skin -> skin.id }) { index, skin ->
+                                }
+                                items(matchingSaved, key = { it.id }) { skin ->
+                                    val index = saved.indexOf(skin)
                                     SkinCard(skin.name, skin.model, choice == skin.id, !working, { library.image(skin) },
                                         { choice = skin.id; model = skin.model; capeId = skin.capeId?.takeIf { id -> account?.capes?.any { it.id == id } == true } },
                                         menu = { close ->
@@ -246,16 +237,27 @@ internal fun SkinsScreen(state: LauncherState, preview: SkinImage? = null) {
                                             })
                                 }
                             }
-                            item("defaults-heading", span = { GridItemSpan(maxLineSpan) }) {
-                                SkinSectionTitle("Стандартные скины", defaultsOpen) { defaultsOpen = !defaultsOpen }
+                            SkinCatalog.sections.forEach { (section, entries) ->
+                                val matches = entries.filter { query.isBlank() || it.name.contains(query.trim(), true) || section.contains(query.trim(), true) }
+                                if (matches.isNotEmpty()) {
+                                    val expanded = openSections[section] ?: (query.isNotBlank() || section == "Стандартные скины")
+                                    item("section:$section", span = { GridItemSpan(maxLineSpan) }) {
+                                        SkinSectionTitle("$section · ${matches.size}", expanded) { openSections[section] = !expanded }
+                                    }
+                                    if (expanded) items(matches, key = { it.id }) { skin ->
+                                        SkinCard(skin.name, skin.model, choice == skin.id, !working,
+                                            { SkinHeads.texture(skin)?.let(MinecraftSkins::fromImage) },
+                                            { choice = skin.id; model = skin.model; capeId = null })
+                                    }
+                                }
                             }
-                            if (defaultsOpen) items(defaultSkins, key = { it.name }) { skin ->
-                                SkinCard(skin.name, skin.model, choice == skin.name, !working,
-                                    { SkinHeads.texture(skin.url)?.let(MinecraftSkins::fromImage) },
-                                    { choice = skin.name; model = skin.model; capeId = null })
-                            }
+                            if (query.isNotBlank() && matchingSaved.isEmpty() && presets.none { it.name.contains(query.trim(), true) || it.section.contains(query.trim(), true) })
+                                item("no-skins", span = { GridItemSpan(maxLineSpan) }) {
+                                    Text("Скины не найдены", color = AWColors.TextMuted, style = MaterialTheme.typography.bodyMedium)
+                                }
                         }
                         VerticalScrollbar(rememberScrollbarAdapter(grid), Modifier.align(Alignment.CenterEnd).fillMaxHeight())
+                        }
                     }
                 }
                 if (compact) gallery(Modifier.fillMaxSize())
