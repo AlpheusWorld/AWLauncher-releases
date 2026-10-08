@@ -39,6 +39,11 @@ class ImportProfilesTest {
             s.execute("INSERT INTO instance_content_sets VALUES ('current','1.21.4','fabric','0.18.5')")
             s.execute("INSERT INTO instance_content_sets VALUES ('old','1.20.1','forge','47.0.1')")
         } }
+        Files.createDirectories(temp.resolve("profiles/Other profile/mods"))
+        DriverManager.getConnection("jdbc:sqlite:$db").use { connection -> connection.createStatement().use { stmt ->
+            stmt.execute("INSERT INTO instances VALUES ('Fabulously Optimized','Other profile',NULL,1720000000,360000,120000,'other')")
+            stmt.execute("INSERT INTO instance_content_sets VALUES ('other','1.21.4','fabric','0.18.5')")
+        } }
         val before = Files.readAllBytes(db)
         val profile = ImportProfiles.discover(game).single()
         assertEquals("1.21.4", profile.versionId)
@@ -46,7 +51,8 @@ class ImportProfilesTest {
         assertEquals("Fabulously Optimized", profile.name)
         assertEquals(4_800_000L, profile.playTimeMillis)
         assertEquals(1_720_000_000_000L, profile.lastPlayed)
-        assertEquals(profile, ImportProfiles.discover(temp).single())
+        assertEquals(profile, ImportProfiles.discover(temp).single { it.gameDir == game })
+        assertEquals(2, ImportProfiles.discover(temp).size)
         assertArrayEquals(before, Files.readAllBytes(db))
     }
 

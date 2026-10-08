@@ -312,7 +312,7 @@ private fun LanguagePanel(settings: LauncherSettings) {
         SectionTitle("Язык приложения")
         OutlinedTextField(value = query, onValueChange = { query = it }, singleLine = true,
             placeholder = { Text("Поиск языка…") }, modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(10.dp),
+            shape = RoundedCornerShape(AWDimens.CornerMedium),
             colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AWColors.Accent,
                 unfocusedBorderColor = AWColors.Outline, focusedContainerColor = AWColors.SurfaceHigh,
                 unfocusedContainerColor = AWColors.SurfaceHigh))
@@ -322,7 +322,7 @@ private fun LanguagePanel(settings: LauncherSettings) {
             LazyColumn(Modifier.fillMaxSize().padding(end = 12.dp), state = scroll, verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 items(languages, key = { it.name }) { language ->
                     val selected = settings.language == language
-                    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
+                    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(AWDimens.CornerMedium))
                         .background(if (selected) AWColors.AccentSoft else Color.Transparent)
                         .selectable(selected, role = Role.RadioButton, onClick = { Settings.update { it.copy(language = language) } }).padding(horizontal = 12.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {

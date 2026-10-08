@@ -74,9 +74,10 @@ fun LauncherTitleBar(
     }
     BoxWithConstraints(Modifier.fillMaxWidth().background(AWColors.Sidebar)) {
         val compact = maxWidth < 900.dp
+        val brandingWidth = if (maxWidth >= 1160.dp) 188.dp else 176.dp
         Column(Modifier.fillMaxWidth()) {
             Row(Modifier.fillMaxWidth().height(AWDimens.TitleBarHeight), verticalAlignment = Alignment.CenterVertically) {
-                DragArea(windowScope, Modifier.width(176.dp).fillMaxHeight(), nativeFrame, toggleMaximize) {
+                DragArea(windowScope, Modifier.width(brandingWidth).fillMaxHeight(), nativeFrame, toggleMaximize) {
                     Box(Modifier.fillMaxSize().padding(horizontal = 12.dp), contentAlignment = Alignment.CenterStart) {
                         Wordmark(148.dp)
                     }
@@ -104,7 +105,7 @@ fun LauncherTitleBar(
                     VersionPill(state, compact = true)
                     Spacer(Modifier.width(12.dp))
                     Row(
-                        Modifier.widthIn(max = 210.dp).background(AWColors.Surface, RoundedCornerShape(10.dp))
+                        Modifier.widthIn(max = 210.dp).background(AWColors.Surface, RoundedCornerShape(AWDimens.CornerMedium))
                             .clickable { state.screen = Screen.DOWNLOADS }
                             .padding(horizontal = 10.dp, vertical = 6.dp),
                         horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically,

@@ -120,7 +120,7 @@ fun AWTextField(
         animationSpec = AWMotion.Hover,
         label = "fieldOutline",
     )
-    val shape = RoundedCornerShape(10.dp)
+    val shape = RoundedCornerShape(AWDimens.CornerMedium)
 
     BasicTextField(
         value = value,
@@ -202,9 +202,9 @@ fun ChoiceChip(
     val hovered by interaction.collectIsHoveredAsState()
     val background by animateColorAsState(
         when {
-            selected -> AWColors.AccentSoft
+            selected -> AWColors.SurfaceHigh
             hovered && enabled -> AWColors.Outline
-            else -> AWColors.SurfaceHigh
+            else -> AWColors.Surface
         },
         animationSpec = AWMotion.Hover,
         label = "chipBackground",
@@ -218,9 +218,9 @@ fun ChoiceChip(
     Row(
         modifier
             .height(44.dp)
-            .clip(RoundedCornerShape(10.dp))
+            .clip(RoundedCornerShape(AWDimens.CornerMedium))
             .background(background)
-            .border(1.dp, if (selected) AWColors.Accent.copy(alpha = 0.45f) else AWColors.Outline, RoundedCornerShape(10.dp))
+            .border(1.dp, if (selected) AWColors.Accent.copy(alpha = 0.30f) else Color.Transparent, RoundedCornerShape(AWDimens.CornerMedium))
             .clickable(enabled = enabled, interactionSource = interaction, indication = null, onClick = onClick)
             .padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -288,17 +288,17 @@ fun AWButton(
     Button(
         onClick = onClick,
         enabled = enabled,
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(AWDimens.CornerMedium),
         colors = colors.copy(containerColor = background),
         interactionSource = interaction,
-        contentPadding = PaddingValues(horizontal = 24.dp),
-        modifier = modifier.height(48.dp).graphicsLayer { translationY = pressOffset * 2.dp.toPx() },
+        contentPadding = PaddingValues(horizontal = 18.dp),
+        modifier = modifier.height(44.dp).graphicsLayer { translationY = pressOffset * 1.dp.toPx() },
     ) {
         if (icon != null) {
             Icon(icon, null, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(10.dp))
         }
-        Text(text, style = MaterialTheme.typography.labelLarge, fontSize = 15.sp, fontWeight = FontWeight.Bold, maxLines = 1, translate = translate)
+        Text(text, style = MaterialTheme.typography.labelLarge, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, translate = translate)
     }
 }
 
@@ -386,7 +386,7 @@ fun AWDropdownMenu(
         shape = RoundedCornerShape(AWDimens.CornerCard),
         containerColor = AWColors.SurfaceHigh,
         border = androidx.compose.foundation.BorderStroke(1.dp, AWColors.Outline.copy(alpha = 0.6f)),
-        shadowElevation = 12.dp,
+        shadowElevation = 3.dp,
         properties = androidx.compose.ui.window.PopupProperties(focusable = focusable),
         content = content,
     )

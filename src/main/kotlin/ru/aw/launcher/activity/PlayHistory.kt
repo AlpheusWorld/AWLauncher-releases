@@ -10,6 +10,7 @@ import ru.aw.launcher.core.writeAtomically
 import ru.aw.launcher.meta.LoaderKind
 import ru.aw.launcher.packs.Modpacks
 import ru.aw.launcher.instance.LocalBuilds
+import ru.aw.launcher.instance.InstanceStore
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.nio.file.Files
@@ -39,6 +40,7 @@ data class PlaySession(
     val pack: String? = null,
     val buildId: String? = null,
     val buildName: String? = null,
+    val launcherOwned: Boolean = false,
 ) {
     val millis: Long get() = end - start
     val label: String get() = buildName ?: pack ?: if (loader.isModded) "$versionId ${loader.label}" else versionId
@@ -75,16 +77,29 @@ object PlayHistory {
         loadCache()
         loadHistory()
         val seen = HashSet<String>()
-        val buildsByFolder = LocalBuilds.list().associateBy { LocalBuilds.dirOf(it).fileName.toString() }
+        val buildsByFolder = LocalBuilds.list().associateBy { LocalBuilds.dirOf(it).toAbsolutePath().normalize() }
+        val ownedNames = HashSet<String>()
+        val nativeRoot = Paths.instances.toAbsolutePath().normalize()
         val found = roots.filter { it.isDirectory() }.flatMap { root ->
             runCatching { root.listDirectoryEntries() }.getOrDefault(emptyList())
                 .filter { it.resolve("logs").isDirectory() }
-                .flatMap { instance -> sessionsOf(instance, zone, seen, buildsByFolder[instance.name]) }
+                .flatMap { instance ->
+                    val path = instance.toAbsolutePath().normalize()
+                    val build = buildsByFolder[path]
+                    val owned = build != null || path.startsWith(nativeRoot) ||
+                        instance.resolve(InstanceStore.FILE_NAME).exists() || Modpacks.read(instance) != null
+                    if (!owned) emptyList() else {
+                        ownedNames += instance.name
+                        sessionsOf(instance, zone, seen, build).map { it.copy(launcherOwned = true) }
+                    }
+                }
         }
         cache.keys.retainAll(seen)
         saveCache()
         if (remember(found)) saveHistory()
-        return history.values.sortedBy { it.start }
+        // Retain the original history file, but exclude foreign launcher sessions from AW statistics.
+        return history.values.filter { it.launcherOwned || it.buildId != null || it.pack != null || it.instance in ownedNames }
+            .sortedBy { it.start }
     }
 
     private fun remember(found: List<PlaySession>): Boolean {
@@ -99,6 +114,7 @@ object PlayHistory {
                 server = session.server ?: known.server,
                 buildId = session.buildId ?: known.buildId,
                 buildName = session.buildName ?: known.buildName,
+                launcherOwned = session.launcherOwned || known.launcherOwned,
             )
             if (merged != known) {
                 history[key] = merged

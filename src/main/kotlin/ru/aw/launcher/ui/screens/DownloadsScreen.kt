@@ -45,7 +45,7 @@ fun DownloadsScreen(state: LauncherState) {
             EmptyState(AWIcons.Download, "Загрузок пока нет", "Добавляй моды и сборки из каталога — они загрузятся по очереди",
                 Modifier.fillMaxWidth().weight(1f))
         } else {
-            LazyColumn(Modifier.fillMaxWidth().weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp),
+            LazyColumn(Modifier.fillMaxWidth().weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp),
                 contentPadding = PaddingValues(bottom = 12.dp)) {
                 itemsIndexed(ordered, key = { _, item -> item.id }) { _, item ->
                     val position = queue.items.filter { it.status == DownloadStatus.WAITING }.indexOfFirst { it.id == item.id } + 1
@@ -65,10 +65,9 @@ private fun DownloadCard(item: QueuedDownload, position: Int, state: LauncherSta
         else -> AWColors.TextMuted
     }
     val shape = RoundedCornerShape(AWDimens.CornerCard)
-    Column(Modifier.fillMaxWidth().background(AWColors.Surface, shape).border(1.dp,
-        if (item.status == DownloadStatus.RUNNING) AWColors.Accent.copy(alpha = 0.45f) else AWColors.Outline, shape)
-        .padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text(item.title, color = AWColors.Text, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium,
+    Column(Modifier.fillMaxWidth().background(AWColors.Surface, shape)
+        .padding(horizontal = 18.dp, vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(item.title, color = AWColors.Text, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleSmall,
             maxLines = 2, overflow = TextOverflow.Ellipsis, translate = false)
         val status = when (item.status) {
             DownloadStatus.WAITING -> "В очереди · $position"

@@ -946,5 +946,10 @@
   "Сборка изменилась после проверки. Проверь моды ещё раз": "The modpack changed after the check. Check its mods again",
   "Сборка изменилась во время загрузки. Проверь моды ещё раз": "The modpack changed while downloading. Check its mods again",
   "Сборка изменилась во время проверки. Проверь моды ещё раз": "The modpack changed while checking. Check its mods again",
-  "Версия сборки уже изменилась": "The modpack version has already changed"
+  "Версия сборки уже изменилась": "The modpack version has already changed",
+  "Обновляется эта сборка. Папка, миры и история сохранятся": "This modpack is updated in place. Its directory, worlds and history are preserved",
+  "Совместимые моды, загрузчик и Java обновятся автоматически": "Compatible mods, the loader and Java will update automatically",
+  "Отметь моды, которые нужно оставить включёнными. Их совместимость не подтверждена": "Select mods to keep enabled. Their compatibility is unverified",
+  "Резервные файлы: aw-migration-backups. При ошибке сборка восстановится автоматически": "Backup files: aw-migration-backups. The modpack is restored automatically if an error occurs",
+  "Перед запуском новой версии сохрани копию миров": "Back up your worlds before launching the new version"
 }

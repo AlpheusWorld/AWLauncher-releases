@@ -1,5 +1,7 @@
 package ru.aw.launcher.ui.dialogs
 
+import ru.aw.launcher.ui.theme.AWDimens
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -165,7 +167,7 @@ internal fun SkinDialog(state: LauncherState, uuid: String, preview: SkinImage? 
 private fun CapeOption(cape: MinecraftCape?, chosen: Boolean, enabled: Boolean, onClick: () -> Unit) {
     val texture by produceState<BufferedImage?>(null, cape?.url) { value = cape?.let { SkinHeads.capeTexture(it) } }
     val thumbnail = remember(texture) { texture?.getSubimage(12, 1, 10, 16)?.toComposeImageBitmap() }
-    val shape = RoundedCornerShape(10.dp)
+    val shape = RoundedCornerShape(AWDimens.CornerMedium)
     val name = cape?.alias?.takeIf { it.isNotBlank() } ?: if (cape == null) "Без плаща" else "Плащ"
     WithTooltip(name) {
         Column(Modifier.fillMaxWidth().clip(shape).background(if (chosen) AWColors.AccentSoft else AWColors.SurfaceHigh)

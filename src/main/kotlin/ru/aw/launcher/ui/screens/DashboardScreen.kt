@@ -10,9 +10,8 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -152,9 +151,9 @@ fun DashboardScreen(state: LauncherState) {
                             AWButton("Каталог Modrinth", onClick = { state.openCatalog(tab = CatalogTab.PACKS) })
                         }
                     }
-                } else LazyVerticalGrid(
-                    GridCells.Adaptive(156.dp), modifier = Modifier.weight(1f).fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp),
+                } else LazyColumn(
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
                     items(library, key = { it.key }) { entry ->
                         Box(Modifier.animateItem(
@@ -220,13 +219,13 @@ private fun recentEntry(state: LauncherState, session: PlaySession): VersionEntr
 @Composable
 private fun RecentCard(state: LauncherState, session: PlaySession, modifier: Modifier) {
     val entry = recentEntry(state, session)
-    val shape = RoundedCornerShape(16.dp)
+    val shape = RoundedCornerShape(AWDimens.CornerLarge)
     Row(
         modifier.clip(shape).background(AWColors.Surface).border(1.dp, AWColors.Outline.copy(alpha = 0.6f), shape)
             .padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         if (session.server == null) BuildArtwork(entry, Modifier.size(42.dp), 20.dp, state)
-        else Box(Modifier.size(42.dp).clip(RoundedCornerShape(10.dp)).background(AWColors.AccentSoft), contentAlignment = Alignment.Center) {
+        else Box(Modifier.size(42.dp).clip(RoundedCornerShape(AWDimens.CornerMedium)).background(AWColors.AccentSoft), contentAlignment = Alignment.Center) {
             Icon(AWIcons.Server, null, tint = AWColors.Accent, modifier = Modifier.size(22.dp))
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
@@ -248,32 +247,32 @@ private fun LibraryCard(state: LauncherState, entry: VersionEntry, compact: Bool
     val selected = state.isSelected(entry)
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
-    val shape = RoundedCornerShape(16.dp)
-    val background = animateColorAsState(if (hovered) AWColors.SurfaceHigh else AWColors.Surface,
-        AWMotion.Hover, label = "libraryCardHover")
-    Column(
-        Modifier.fillMaxWidth().clip(shape).drawBehind { drawRect(background.value) }
-            .border(if (checked) 2.dp else 1.dp, if (checked || selected) AWColors.Accent.copy(alpha = 0.7f) else AWColors.Outline, shape)
-            .clickable(interactionSource = interaction, indication = null) { if (selectionMode) toggle() else state.openInstance(entry) }
-            .padding(10.dp), verticalArrangement = Arrangement.spacedBy(9.dp),
-    ) {
-        Box(Modifier.fillMaxWidth().aspectRatio(if (compact) 1.35f else 1f)) {
-            BuildArtwork(entry, Modifier.fillMaxSize(), 66.dp, state)
-            if (selectionMode) Checkbox(checked, onCheckedChange = { toggle() }, modifier = Modifier.align(Alignment.TopStart))
-            else IconButton(onClick = { state.toggleFavorite(entry) }, enabled = !state.libraryBusy && !state.libraryLoading,
-                modifier = Modifier.align(Alignment.TopStart).padding(3.dp).size(30.dp).clip(RoundedCornerShape(8.dp)).background(AWColors.Surface.copy(alpha = 0.9f))) {
-                Icon(Icons.Default.Star, "Избранное",
-                    tint = if (state.libraryOptions(entry).favorite) AWColors.Warning else AWColors.TextMuted, modifier = Modifier.size(18.dp))
-            }
-            Box(Modifier.align(Alignment.TopEnd).padding(3.dp).clip(RoundedCornerShape(9.dp)).background(AWColors.Surface.copy(alpha = 0.92f))) { BuildMenu(state, entry) }
+    val background by animateColorAsState(if (hovered || selected) AWColors.SurfaceHigh else AWColors.Surface,
+        AWMotion.Hover, label = "libraryRowHover")
+    val shape = RoundedCornerShape(AWDimens.CornerMedium)
+    val settings by Settings.state.collectAsState()
+    val group = settings.libraryGroups.firstOrNull { it.id == state.libraryOptions(entry).groupId }?.name
+    Row(Modifier.fillMaxWidth().clip(shape).background(background)
+        .clickable(interactionSource = interaction, indication = null) { if (selectionMode) toggle() else state.openInstance(entry) }
+        .padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        if (selectionMode) Checkbox(checked, onCheckedChange = { toggle() })
+        BuildArtwork(entry, Modifier.size(if (compact) 44.dp else 52.dp).clip(shape), 32.dp, state)
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(entry.title, color = AWColors.Text, fontWeight = FontWeight.SemiBold, maxLines = 1,
+                overflow = TextOverflow.Ellipsis, translate = false)
+            Text(listOfNotNull("${entry.loader.label} ${entry.id}", group).joinToString(" · "),
+                color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall, maxLines = 1,
+                overflow = TextOverflow.Ellipsis, translate = false)
         }
-        Text(entry.title, color = AWColors.Text, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, translate = false)
-        Text("${entry.loader.label} ${entry.id}", color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis, translate = false)
-        val settings by Settings.state.collectAsState()
-        val groupName = settings.libraryGroups.firstOrNull { it.id == state.libraryOptions(entry).groupId }?.name.orEmpty()
-        Text(groupName, color = AWColors.TextSoft, style = MaterialTheme.typography.labelMedium, translate = false,
-            modifier = Modifier.fillMaxWidth().height(18.dp), maxLines = 1, overflow = TextOverflow.Ellipsis)
-        AWButton("Играть", icon = Icons.Default.PlayArrow, style = if (selected) ButtonStyle.PRIMARY else ButtonStyle.SECONDARY, enabled = !state.busy && !state.buildsBusy, modifier = Modifier.fillMaxWidth().height(44.dp), onClick = { state.selectEntry(entry); state.play() })
+        IconButton(onClick = { state.toggleFavorite(entry) }, enabled = !state.libraryBusy && !state.libraryLoading,
+            modifier = Modifier.size(32.dp)) {
+            Icon(Icons.Default.Star, "Избранное", tint = if (state.libraryOptions(entry).favorite) AWColors.Warning else AWColors.TextMuted,
+                modifier = Modifier.size(17.dp))
+        }
+        AWButton("Играть", icon = Icons.Default.PlayArrow, style = if (selected) ButtonStyle.PRIMARY else ButtonStyle.SECONDARY,
+            enabled = !state.busy && !state.buildsBusy, onClick = { state.selectEntry(entry); state.play() })
+        BuildMenu(state, entry)
     }
 }
 
@@ -293,8 +292,8 @@ internal fun BuildArtwork(entry: VersionEntry?, modifier: Modifier, iconSize: Dp
         value = if (localIcon != null) ModIcons.loadLocal(localIcon) else url?.let { ModIcons.load(it, 256) }
     }
     val tint = loaderColor(entry?.loader ?: LoaderKind.VANILLA)
-    Box(modifier.clip(RoundedCornerShape(12.dp)).background(options?.iconBackground?.let(ru.aw.launcher.ui.InstanceIcons::color) ?: tint.copy(alpha = 0.10f))
-        .border(1.dp, tint.copy(alpha = 0.20f), RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
+    Box(modifier.clip(RoundedCornerShape(AWDimens.CornerCard)).background(options?.iconBackground?.let(ru.aw.launcher.ui.InstanceIcons::color) ?: tint.copy(alpha = 0.10f))
+        .border(1.dp, tint.copy(alpha = 0.20f), RoundedCornerShape(AWDimens.CornerCard)), contentAlignment = Alignment.Center) {
         val image = bitmap
         if (image != null) Image(image, entry?.title, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
         else PresetInstanceIcon("cube", options?.iconBackground ?: when (entry?.loader) {
@@ -340,7 +339,7 @@ internal fun DashboardSidebar(state: LauncherState, modifier: Modifier) {
                 NoticeLevel.INFO -> AWColors.Accent
             }
             Column(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(AWColors.Surface).clickable { state.openNotices() }.padding(12.dp),
+                Modifier.fillMaxWidth().clickable { state.openNotices() }.padding(vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Icon(if (notice.level == NoticeLevel.ERROR) AWIcons.Log else AWIcons.History, null, tint = color, modifier = Modifier.size(20.dp))
@@ -364,7 +363,7 @@ private fun SidebarAccount(state: LauncherState) {
         Text("Аккаунт", color = AWColors.TextMuted, style = MaterialTheme.typography.titleSmall)
         Box {
             Row(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(AWColors.SurfaceHigh)
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(AWDimens.CornerCard)).background(AWColors.SurfaceHigh)
                     .clickable { if (accounts.isEmpty()) state.screen = Screen.ACCOUNTS else open = true }
                     .padding(12.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically,

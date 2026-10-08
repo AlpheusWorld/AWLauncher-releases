@@ -1,5 +1,7 @@
 package ru.aw.launcher.ui.screens
 
+import ru.aw.launcher.ui.theme.AWDimens
+
 import androidx.compose.animation.core.animateFloatAsState
 
 import androidx.compose.foundation.*
@@ -180,7 +182,7 @@ private fun InstanceContent(state: LauncherState, entry: VersionEntry, model: Co
         }
         BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
             val narrow = maxWidth < 650.dp
-            Column(Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)).border(1.dp, AWColors.Outline, RoundedCornerShape(12.dp))) {
+            Column(Modifier.fillMaxSize().clip(RoundedCornerShape(AWDimens.CornerCard)).border(1.dp, AWColors.Outline, RoundedCornerShape(AWDimens.CornerCard))) {
                 Row(Modifier.fillMaxWidth().height(44.dp).background(AWColors.SurfaceHigh).padding(start = 10.dp, end = 22.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     val selectable = rows
                     Checkbox(selectable.isNotEmpty() && selectable.all { it.rowKey in selected }, enabled = !busy && selectable.isNotEmpty(), onCheckedChange = { checked ->
@@ -312,7 +314,7 @@ private fun InstanceFiles(state: LauncherState, entry: VersionEntry, worlds: Boo
                 if (worlds) "Миров пока нет" else "Папка пуста", if (worlds) "Создай мир в игре или перенеси сборку" else "Добавь файлы через проводник", Modifier.weight(1f).fillMaxWidth())
             else -> LazyColumn(Modifier.weight(1f)) {
                 items(files.orEmpty().filter { query.isBlank() || it.path.name.contains(query, true) }, key = { it.path.toString() }) { file ->
-                    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(enabled = file.directory) {
+                    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(AWDimens.CornerCard)).clickable(enabled = file.directory) {
                         relative = root.relativize(file.path).toString()
                     }.padding(12.dp), horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
                         Icon(if (file.directory) AWIcons.Folder else AWIcons.Log, null, tint = AWColors.TextMuted, modifier = Modifier.size(24.dp))

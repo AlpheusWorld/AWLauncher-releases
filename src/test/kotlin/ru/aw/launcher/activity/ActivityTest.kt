@@ -17,6 +17,38 @@ import kotlin.io.path.writeBytes
 import kotlin.io.path.writeText
 
 class ActivityTest {
+    @Test
+    fun `general activity excludes foreign launcher profiles and previously cached foreign sessions`(@TempDir root: Path) {
+        val historyFile = PlayHistory.historyFile
+        val cacheFile = PlayHistory.cacheFile
+        val settings = ru.aw.launcher.core.Settings.current
+        try {
+            PlayHistory.historyFile = root.resolve("history.json")
+            PlayHistory.cacheFile = null
+            PlayHistory.resetForTests()
+            val imported = root.resolve("aw-profile")
+            val foreign = root.resolve("modrinth-other-profile")
+            for (dir in listOf(imported, foreign)) {
+                dir.resolve("logs").createDirectories()
+                dir.resolve("logs/2026-09-27-1.log.gz").writeBytes(ByteArrayOutputStream().also { out -> GZIPOutputStream(out).use { it.write("[10:00:00] Start\n[11:00:00] Stop\n".toByteArray()) } }.toByteArray())
+            }
+            imported.resolve(ru.aw.launcher.instance.InstanceStore.FILE_NAME).writeText("{}")
+            val stale = PlaySession("modrinth-other-profile", "1.21.1", LoaderKind.FABRIC, 0, 7_200_000)
+            PlayHistory.historyFile!!.writeText(ru.aw.launcher.core.Json.encodeToString(kotlinx.serialization.builtins.ListSerializer(PlaySession.serializer()), listOf(stale)))
+            PlayHistory.resetForTests()
+            val sessions = PlayHistory.scan(listOf(root), zone)
+            assertEquals(listOf("aw-profile"), sessions.map { it.instance })
+            assertEquals(3_600_000L, ActivityStats.of(sessions).totalMillis)
+            PlayHistory.resetForTests()
+            assertEquals(3_600_000L, ActivityStats.of(PlayHistory.scan(listOf(root), zone)).totalMillis)
+        } finally {
+            PlayHistory.historyFile = historyFile
+            PlayHistory.cacheFile = cacheFile
+            PlayHistory.resetForTests()
+            ru.aw.launcher.core.Settings.update { settings }
+        }
+    }
+
 
     @Test
     fun `calendar hit testing respects gaps, bounds and right to left layout`() {
@@ -109,6 +141,7 @@ class ActivityTest {
         PlayHistory.cacheFile = null
         PlayHistory.historyFile = root.resolve("activity.json")
         val logs = root.resolve("games/1.21.11-fabric/logs").createDirectories()
+        logs.parent.resolve(ru.aw.launcher.instance.InstanceStore.FILE_NAME).writeText("{}")
         val old = logs.resolve("latest.log").apply { writeText("[18:39:48] [main/INFO]: a\n[19:25:09] [main/INFO]: b\n") }
         assertEquals(1, PlayHistory.scan(listOf(root.resolve("games")), zone).size)
 
@@ -128,6 +161,7 @@ class ActivityTest {
         PlayHistory.cacheFile = null
         PlayHistory.historyFile = null
         val logs = root.resolve("1.21.11-fabric/logs").createDirectories()
+        logs.parent.resolve(ru.aw.launcher.instance.InstanceStore.FILE_NAME).writeText("{}")
         val gz = ByteArrayOutputStream().also { out ->
             GZIPOutputStream(out).use { it.write("[10:00:00] [main/INFO]: a\n[10:40:00] [main/INFO]: b\n".toByteArray()) }
         }

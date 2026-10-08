@@ -1,5 +1,7 @@
 package ru.aw.launcher.ui.dialogs
 
+import ru.aw.launcher.ui.theme.AWDimens
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -57,8 +59,8 @@ internal fun BuildMigrationDialog(state: LauncherState, entry: VersionEntry, pre
                     }
                 })
         }) {
-        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Text("Обновится эта же сборка: имя, папка, миры и конфиги сохранятся", color = AWColors.TextSoft,
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("Обновляется эта сборка. Папка, миры и история сохранятся", color = AWColors.TextSoft,
                 style = MaterialTheme.typography.bodySmall)
             Text("Новая версия Minecraft", color = AWColors.TextMuted, style = MaterialTheme.typography.labelLarge)
             Box {
@@ -83,18 +85,19 @@ internal fun BuildMigrationDialog(state: LauncherState, entry: VersionEntry, pre
                 val missing = ready.mods.filter { it.replacement == null }
                 Text("Совместимых модов: ${ready.mods.size - missing.size} · Без подходящей версии: ${missing.size}",
                     color = AWColors.Text, fontWeight = FontWeight.Bold)
-                Text("Совместимые версии и необходимые зависимости будут загружены. Java и загрузчик подберутся для новой версии",
+                Text("Совместимые моды, загрузчик и Java обновятся автоматически",
                     color = AWColors.TextSoft, style = MaterialTheme.typography.bodySmall)
                 if (missing.isNotEmpty()) {
-                    Text("Выбери, какие моды оставить включёнными. Их совместимость не подтверждена; остальные будут отключены",
+                    Text("Отметь моды, которые нужно оставить включёнными. Их совместимость не подтверждена",
                         color = AWColors.Warning, style = MaterialTheme.typography.bodySmall)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         AWButton("Отключить неподходящие", onClick = { keep = emptySet() })
                         AWButton("Оставить включёнными", onClick = { keep = missing.filter { it.item.enabled }.map { it.item.fileName }.toSet() })
                     }
                 }
+                androidx.compose.material3.HorizontalDivider(color = AWColors.Outline)
                 for (mod in ready.mods) {
-                    Row(Modifier.fillMaxWidth().background(AWColors.SurfaceHigh, RoundedCornerShape(10.dp)).padding(10.dp),
+                    Row(Modifier.fillMaxWidth().padding(vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         if (mod.replacement == null) Checkbox(mod.item.fileName in keep, enabled = mod.item.enabled,
                             onCheckedChange = { enabled -> keep = if (enabled) keep + mod.item.fileName else keep - mod.item.fileName })
@@ -108,9 +111,9 @@ internal fun BuildMigrationDialog(state: LauncherState, entry: VersionEntry, pre
                         }
                     }
                 }
-                Text("Старые моды и настройки сохранятся в папке aw-migration-backups внутри сборки. При ошибке изменения откатятся автоматически",
+                Text("Резервные файлы: aw-migration-backups. При ошибке сборка восстановится автоматически",
                     color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall)
-                Text("Миры не меняются при обновлении сборки. Перед первым запуском на новой версии сохрани резервную копию миров",
+                Text("Перед запуском новой версии сохрани копию миров",
                     color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall)
             }
         }

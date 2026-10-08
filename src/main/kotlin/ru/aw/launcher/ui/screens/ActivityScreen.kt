@@ -182,20 +182,19 @@ private fun RowScope.StatCard(label: String, value: String, icon: ImageVector, t
     Column(
         Modifier
             .weight(1f)
-            .border(1.dp, AWColors.Outline, shape)
-            .clip(shape)
+                        .clip(shape)
             .background(AWColors.Surface)
             .padding(18.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
-                Modifier.size(30.dp).clip(CircleShape).background(tone.copy(alpha = 0.14f)),
+                Modifier.size(30.dp).clip(RoundedCornerShape(4.dp)).background(AWColors.SurfaceHigh),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(icon, null, tint = tone, modifier = Modifier.size(16.dp))
             }
             Spacer(Modifier.width(10.dp))
-            Text(label.uppercase(), style = MaterialTheme.typography.labelSmall, color = AWColors.TextMuted, maxLines = 1)
+            Text(label, style = MaterialTheme.typography.labelSmall, color = AWColors.TextMuted, maxLines = 1)
         }
         Spacer(Modifier.height(14.dp))
         Box(Modifier.height(34.dp), contentAlignment = Alignment.CenterStart) {
@@ -206,7 +205,7 @@ private fun RowScope.StatCard(label: String, value: String, icon: ImageVector, t
                     value.length <= 10 -> 22.sp
                     else -> 19.sp
                 },
-                fontWeight = FontWeight.Black,
+                fontWeight = FontWeight.SemiBold,
                 color = AWColors.Text,
                 maxLines = 1,
                 softWrap = false,
@@ -220,8 +219,7 @@ private fun Card(modifier: Modifier = Modifier, content: @Composable () -> Unit)
     val shape = RoundedCornerShape(AWDimens.CornerLarge)
     Box(
         modifier
-            .border(1.dp, AWColors.Outline, shape)
-            .clip(shape)
+                        .clip(shape)
             .background(AWColors.Surface)
             .padding(22.dp),
     ) { content() }
@@ -461,7 +459,7 @@ private fun RecentCard(stats: ActivityStats?, rows: Int, rowHeight: Dp, modifier
 private fun CardTitle(text: String, icon: ImageVector, tone: Color) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(
-            Modifier.size(26.dp).clip(CircleShape).background(tone.copy(alpha = 0.14f)),
+            Modifier.size(26.dp).clip(RoundedCornerShape(4.dp)).background(AWColors.SurfaceHigh),
             contentAlignment = Alignment.Center,
         ) {
             Icon(icon, null, tint = tone, modifier = Modifier.size(14.dp))

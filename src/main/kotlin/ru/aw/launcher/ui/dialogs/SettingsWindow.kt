@@ -1,5 +1,7 @@
 package ru.aw.launcher.ui.dialogs
 
+import ru.aw.launcher.ui.theme.AWDimens
+
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
@@ -84,7 +86,7 @@ internal fun SettingsWindowHost(state: LauncherState, width: Dp, height: Dp) {
             Column(Modifier.width(width).height(height).graphicsLayer {
                 alpha = if (visibility.value == 0f) 0f else 1f
                 translationY = (1f - visibility.value) * 8.dp.toPx()
-            }.background(AWColors.Surface, RoundedCornerShape(18.dp)).border(1.dp, AWColors.Outline, RoundedCornerShape(18.dp))
+            }.background(AWColors.Surface, RoundedCornerShape(AWDimens.CornerLarge)).border(1.dp, AWColors.Outline, RoundedCornerShape(AWDimens.CornerLarge))
                 .pointerInput(Unit) { detectTapGestures(onTap = {}) }
                 .focusRequester(focus).focusProperties { exit = { FocusRequester.Cancel } }.focusable()
                 .semantics { paneTitle = I18n.text(if (modal.entry == null) "Настройки" else "Настройки сборки") }) {
@@ -103,7 +105,7 @@ internal fun SettingsWindowHost(state: LauncherState, width: Dp, height: Dp) {
                             val sectionOrder = if (modal.entry == null) listOf(0, 1, 2, 3, 5, 4) else labels.indices.toList()
                             sectionOrder.forEach { index ->
                                 val label = labels[index]
-                                Row(Modifier.fillMaxWidth().background(if (section == index) AWColors.AccentSoft else androidx.compose.ui.graphics.Color.Transparent, RoundedCornerShape(10.dp))
+                                Row(Modifier.fillMaxWidth().background(if (section == index) AWColors.AccentSoft else androidx.compose.ui.graphics.Color.Transparent, RoundedCornerShape(AWDimens.CornerMedium))
                                     .clickable { section = index }.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                                     Text(label, color = if (section == index) AWColors.Accent else AWColors.TextSoft, style = MaterialTheme.typography.titleSmall)
                                 }

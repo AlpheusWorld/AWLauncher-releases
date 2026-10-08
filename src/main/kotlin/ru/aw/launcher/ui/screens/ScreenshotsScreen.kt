@@ -163,7 +163,7 @@ fun ScreenshotsScreen(state: LauncherState, entry: VersionEntry? = null) {
                 else -> LazyVerticalGrid(GridCells.Adaptive(230.dp), state = grid, modifier = Modifier.weight(1f).fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(14.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                     items(files, key = { it.path.toString() }) { file ->
-                        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(AWColors.Surface)
+                        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(AWDimens.CornerCard)).background(AWColors.Surface)
                             .clickable { selectedPath = file.path.toString() }) {
                             ScreenshotImage(file, Modifier.fillMaxWidth().height(150.dp))
                             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
@@ -194,7 +194,7 @@ private fun ScreenshotImage(file: ScreenshotFile, modifier: Modifier, full: Bool
         value = ModIcons.loadLocal(file.path, if (full) 1280 else 384, stamp = file.stamp, maxBytes = 32 * 1024 * 1024)
         loading = false
     }
-    Box(modifier.clip(RoundedCornerShape(12.dp)).background(AWColors.SurfaceHigh), contentAlignment = Alignment.Center) {
+    Box(modifier.clip(RoundedCornerShape(AWDimens.CornerCard)).background(AWColors.SurfaceHigh), contentAlignment = Alignment.Center) {
         val image = bitmap
         if (image != null) Image(image, file.path.fileName.toString(), Modifier.fillMaxSize(), contentScale = if (full) ContentScale.Fit else ContentScale.Crop)
         else Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {

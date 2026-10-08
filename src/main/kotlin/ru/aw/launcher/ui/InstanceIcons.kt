@@ -1,5 +1,7 @@
 package ru.aw.launcher.ui
 
+import ru.aw.launcher.ui.theme.AWDimens
+
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -76,7 +78,7 @@ internal object InstanceIcons {
 internal fun PresetInstanceIcon(symbol: String, background: String?, modifier: Modifier = Modifier) {
     val color = InstanceIcons.color(background)
     val art = remember(symbol) { InstanceIcons.artwork(symbol) }
-    val shape = RoundedCornerShape(12.dp)
+    val shape = RoundedCornerShape(AWDimens.CornerCard)
     Box(modifier.clip(shape).background(Brush.radialGradient(listOf(
         color.copy(red=(color.red+0.10f).coerceAtMost(1f),green=(color.green+0.10f).coerceAtMost(1f),blue=(color.blue+0.10f).coerceAtMost(1f)), color)))
         .border(1.dp,Color.White.copy(alpha=0.12f),shape)) {

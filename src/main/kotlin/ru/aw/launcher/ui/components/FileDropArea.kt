@@ -1,5 +1,7 @@
 package ru.aw.launcher.ui.components
 
+import ru.aw.launcher.ui.theme.AWDimens
+
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -48,9 +50,9 @@ fun FileDropArea(modifier: Modifier, enabled: Boolean, label: String, onFiles: (
     Box(modifier.dragAndDropTarget(shouldStartDragAndDrop = { active && it.dragData() is DragData.FilesList }, target = target)) {
         content()
         if (hovering && enabled) Box(Modifier.matchParentSize().background(AWColors.AccentSoft)
-            .border(2.dp, AWColors.Accent, RoundedCornerShape(14.dp)), contentAlignment = Alignment.Center) {
+            .border(2.dp, AWColors.Accent, RoundedCornerShape(AWDimens.CornerCard)), contentAlignment = Alignment.Center) {
             LocalizedText(label, color = AWColors.Text, style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.background(AWColors.Surface, RoundedCornerShape(10.dp)).padding(18.dp))
+                modifier = Modifier.background(AWColors.Surface, RoundedCornerShape(AWDimens.CornerMedium)).padding(18.dp))
         }
     }
 }

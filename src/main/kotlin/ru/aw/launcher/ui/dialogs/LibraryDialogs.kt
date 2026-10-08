@@ -1,5 +1,7 @@
 package ru.aw.launcher.ui.dialogs
 
+import ru.aw.launcher.ui.theme.AWDimens
+
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -43,7 +45,7 @@ internal fun IconEditorDialog(state: LauncherState, entry: VersionEntry) {
     }) {
         Row(Modifier.fillMaxWidth().heightIn(max = 480.dp), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
             Column(Modifier.width(198.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                Box(Modifier.size(180.dp).clip(RoundedCornerShape(18.dp)).background(InstanceIcons.color(background)), contentAlignment = Alignment.Center) {
+                Box(Modifier.size(180.dp).clip(RoundedCornerShape(AWDimens.CornerLarge)).background(InstanceIcons.color(background)), contentAlignment = Alignment.Center) {
                     val picture = bitmap
                     if (image != null && picture != null) androidx.compose.foundation.Image(picture, "Своя иконка", Modifier.fillMaxSize())
                     else PresetInstanceIcon(symbol, background, Modifier.fillMaxSize())
@@ -71,8 +73,8 @@ internal fun IconEditorDialog(state: LauncherState, entry: VersionEntry) {
                 Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     InstanceIcons.backgrounds.forEach { (id, label, color) ->
                         WithTooltip(label) {
-                            Box(Modifier.size(48.dp).clip(RoundedCornerShape(10.dp)).background(color)
-                                .border(if (background == id) 2.dp else 1.dp, if (background == id) AWColors.Text else AWColors.Outline, RoundedCornerShape(10.dp))
+                            Box(Modifier.size(48.dp).clip(RoundedCornerShape(AWDimens.CornerMedium)).background(color)
+                                .border(if (background == id) 2.dp else 1.dp, if (background == id) AWColors.Text else AWColors.Outline, RoundedCornerShape(AWDimens.CornerMedium))
                                 .selectable(background == id,enabled = !state.libraryBusy,role = Role.RadioButton) { background = id },contentAlignment = Alignment.Center) {
                                 if(background == id) Icon(Icons.Default.Check,null,tint=AWColors.Text,modifier=Modifier.size(20.dp))
                             }
@@ -84,8 +86,8 @@ internal fun IconEditorDialog(state: LauncherState, entry: VersionEntry) {
                 LazyVerticalGrid(GridCells.Fixed(4), modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     items(InstanceIcons.symbols, key = { it.first }) { (id, label) ->
                         WithTooltip(label) {
-                            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
-                                .border(if (image == null && symbol == id) 2.dp else 1.dp, if (image == null && symbol == id) AWColors.Accent else AWColors.Outline, RoundedCornerShape(12.dp))
+                            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(AWDimens.CornerCard))
+                                .border(if (image == null && symbol == id) 2.dp else 1.dp, if (image == null && symbol == id) AWColors.Accent else AWColors.Outline, RoundedCornerShape(AWDimens.CornerCard))
                                 .selectable(image == null && symbol == id,enabled = !state.libraryBusy,role = Role.RadioButton) { image = null; symbol = id }.padding(7.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally,verticalArrangement = Arrangement.spacedBy(7.dp)) {
                                 PresetInstanceIcon(id, background, Modifier.fillMaxWidth().aspectRatio(1f))

@@ -104,11 +104,14 @@ fun App(
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().background(AWColors.Background)) {
             titleBar()
-            Row(Modifier.weight(1f).fillMaxWidth()) {
-                CompactNavRail(state)
+            BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+            val expandedNav = maxWidth >= 1160.dp
+            Row(Modifier.fillMaxSize()) {
+                CompactNavRail(state, expandedNav)
                 Box(Modifier.weight(1f).fillMaxHeight()) {
                     ScreenHost(state)
                 }
+            }
             }
         }
         NoticeToast(
@@ -168,27 +171,28 @@ private fun PrimaryScreenLayout(state: LauncherState, content: @Composable () ->
 }
 
 @Composable
-private fun CompactNavRail(state: LauncherState) {
+private fun CompactNavRail(state: LauncherState, expanded: Boolean) {
     val notices by state.notices.collectAsState()
     val seen by state.noticesSeen.collectAsState()
     val unread = notices.filter { it.id > seen }
-    BoxWithConstraints(Modifier.width(AWDimens.RailWidth).fillMaxHeight()) {
+    val railWidth = if (expanded) 188.dp else AWDimens.RailWidth
+    BoxWithConstraints(Modifier.width(railWidth).fillMaxHeight()) {
     val short = maxHeight < 520.dp
     val itemHeight = if (short) 36.dp else 46.dp
     Column(
-        Modifier.width(AWDimens.RailWidth).fillMaxHeight().background(AWColors.Sidebar).padding(horizontal = 8.dp, vertical = 8.dp),
+        Modifier.width(railWidth).fillMaxHeight().background(AWColors.Sidebar).padding(horizontal = 8.dp, vertical = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(if (short) 4.dp else 8.dp),
     ) {
-        NavItem("Главная", Icons.Default.Home, state.screen == Screen.HOME, compact = true, itemHeight = itemHeight) { state.screen = Screen.HOME }
-        NavItem("Играть", Icons.Default.PlayArrow, state.screen in setOf(Screen.PLAY, Screen.BUILDS, Screen.INSTANCE), compact = true, itemHeight = itemHeight) { state.screen = Screen.PLAY }
-        NavItem("Каталог", Icons.Default.Search, state.screen == Screen.CATALOG, compact = true, itemHeight = itemHeight) { state.openCatalog() }
-        NavItem("Скриншоты", AWIcons.Image, state.screen == Screen.SCREENSHOTS, compact = true, itemHeight = itemHeight) { state.screen = Screen.SCREENSHOTS }
-        NavItem("Загрузки", AWIcons.Download, state.screen == Screen.DOWNLOADS, badge = state.downloads.pendingCount, compact = true, itemHeight = itemHeight) { state.screen = Screen.DOWNLOADS }
+        NavItem("Главная", Icons.Default.Home, state.screen == Screen.HOME, compact = !expanded, itemHeight = itemHeight) { state.screen = Screen.HOME }
+        NavItem("Играть", Icons.Default.PlayArrow, state.screen in setOf(Screen.PLAY, Screen.BUILDS, Screen.INSTANCE), compact = !expanded, itemHeight = itemHeight) { state.screen = Screen.PLAY }
+        NavItem("Каталог", Icons.Default.Search, state.screen == Screen.CATALOG, compact = !expanded, itemHeight = itemHeight) { state.openCatalog() }
+        NavItem("Скриншоты", AWIcons.Image, state.screen == Screen.SCREENSHOTS, compact = !expanded, itemHeight = itemHeight) { state.screen = Screen.SCREENSHOTS }
+        NavItem("Загрузки", AWIcons.Download, state.screen == Screen.DOWNLOADS, badge = state.downloads.pendingCount, compact = !expanded, itemHeight = itemHeight) { state.screen = Screen.DOWNLOADS }
         Spacer(Modifier.weight(1f))
-        NavItem("Активность", AWIcons.Activity, state.screen == Screen.ACTIVITY, compact = true, itemHeight = itemHeight) { state.screen = Screen.ACTIVITY }
-        NavItem("Уведомления", Icons.Default.Notifications, state.screen == Screen.NOTICES, badge = unread.size, badgeAlert = unread.any { it.level == NoticeLevel.ERROR }, compact = true, itemHeight = itemHeight) { state.openNotices() }
-        NavItem("Аккаунты", Icons.Default.Person, state.screen == Screen.ACCOUNTS, compact = true, itemHeight = itemHeight) { state.screen = Screen.ACCOUNTS }
-        NavItem("Настройки", Icons.Default.Settings, state.modal is Modal.Settings, compact = true, itemHeight = itemHeight) { state.openSettings() }
+        NavItem("Активность", AWIcons.Activity, state.screen == Screen.ACTIVITY, compact = !expanded, itemHeight = itemHeight) { state.screen = Screen.ACTIVITY }
+        NavItem("Уведомления", Icons.Default.Notifications, state.screen == Screen.NOTICES, badge = unread.size, badgeAlert = unread.any { it.level == NoticeLevel.ERROR }, compact = !expanded, itemHeight = itemHeight) { state.openNotices() }
+        NavItem("Аккаунты", Icons.Default.Person, state.screen == Screen.ACCOUNTS, compact = !expanded, itemHeight = itemHeight) { state.screen = Screen.ACCOUNTS }
+        NavItem("Настройки", Icons.Default.Settings, state.modal is Modal.Settings, compact = !expanded, itemHeight = itemHeight) { state.openSettings() }
     }
     }
 }

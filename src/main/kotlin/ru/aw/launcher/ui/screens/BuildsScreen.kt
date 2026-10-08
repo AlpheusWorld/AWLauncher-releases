@@ -419,7 +419,7 @@ private fun CreationOptionRow(
     onClick: () -> Unit,
 ) {
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp))
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(AWDimens.CornerLarge))
             .background(AWColors.SurfaceHigh)
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 12.dp),
@@ -470,7 +470,7 @@ private fun LocalBuildCard(
             val labels = maxWidth >= 940.dp
             val info: @Composable (Modifier) -> Unit = { modifier ->
                 Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Box(Modifier.size(44.dp).clip(RoundedCornerShape(12.dp)).background(AWColors.AccentSoft), contentAlignment = Alignment.Center) {
+                    Box(Modifier.size(44.dp).clip(RoundedCornerShape(AWDimens.CornerCard)).background(AWColors.AccentSoft), contentAlignment = Alignment.Center) {
                         Icon(AWIcons.Layers, null, tint = AWColors.Accent, modifier = Modifier.size(22.dp))
                     }
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
@@ -506,7 +506,7 @@ private fun LocalBuildCard(
 private fun ProfileAction(text: String, icon: ImageVector, label: Boolean, enabled: Boolean = true, danger: Boolean = false, onClick: () -> Unit) {
     if (label) AWButton(text, onClick = onClick, enabled = enabled, icon = icon, style = if (danger) ButtonStyle.DANGER else ButtonStyle.SECONDARY)
     else WithTooltip(text) {
-        IconButton(onClick = onClick, enabled = enabled, modifier = Modifier.size(48.dp).clip(RoundedCornerShape(12.dp))
+        IconButton(onClick = onClick, enabled = enabled, modifier = Modifier.size(48.dp).clip(RoundedCornerShape(AWDimens.CornerCard))
             .background(if (danger) AWColors.Danger.copy(alpha = 0.14f) else AWColors.SurfaceHigh)) {
             Icon(icon, text, tint = if (!enabled) AWColors.TextMuted else if (danger) AWColors.Danger else AWColors.Text, modifier = Modifier.size(20.dp))
         }
@@ -568,7 +568,7 @@ internal fun ImportDirectoryDialog(state: LauncherState, source: Path, onDismiss
                     items(profiles.orEmpty(), key = { it.gameDir.toString() }) { profile ->
                         var versionMenu by remember(profile.gameDir) { mutableStateOf(false) }
                         var loaderMenu by remember(profile.gameDir) { mutableStateOf(false) }
-                        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(AWColors.SurfaceHigh).padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(AWDimens.CornerCard)).background(AWColors.SurfaceHigh).padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                 AWSwitch(profile.gameDir in selected) { checked -> selected = if (checked) selected + profile.gameDir else selected - profile.gameDir }
                                 Column(Modifier.weight(1f)) {

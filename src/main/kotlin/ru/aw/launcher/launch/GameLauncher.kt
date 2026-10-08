@@ -101,6 +101,7 @@ object GameLauncher {
     ): PreparedLaunch {
         val options = withContext(Dispatchers.IO) {
             gameDir.createDirectories()
+            if (!java.nio.file.Files.exists(gameDir.resolve(InstanceStore.FILE_NAME))) InstanceStore.update(gameDir) { it }
             InstanceStore.get(gameDir)
         }
         val settings = options.launchSettings(Settings.current)

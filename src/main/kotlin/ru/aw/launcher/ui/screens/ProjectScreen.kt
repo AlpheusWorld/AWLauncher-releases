@@ -179,7 +179,7 @@ internal fun ProjectScreen(
                             else LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                 items(filtered, key = { it.id }) { version ->
                                     Row(
-                                        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(AWColors.SurfaceHigh)
+                                        Modifier.fillMaxWidth().clip(RoundedCornerShape(AWDimens.CornerCard)).background(AWColors.SurfaceHigh)
                                             .clickable { release = version }.padding(12.dp),
                                         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
                                     ) {
@@ -205,7 +205,7 @@ internal fun ProjectScreen(
                         else -> if (gallery.isEmpty()) ListHint("Автор пока не добавил изображения") else {
                             LazyVerticalGrid(GridCells.Adaptive(230.dp), modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(16.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                                 items(gallery, key = { it.url }) { entry ->
-                                    Column(Modifier.clip(RoundedCornerShape(12.dp)).background(AWColors.SurfaceHigh).clickable { imageIndex = gallery.indexOf(entry) }) {
+                                    Column(Modifier.clip(RoundedCornerShape(AWDimens.CornerCard)).background(AWColors.SurfaceHigh).clickable { imageIndex = gallery.indexOf(entry) }) {
                                         ProjectImage(entry.url, entry.title, Modifier.fillMaxWidth().height(150.dp), ContentScale.Crop)
                                         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                                             if (!entry.title.isNullOrBlank()) Text(entry.title, color = AWColors.Text, fontWeight = FontWeight.Bold, translate = false)

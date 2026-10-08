@@ -47,8 +47,7 @@ fun Panel(
     Box(
         modifier = modifier
             .background(AWColors.Surface, shape)
-            .border(1.dp, AWColors.Outline, shape)
-            .padding(18.dp),
+            .padding(20.dp),
     ) { content() }
 }
 

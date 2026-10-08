@@ -1,5 +1,7 @@
 package ru.aw.launcher.ui.dialogs
 
+import ru.aw.launcher.ui.theme.AWDimens
+
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
@@ -181,7 +183,7 @@ internal fun ProfileDirectoryPicker(
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         AWTextField(query, { query = it }, "Найти папку", leadingIcon = Icons.Default.Search,
                             clearable = true, modifier = Modifier.fillMaxWidth())
-                        Box(Modifier.fillMaxSize().clip(RoundedCornerShape(10.dp)).background(AWColors.Background)) {
+                        Box(Modifier.fillMaxSize().clip(RoundedCornerShape(AWDimens.CornerMedium)).background(AWColors.Background)) {
                             when {
                                 loading -> Text("Загружаю папки…", color = AWColors.TextMuted,
                                     modifier = Modifier.align(Alignment.Center))
@@ -226,7 +228,7 @@ internal fun ProfileDirectoryPicker(
                     }
                 }
                 if (!short) Text("Двойной щелчок открывает папку", color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall)
-                Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(AWColors.SurfaceHigh).padding(12.dp),
+                Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(AWDimens.CornerMedium)).background(AWColors.SurfaceHigh).padding(12.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                     Icon(AWIcons.Folder, null, tint = AWColors.Accent, modifier = Modifier.size(20.dp))
                     Column(Modifier.weight(1f)) {

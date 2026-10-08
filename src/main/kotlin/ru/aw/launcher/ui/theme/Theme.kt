@@ -58,18 +58,18 @@ private data class AWPalette(
 )
 
 private val DarkPalette = AWPalette(
-    background = Color(0xFF111114),
-    sidebar = Color(0xFF15151A),
-    surface = Color(0xFF19191F),
-    surfaceHigh = Color(0xFF23232B),
-    outline = Color(0xFF34343F),
-    accent = Color(0xFF32C879),
-    accentPressed = Color(0xFF26AA66),
-    accentSoft = Color(0xFF32C879).copy(alpha = 0.14f),
-    onAccent = Color(0xFF082015),
-    text = Color(0xFFF0F5F2),
-    textSoft = Color(0xFFC0C4CF),
-    textMuted = Color(0xFFA0A7B5),
+    background = Color(0xFF101213),
+    sidebar = Color(0xFF151819),
+    surface = Color(0xFF1A1E20),
+    surfaceHigh = Color(0xFF242A2D),
+    outline = Color(0xFF30383B),
+    accent = Color(0xFF54C68A),
+    accentPressed = Color(0xFF3BA970),
+    accentSoft = Color(0xFF54C68A).copy(alpha = 0.10f),
+    onAccent = Color(0xFF092517),
+    text = Color(0xFFE9EDEF),
+    textSoft = Color(0xFFB8C0C3),
+    textMuted = Color(0xFF8F9BA0),
     danger = Color(0xFFF18A8A),
     warning = Color(0xFFEEB16D),
     info = Color(0xFF94BDD5),
@@ -79,23 +79,23 @@ private val DarkPalette = AWPalette(
     loaderQuilt = Color(0xFFE6C07B),
     loaderForge = Color(0xFFEEA56E),
     loaderNeoForge = Color(0xFFF18A8A),
-    shadow = Color(0xFF07100C),
+    shadow = Color(0xFF000000),
     dark = true,
 )
 
 private val LightPalette = AWPalette(
-    background = Color(0xFFF2F6F3),
-    sidebar = Color(0xFFFAFCFA),
+    background = Color(0xFFF4F5F6),
+    sidebar = Color(0xFFEBEDEF),
     surface = Color(0xFFFFFFFF),
-    surfaceHigh = Color(0xFFEDF3EF),
-    outline = Color(0xFFD8E3DC),
+    surfaceHigh = Color(0xFFE8ECEE),
+    outline = Color(0xFFD0D7DA),
     accent = Color(0xFF159A5B),
     accentPressed = Color(0xFF0D804B),
     accentSoft = Color(0xFF159A5B).copy(alpha = 0.12f),
     onAccent = Color(0xFFFFFFFF),
-    text = Color(0xFF17251D),
-    textSoft = Color(0xFF53645B),
-    textMuted = Color(0xFF77877E),
+    text = Color(0xFF172024),
+    textSoft = Color(0xFF4D5B62),
+    textMuted = Color(0xFF687980),
     danger = Color(0xFFB63F42),
     warning = Color(0xFF95611E),
     info = Color(0xFF3F7399),
@@ -111,10 +111,10 @@ private val LightPalette = AWPalette(
 
 private val OledPalette = DarkPalette.copy(
     background = Color.Black,
-    sidebar = Color(0xFF0B0B0E),
-    surface = Color(0xFF101014),
-    surfaceHigh = Color(0xFF1A1A21),
-    outline = Color(0xFF30303A),
+    sidebar = Color(0xFF0B0E0F),
+    surface = Color(0xFF111618),
+    surfaceHigh = Color(0xFF1C2326),
+    outline = Color(0xFF2B3438),
     shadow = Color.Transparent,
 )
 
@@ -184,10 +184,10 @@ fun languageFont(language: Language): FontFamily {
 }
 
 private val AWTypography = Typography(
-    displayMedium = TextStyle(fontSize = 44.sp, fontWeight = FontWeight.Black, letterSpacing = (-0.8).sp, lineHeight = 46.sp),
-    displaySmall = TextStyle(fontSize = 28.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.5).sp),
-    headlineLarge = TextStyle(fontSize = 24.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.4).sp, lineHeight = 30.sp),
-    headlineMedium = TextStyle(fontSize = 22.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.3).sp, lineHeight = 28.sp),
+    displayMedium = TextStyle(fontSize = 38.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.8).sp, lineHeight = 46.sp),
+    displaySmall = TextStyle(fontSize = 26.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.5).sp),
+    headlineLarge = TextStyle(fontSize = 24.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.4).sp, lineHeight = 30.sp),
+    headlineMedium = TextStyle(fontSize = 22.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.3).sp, lineHeight = 28.sp),
     headlineSmall = TextStyle(fontSize = 20.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.2).sp, lineHeight = 26.sp),
     titleLarge = TextStyle(fontSize = 18.sp, fontWeight = FontWeight.SemiBold, lineHeight = 24.sp),
     titleMedium = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.SemiBold, lineHeight = 21.sp),
@@ -223,31 +223,30 @@ object AWDimens {
         val width = (available * 0.18f).coerceIn(208.dp, 238.dp)
         return width.takeIf { available - it >= 740.dp }
     }
-    val CornerLarge = 16.dp
-    val CornerCard = 16.dp
-    val CornerMedium = 14.dp
-    val CornerSmall = 10.dp
-    val Gutter = 22.dp
+    val CornerLarge = 10.dp
+    val CornerCard = 8.dp
+    val CornerMedium = 6.dp
+    val CornerSmall = 4.dp
+    val Gutter = 24.dp
     val RailWidth = 64.dp
     val TitleBarHeight = 44.dp
 }
 
-val PillShape = RoundedCornerShape(percent = 50)
+val PillShape = RoundedCornerShape(6.dp)
 
 @Composable
 fun Modifier.softShadow(shape: Shape, elevation: Dp = 20.dp): Modifier {
-    val dark = AWColors.IsDark
     return shadow(
-        elevation = if (dark) elevation else elevation * 0.58f,
+        elevation = elevation.coerceAtMost(3.dp),
         shape = shape,
         clip = false,
-        ambientColor = AWColors.Shadow.copy(alpha = if (dark) 0.28f else 0.07f),
-        spotColor = AWColors.Shadow.copy(alpha = if (dark) 0.48f else 0.13f),
+        ambientColor = Color.Black.copy(alpha = 0.12f),
+        spotColor = Color.Black.copy(alpha = 0.16f),
     )
 }
 
 fun Modifier.glow(shape: Shape, color: Color, elevation: Dp = 22.dp): Modifier =
-    shadow(elevation = elevation, shape = shape, clip = false, ambientColor = color, spotColor = color)
+    shadow(elevation = 2.dp, shape = shape, clip = false, ambientColor = Color.Black.copy(alpha = 0.12f), spotColor = Color.Black.copy(alpha = 0.16f))
 
 @Composable
 fun AWTheme(mode: ThemeMode = ThemeMode.SYSTEM, content: @Composable () -> Unit) {
