@@ -152,7 +152,13 @@ internal fun SkinsScreen(state: LauncherState, preview: SkinImage? = null) {
             }
             BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
                 val compact = maxWidth < 700.dp
-                val columns = if (maxWidth < 420.dp) 2 else 3
+                val columns = when {
+                    maxWidth >= 1800.dp -> 6
+                    maxWidth >= 1500.dp -> 5
+                    maxWidth >= 1100.dp -> 4
+                    maxWidth < 420.dp -> 2
+                    else -> 3
+                }
                 val previewContent: @Composable (Modifier) -> Unit = { modifier ->
                     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text(account?.name ?: "Minecraft", translate = false, color = AWColors.TextSoft, style = MaterialTheme.typography.titleSmall)
