@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -70,6 +71,15 @@ internal fun SettingsWindowHost(state: LauncherState, width: Dp, height: Dp) {
         val labels = if (modal.entry == null) listOf("Внешний вид", "Язык", "Игра", "Загрузки", "О лаунчере", "Discord")
             else listOf("Общие", "Память и Java", "Окно игры")
         var section by remember(modal.entry?.key, modal.section) { mutableStateOf(modal.section.coerceIn(labels.indices)) }
+        var query by remember(modal.entry?.key) { mutableStateOf("") }
+        var categoriesOpen by remember { mutableStateOf(false) }
+        val compact = width < 720.dp
+        val sectionOrder = if (modal.entry == null) listOf(0, 1, 2, 3, 5, 4) else labels.indices.toList()
+        val keywords = if (modal.entry == null) listOf("тема окно поведение appearance", "язык language", "память java minecraft игра memory", "сеть загрузка папка network downloads", "версия обновление github update", "discord активность")
+            else listOf("имя папка сборка", "java память аргументы memory", "экран разрешение окно fullscreen")
+        val filteredSections = sectionOrder.filter { index -> query.isBlank() ||
+            I18n.text(labels[index]).contains(query.trim(), true) || keywords[index].contains(query.trim(), true) }
+
         val sectionVisibility = remember(modal.entry?.key, section) { Animatable(0f) }
         LaunchedEffect(sectionVisibility) {
             sectionVisibility.animateTo(1f, AWMotion.SectionEnter)
@@ -92,28 +102,48 @@ internal fun SettingsWindowHost(state: LauncherState, width: Dp, height: Dp) {
                 .semantics { paneTitle = I18n.text(if (modal.entry == null) "Настройки" else "Настройки сборки") }) {
                 Row(Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text(if (modal.entry == null) "Настройки" else "Настройки сборки", style = MaterialTheme.typography.headlineSmall, color = AWColors.Text)
+                        Text(if (modal.entry == null) "Настройки" else "Настройки сборки", style = MaterialTheme.typography.titleLarge, color = AWColors.Text)
                         modal.entry?.let { Text(it.title, color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall, translate = false) }
                     }
                     IconButton(onClick = { state.modal = null }) { Icon(Icons.Default.Close, "Закрыть", tint = AWColors.TextMuted) }
                 }
                 HorizontalDivider(color = AWColors.Outline)
-                Row(Modifier.weight(1f)) {
-                    Column(Modifier.width(190.dp).fillMaxHeight().padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text(if (modal.entry == null) "Лаунчер" else "Сборка", color = AWColors.TextMuted, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(8.dp))
-                            val sectionOrder = if (modal.entry == null) listOf(0, 1, 2, 3, 5, 4) else labels.indices.toList()
-                            sectionOrder.forEach { index ->
-                                val label = labels[index]
-                                Row(Modifier.fillMaxWidth().background(if (section == index) AWColors.AccentSoft else androidx.compose.ui.graphics.Color.Transparent, RoundedCornerShape(AWDimens.CornerMedium))
-                                    .clickable { section = index }.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    Text(label, color = if (section == index) AWColors.Accent else AWColors.TextSoft, style = MaterialTheme.typography.titleSmall)
-                                }
+                if (compact) {
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Box {
+                            AWButton(labels[section], icon = Icons.Default.KeyboardArrowDown, onClick = { categoriesOpen = true })
+                            AWDropdownMenu(categoriesOpen, onDismissRequest = { categoriesOpen = false }) {
+                                sectionOrder.forEach { index -> AWMenuItem(labels[index], onClick = { section = index; categoriesOpen = false }) }
                             }
                         }
-                        Text("AWLauncher ${ArgumentBuilder.LAUNCHER_VERSION}", color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall, translate = false)
+                        Text("AWLauncher ${ArgumentBuilder.LAUNCHER_VERSION}", color = AWColors.TextMuted,
+                            style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f), translate = false)
                     }
-                    VerticalDivider(color = AWColors.Outline)
+                    HorizontalDivider(color = AWColors.Outline)
+                }
+                Row(Modifier.weight(1f)) {
+                    if (!compact) {
+                        Column(Modifier.width(216.dp).fillMaxHeight().background(AWColors.Sidebar).padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            AWTextField(query, onValueChange = { query = it }, placeholder = "Найти раздел", modifier = Modifier.fillMaxWidth(), clearable = true)
+                            Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()),
+                                verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                filteredSections.forEach { index ->
+                                    Row(Modifier.fillMaxWidth().background(if (section == index) AWColors.SurfaceHigh else androidx.compose.ui.graphics.Color.Transparent,
+                                        RoundedCornerShape(AWDimens.CornerMedium)).clickable { section = index }.padding(horizontal = 12.dp, vertical = 13.dp)) {
+                                        Text(labels[index], color = if (section == index) AWColors.Accent else AWColors.TextSoft,
+                                            style = MaterialTheme.typography.titleSmall)
+                                    }
+                                }
+                                if (filteredSections.isEmpty()) Text("Раздел не найден", color = AWColors.TextMuted,
+                                    style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(8.dp))
+                            }
+                            Text("AWLauncher ${ArgumentBuilder.LAUNCHER_VERSION}", color = AWColors.TextMuted,
+                                style = MaterialTheme.typography.bodySmall, translate = false)
+                        }
+                        VerticalDivider(color = AWColors.Outline)
+                    }
                     Box(Modifier.weight(1f).fillMaxHeight().padding(20.dp).graphicsLayer {
                         alpha = if (sectionVisibility.value == 0f) 0f else 1f
                         translationY = (1f - sectionVisibility.value) * 4.dp.toPx()

@@ -109,7 +109,7 @@ fun main(args: Array<String>) {
     PlayHistory.historyFile = File(out, "activity-preview.json").toPath().also { copy ->
         runCatching { Files.copy(Paths.root.resolve("activity.json"), copy, StandardCopyOption.REPLACE_EXISTING) }
     }
-    val preloaded = if (selectedScreens?.all { it.startsWith("skin-editor") || it.startsWith("downloads") || it.startsWith("migration") } == true)
+    val preloaded = if (selectedScreens?.all { it.startsWith("skin-editor") || it.startsWith("downloads") || it.startsWith("migration") || it.startsWith("settings-redesign") || it.startsWith("accounts-redesign") } == true)
         ru.aw.launcher.core.PreloadResult(ru.aw.launcher.meta.VersionManifest(versions = listOf(
             ru.aw.launcher.meta.ManifestVersion(id = "1.21.11", url = ""))), emptyMap(), emptySet())
     else runBlocking { Preloader.run { _, _ -> } }.copy(manifestStale = false, loaderSupportStale = false)
@@ -211,6 +211,22 @@ fun main(args: Array<String>) {
         Settings.update { it.copy(language = Language.RU) }
     }
     if (selectedScreens?.all { it.startsWith("skin-editor") } == true) { renderSkins(); exitProcess(0) }
+
+    if (selectedScreens?.all { it.startsWith("settings-redesign") || it.startsWith("accounts-redesign") } == true) {
+        val selected = ru.aw.launcher.auth.Account("00000000000000000000000000000010", "MinecraftPlayer", ru.aw.launcher.auth.AccountType.MICROSOFT,
+            expiresAt = Long.MAX_VALUE)
+        AccountManager.addOffline("CreativePlayer")
+        AccountManager.upsert(selected)
+        state.screen = Screen.ACCOUNTS
+        render("accounts-redesign", 1280, 780) { AWTheme(ThemeMode.DARK) { App(state, onGameStarted = {}) } }
+        render("accounts-redesign-small", 600, 540) { AWTheme(ThemeMode.DARK) { App(state, onGameStarted = {}) } }
+        for ((name, section) in listOf("appearance" to 0, "game" to 2, "downloads" to 3, "about" to 4)) {
+            state.modal = Modal.Settings(section = section)
+            render("settings-redesign-$name", 1280, 780) { AWTheme(ThemeMode.DARK) { App(state, onGameStarted = {}) } }
+            render("settings-redesign-$name-small", 600, 540) { AWTheme(ThemeMode.DARK) { App(state, onGameStarted = {}) } }
+        }
+        exitProcess(0)
+    }
 
     if (selectedScreens?.all { it.startsWith("profile-directory") } == true) {
         val directory = File(out, "profile-picker-fixture").toPath()

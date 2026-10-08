@@ -99,11 +99,11 @@ internal fun SettingsContent(state: LauncherState, section: Int) {
 
     Column(
         Modifier.fillMaxSize().verticalScroll(scroll),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(24.dp),
     ) {
         if (section == 0) {
             AppearancePanel(settings)
-            Panel(Modifier.fillMaxWidth()) {
+            SettingsGroup(Modifier.fillMaxWidth()) {
                 Column {
                     SectionTitle("Поведение лаунчера")
                     LabeledRow("Не закрывать лаунчер при запуске игры") {
@@ -119,7 +119,7 @@ internal fun SettingsContent(state: LauncherState, section: Int) {
         if (section == 2) {
             MemoryPanel(settings)
 
-            Panel(Modifier.fillMaxWidth()) {
+            SettingsGroup(Modifier.fillMaxWidth()) {
                 Column {
                     SectionTitle("Список версий")
                     LabeledRow("Показывать снапшоты") {
@@ -166,7 +166,7 @@ private fun DiscordPanel(settings: LauncherSettings) {
     val card = remember(presence, settings) { DiscordPresence.activity(presence, settings) }
     SectionTitle("Discord Rich Presence")
     Text("Покажи друзьям, во что играешь", style = MaterialTheme.typography.bodyMedium, color = AWColors.TextMuted)
-    Panel(Modifier.fillMaxWidth()) {
+    SettingsGroup(Modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                 Image(Brand.icon, "AWLauncher", Modifier.size(64.dp))
@@ -182,7 +182,7 @@ private fun DiscordPanel(settings: LauncherSettings) {
             Text("С таймером текущей сессии и кнопкой сайта", style = MaterialTheme.typography.bodySmall, color = AWColors.TextMuted)
         }
     }
-    Panel(Modifier.fillMaxWidth()) {
+    SettingsGroup(Modifier.fillMaxWidth()) {
         Column {
             LabeledRow("Показывать активность в Discord", "Сборка, версия Minecraft и время игры") {
                 AWSwitch(settings.discordPresence) { value -> Settings.update { it.copy(discordPresence = value) } }
@@ -211,7 +211,7 @@ private fun DiscordPanel(settings: LauncherSettings) {
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun AppearancePanel(settings: LauncherSettings) {
-    Panel(Modifier.fillMaxWidth()) {
+    SettingsGroup(Modifier.fillMaxWidth()) {
         Column {
             SectionTitle("Внешний вид")
             Text(
@@ -247,7 +247,7 @@ private fun MemoryPanel(settings: LauncherSettings) {
     val customMemory = memoryText.toIntOrNull()
     val validMemory = customMemory != null && customMemory in 512..limit
 
-    Panel(Modifier.fillMaxWidth()) {
+    SettingsGroup(Modifier.fillMaxWidth()) {
         Column {
             SectionTitle("Память")
             Text(
@@ -348,7 +348,7 @@ private fun LanguagePanel(settings: LauncherSettings) {
 
 @Composable
 private fun JvmArgumentsPanel(settings: LauncherSettings) {
-    Panel(Modifier.fillMaxWidth()) {
+    SettingsGroup(Modifier.fillMaxWidth()) {
         Column {
             SectionTitle("Аргументы JVM")
             OutlinedTextField(
@@ -375,7 +375,7 @@ private fun JvmArgumentsPanel(settings: LauncherSettings) {
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun DownloadsPanel(state: LauncherState, settings: LauncherSettings) {
-    Panel(Modifier.fillMaxWidth()) {
+    SettingsGroup(Modifier.fillMaxWidth()) {
         Column {
             SectionTitle("Загрузка и целостность")
             val threads = settings.downloadConcurrency.takeIf { it > 0 } ?: Downloader.DEFAULT_CONCURRENCY
@@ -408,5 +408,13 @@ private fun DownloadsPanel(state: LauncherState, settings: LauncherSettings) {
                 modifier = Modifier.padding(top = 6.dp),
             )
         }
+    }
+}
+
+@Composable
+private fun SettingsGroup(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        content()
+        HorizontalDivider(color = AWColors.Outline.copy(alpha = 0.6f), modifier = Modifier.padding(top = 8.dp))
     }
 }

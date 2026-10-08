@@ -951,5 +951,21 @@
   "Совместимые моды, загрузчик и Java обновятся автоматически": "Compatible mods, the loader and Java will update automatically",
   "Отметь моды, которые нужно оставить включёнными. Их совместимость не подтверждена": "Select mods to keep enabled. Their compatibility is unverified",
   "Резервные файлы: aw-migration-backups. При ошибке сборка восстановится автоматически": "Backup files: aw-migration-backups. The modpack is restored automatically if an error occurs",
-  "Перед запуском новой версии сохрани копию миров": "Back up your worlds before launching the new version"
+  "Перед запуском новой версии сохрани копию миров": "Back up your worlds before launching the new version",
+  "Выбранный аккаунт используется при запуске Minecraft": "The selected account is used to launch Minecraft",
+  "Аккаунтов пока нет": "No accounts yet",
+  "Добавь аккаунт ниже": "Add an account below",
+  "Вход откроется в браузере Microsoft": "Sign-in will open in your browser",
+  "Подтверди вход по коду в браузере Microsoft": "Enter the code in your browser to sign in to Microsoft",
+  "Нужен аккаунт с Minecraft Java Edition": "Requires an account that owns Minecraft Java Edition",
+  "Код подтверждения": "Verification code",
+  "Для одиночной игры и серверов с офлайн-входом. Скины и Realms недоступны": "For singleplayer and offline servers. Skins and Realms are unavailable",
+  "Офлайн-профиль": "Offline profile",
+  "Microsoft · сессия активна": "Microsoft · signed in",
+  "Найти раздел": "Find a section",
+  "Раздел не найден": "No matching section",
+  "Сохранить изменения": "Save changes",
+  "Вернуть стандартный скин": "Restore default skin",
+  "Плащи этого аккаунта": "Capes on this account",
+  "После сохранения может потребоваться повторный вход в игру": "You may need to rejoin the game after saving"
 }

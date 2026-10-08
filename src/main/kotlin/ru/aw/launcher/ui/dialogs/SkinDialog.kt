@@ -92,21 +92,19 @@ internal fun SkinDialog(state: LauncherState, uuid: String, preview: SkinImage? 
         capeTexture = null
         capeTexture = account.capes.firstOrNull { it.id == selectedCape }?.let { SkinHeads.capeTexture(it) }
     }
-    AWDialog("Скин и плащ Minecraft", subtitle = account.name, width = 760.dp, scrollable = true,
+    AWDialog("Скин и плащ Minecraft", subtitle = account.name, width = 860.dp, scrollable = true,
         onDismiss = { if (!saving) state.modal = null }, actions = {
-            AWButton("Стандартный", enabled = !loading && !saving, onClick = { state.applySkin(uuid, null, model) })
-            AWButton("Отмена", enabled = !saving, onClick = { state.modal = null })
-            AWButton(if (saving) "Применяю…" else "Применить к аккаунту", style = ButtonStyle.PRIMARY,
+            AWButton("Закрыть", enabled = !saving, onClick = { state.modal = null })
+            AWButton(if (saving) "Применяю…" else "Сохранить изменения", style = ButtonStyle.PRIMARY,
                 enabled = (skinChanged || capeChanged) && !loading && !saving, onClick = apply)
         }) {
         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Text("Внешний вид изменится в профиле Minecraft Java и будет доступен в других лаунчерах", color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall)
             BoxWithConstraints(Modifier.fillMaxWidth()) {
-                val previewWidth = (maxWidth * 0.44f).coerceAtMost(316.dp)
-                val previewHeight = if (maxWidth < 600.dp) 240.dp else 396.dp
-                Row(horizontalArrangement = Arrangement.spacedBy(18.dp), verticalAlignment = Alignment.Top) {
-                    SkinPreview(draft?.image ?: texture, model, Modifier.width(previewWidth).height(previewHeight), loading, cape = capeTexture, showBack = appearanceTab == 1)
-                    Column(Modifier.weight(1f).height(previewHeight).verticalScroll(rememberScrollState()).padding(top = 6.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                val narrow = maxWidth < 620.dp
+                val previewHeight = if (narrow) 150.dp else 410.dp
+                val controls: @Composable (Modifier) -> Unit = { controlsModifier ->
+                    Column(controlsModifier, verticalArrangement = Arrangement.spacedBy(14.dp)) {
+
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             ChoiceChip("Скин", selected = appearanceTab == 0, onClick = { appearanceTab = 0 })
                             ChoiceChip("Плащ", selected = appearanceTab == 1, onClick = { appearanceTab = 1 })
@@ -143,22 +141,33 @@ internal fun SkinDialog(state: LauncherState, uuid: String, preview: SkinImage? 
                                 }
                             })
                             filename?.let { Text(it, translate = false, color = AWColors.TextSoft, style = MaterialTheme.typography.bodySmall, maxLines = 2) }
+                            AWButton("Вернуть стандартный скин", enabled = !loading && !saving, onClick = { state.applySkin(uuid, null, model) })
                             Text("PNG 64×64 или 64×32 · до 1 МБ", color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall)
                         } else {
                             Text("Плащ", color = AWColors.Text, style = MaterialTheme.typography.titleSmall)
-                            Text("Доступные плащи твоего аккаунта Minecraft", color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall)
-                            LazyVerticalGrid(columns = GridCells.Adaptive(78.dp), modifier = Modifier.fillMaxWidth().heightIn(max = 180.dp),
+                            Text("Плащи этого аккаунта", color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall)
+                            LazyVerticalGrid(columns = GridCells.Adaptive(92.dp), modifier = Modifier.fillMaxWidth().heightIn(max = 250.dp),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 item("none") { CapeOption(null, selectedCape == null, !loading && !saving) { selectedCape = null } }
                                 items(account.capes, key = { it.id }) { cape -> CapeOption(cape, selectedCape == cape.id, !loading && !saving) { selectedCape = cape.id } }
                             }
                             if (!loading && account.capes.isEmpty()) Text("У этого аккаунта пока нет плащей", color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall)
                         }
+
                     }
+                }
+                if (narrow) Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    SkinPreview(draft?.image ?: texture, model, Modifier.fillMaxWidth().height(previewHeight), loading,
+                        cape = capeTexture, showBack = appearanceTab == 1)
+                    controls(Modifier.fillMaxWidth())
+                } else Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(24.dp), verticalAlignment = Alignment.Top) {
+                    SkinPreview(draft?.image ?: texture, model, Modifier.width(330.dp).height(previewHeight), loading,
+                        cape = capeTexture, showBack = appearanceTab == 1)
+                    controls(Modifier.weight(1f).height(previewHeight).verticalScroll(rememberScrollState()))
                 }
             }
             (error ?: state.skinError)?.let { Text(it, color = AWColors.Danger, style = MaterialTheme.typography.bodySmall) }
-            Text("Игра и сервер могут показать новый скин и плащ после повторного входа", color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall)
+            Text("После сохранения может потребоваться повторный вход в игру", color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall)
         }
     }
 }
@@ -171,7 +180,7 @@ private fun CapeOption(cape: MinecraftCape?, chosen: Boolean, enabled: Boolean, 
     val name = cape?.alias?.takeIf { it.isNotBlank() } ?: if (cape == null) "Без плаща" else "Плащ"
     WithTooltip(name) {
         Column(Modifier.fillMaxWidth().clip(shape).background(if (chosen) AWColors.AccentSoft else AWColors.SurfaceHigh)
-            .border(1.dp, if (chosen) AWColors.Accent else AWColors.Outline, shape)
+            .border(1.dp, if (chosen) AWColors.Accent else androidx.compose.ui.graphics.Color.Transparent, shape)
             .clickable(enabled = enabled, role = Role.RadioButton, onClick = onClick).semantics { selected = chosen }
             .padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Box(Modifier.height(64.dp).fillMaxWidth(), contentAlignment = Alignment.Center) {

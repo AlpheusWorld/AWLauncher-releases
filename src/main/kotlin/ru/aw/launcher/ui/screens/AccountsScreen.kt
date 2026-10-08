@@ -1,22 +1,11 @@
 package ru.aw.launcher.ui.screens
 
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -37,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import ru.aw.launcher.ui.components.AWIcons
@@ -49,125 +39,70 @@ import ru.aw.launcher.ui.SkinHead
 import ru.aw.launcher.ui.components.ButtonStyle
 import ru.aw.launcher.ui.components.AWButton
 import ru.aw.launcher.ui.components.AWTextField
-import ru.aw.launcher.ui.components.Panel
 import ru.aw.launcher.ui.components.SectionTitle
 import ru.aw.launcher.ui.components.Tag
+import ru.aw.launcher.ui.components.ChoiceChip
+import ru.aw.launcher.ui.components.EmptyState
 import ru.aw.launcher.ui.theme.AWColors
 import ru.aw.launcher.ui.theme.AWMotion
 import ru.aw.launcher.ui.theme.AWDimens
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun AccountsScreen(state: LauncherState) {
     val accounts by state.accounts.collectAsState()
     val selected by state.selectedAccount.collectAsState()
     var nickname by remember { mutableStateOf("") }
     var nicknameError by remember { mutableStateOf<String?>(null) }
-
+    var offline by remember { mutableStateOf(false) }
     val addOffline = {
-        val problem = state.addOffline(nickname)
-        nicknameError = problem
-        if (problem == null) nickname = ""
+        nicknameError = state.addOffline(nickname)
+        if (nicknameError == null) nickname = ""
     }
-
-    Column(
-        Modifier.fillMaxSize().padding(AWDimens.Gutter).verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        Panel(Modifier.fillMaxWidth()) {
-            Column {
-                SectionTitle("Лицензионный вход")
-                Text(
-                    if (AuthConfig.isConfigured) {
-                        "Откроется браузер Microsoft. Пароль вводится только там — лаунчер его не видит и не хранит."
-                    } else {
-                        "Вход по коду Microsoft. Подтверди свой аккаунт в браузере — он появится в лаунчере."
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = AWColors.TextMuted,
-                )
-                Spacer(Modifier.height(12.dp))
-                AWButton(
-                    when {
-                        state.signingIn -> state.signInStage.ifBlank { "Вход…" }
-                        else -> "Войти через Microsoft"
-                    },
-                    style = ButtonStyle.PRIMARY,
-                    enabled = !state.signingIn,
-                    onClick = { state.signInMicrosoft() },
-                )
-                state.signInCode?.let { login ->
-                    Spacer(Modifier.height(12.dp))
-                    Text("Если Microsoft попросит код, введи:", color = AWColors.TextMuted)
-                    Text(login.code, style = MaterialTheme.typography.headlineMedium, color = AWColors.Accent, translate = false)
-                    AWButton("Открыть Microsoft", onClick = state::openMicrosoftSignInPage)
-                }
-                if (state.signingIn) {
-                    Spacer(Modifier.height(8.dp))
-                    AWButton("Отменить", style = ButtonStyle.SECONDARY, onClick = state::cancelMicrosoftSignIn)
-                }
+    Column(Modifier.fillMaxSize().padding(AWDimens.Gutter).verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(20.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text("Аккаунты", style = MaterialTheme.typography.headlineSmall, color = AWColors.Text, modifier = Modifier.weight(1f))
+            Text(accounts.size.toString(), color = AWColors.TextMuted, style = MaterialTheme.typography.titleSmall)
+        }
+        Text("Выбранный аккаунт используется при запуске Minecraft", color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall)
+        if (accounts.isEmpty()) {
+            EmptyState(AWIcons.Image, "Аккаунтов пока нет", "Добавь аккаунт ниже", Modifier.fillMaxWidth().height(130.dp))
+        } else Column(Modifier.fillMaxWidth().background(AWColors.Surface, RoundedCornerShape(AWDimens.CornerCard)).padding(6.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            accounts.sortedByDescending { it.uuid == selected?.uuid }.forEach { account ->
+                AccountRow(account, account.uuid == selected?.uuid,
+                    onSelect = { state.selectAccount(account.uuid) }, onRemove = { state.removeAccount(account.uuid) },
+                    onSkin = { state.openSkinEditor(account) })
             }
         }
-
-        Panel(Modifier.fillMaxWidth()) {
-            Column {
-                SectionTitle("Офлайн-режим")
-                Text(
-                    "Работает только на серверах с online-mode=false. Скины и Realms недоступны.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = AWColors.TextMuted,
-                )
-                Spacer(Modifier.height(12.dp))
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    AWTextField(
-                        value = nickname,
-                        onValueChange = {
-                            nickname = it
-                            nicknameError = null
-                        },
-                        placeholder = "Никнейм",
-                        isError = nicknameError != null,
-                        onSubmit = addOffline,
-                        modifier = Modifier.width(240.dp),
-                    )
-                    AWButton("Добавить", onClick = addOffline, enabled = nickname.isNotBlank())
-                }
-                nicknameError?.let {
-                    Text(
-                        it,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = AWColors.Danger,
-                        modifier = Modifier.padding(top = 6.dp),
-                    )
-                }
-            }
+        androidx.compose.material3.HorizontalDivider(color = AWColors.Outline)
+        SectionTitle("Добавить аккаунт")
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            ChoiceChip("Microsoft", selected = !offline, enabled = !state.signingIn, onClick = { offline = false })
+            ChoiceChip("Офлайн", selected = offline, enabled = !state.signingIn, onClick = { offline = true })
         }
-
-        Panel(Modifier.fillMaxWidth()) {
-            Column {
-                SectionTitle("Аккаунты (${accounts.size})")
-                if (accounts.isEmpty()) {
-                    Text(
-                        "Пока пусто.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = AWColors.TextMuted,
-                    )
-                } else {
-                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        accounts.forEach { account ->
-                            AccountRow(
-                                account = account,
-                                isSelected = account.uuid == selected?.uuid,
-                                onSelect = { state.selectAccount(account.uuid) },
-                                onRemove = { state.removeAccount(account.uuid) },
-                                onSkin = { state.openSkinEditor(account) },
-                            )
-                        }
-                    }
-                }
+        if (!offline) {
+            Text(if (AuthConfig.isConfigured) "Вход откроется в браузере Microsoft" else "Подтверди вход по коду в браузере Microsoft",
+                color = AWColors.TextSoft, style = MaterialTheme.typography.bodyMedium)
+            Text("Нужен аккаунт с Minecraft Java Edition", color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall)
+            AWButton(if (state.signingIn) state.signInStage.ifBlank { "Вход…" } else "Войти через Microsoft",
+                style = ButtonStyle.PRIMARY, enabled = !state.signingIn, onClick = state::signInMicrosoft)
+            state.signInCode?.let { login ->
+                Text("Код подтверждения", color = AWColors.TextMuted, style = MaterialTheme.typography.labelMedium)
+                Text(login.code, color = AWColors.Accent, style = MaterialTheme.typography.headlineMedium, translate = false)
+                AWButton("Открыть Microsoft", onClick = state::openMicrosoftSignInPage)
             }
+            if (state.signingIn) AWButton("Отменить", onClick = state::cancelMicrosoftSignIn)
+        } else {
+            Text("Для одиночной игры и серверов с офлайн-входом. Скины и Realms недоступны", color = AWColors.TextMuted,
+                style = MaterialTheme.typography.bodySmall)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                AWTextField(nickname, onValueChange = { nickname = it; nicknameError = null }, placeholder = "Никнейм",
+                    isError = nicknameError != null, onSubmit = addOffline, modifier = Modifier.widthIn(max = 280.dp))
+                AWButton("Добавить", onClick = addOffline, enabled = nickname.isNotBlank())
+            }
+            nicknameError?.let { Text(it, color = AWColors.Danger, style = MaterialTheme.typography.bodySmall) }
         }
     }
 }
@@ -193,49 +128,52 @@ private fun AccountRow(
     )
 
     BoxWithConstraints(Modifier.fillMaxWidth()) {
-    val compact = maxWidth < 540.dp
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(AWDimens.CornerMedium))
-            .background(background)
-            .clickable(interactionSource = interaction, indication = null, onClick = onSelect)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        SkinHead(account, 32.dp)
-        Column(Modifier.weight(1f)) {
-            Text(
-                account.name,
-                style = MaterialTheme.typography.titleMedium,
-                color = if (isSelected) AWColors.Accent else AWColors.Text,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1, overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                when {
-                    account.isOffline -> "Вход не нужен"
-                    account.isExpired -> "Сессия обновится при запуске"
-                    else -> "Сессия активна"
-                },
-                style = MaterialTheme.typography.bodySmall,
-                color = AWColors.TextMuted,
-                maxLines = 1, overflow = TextOverflow.Ellipsis,
-            )
+        val compact = maxWidth < 540.dp
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(AWDimens.CornerMedium))
+                .background(background)
+                .selectable(selected = isSelected, role = Role.RadioButton, interactionSource = interaction, indication = null, onClick = onSelect)
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            SkinHead(account, 44.dp)
+            Column(Modifier.weight(1f)) {
+                Text(
+                    account.name,
+                    translate = false,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = if (isSelected) AWColors.Accent else AWColors.Text,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    when {
+                        account.isOffline -> "Офлайн-профиль"
+                        account.isExpired -> "Сессия обновится при запуске"
+                        else -> "Microsoft · сессия активна"
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = AWColors.TextMuted,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis,
+                )
+            }
+            if (!compact) {
+                if (account.isOffline) Tag("Офлайн", AWColors.Warning) else Tag("Лицензия", AWColors.Accent)
+            }
+            if (!account.isOffline) {
+                if (compact) WithTooltip("Скин и плащ") {
+                    IconButton(onClick = onSkin, modifier = Modifier.size(44.dp)) { Icon(AWIcons.Image, "Скин и плащ", tint = AWColors.TextMuted) }
+                } else AWButton("Скин и плащ", onClick = onSkin)
+            }
+            if (isSelected) {
+                Icon(Icons.Default.Check, null, tint = AWColors.Accent, modifier = Modifier.size(18.dp))
+            }
+            IconButton(onClick = onRemove, modifier = Modifier.size(40.dp)) {
+                Icon(Icons.Default.Delete, "Удалить", tint = AWColors.TextMuted, modifier = Modifier.size(16.dp))
+            }
         }
-        if (account.isOffline) Tag("Офлайн", AWColors.Warning) else Tag("Лицензия", AWColors.Accent)
-        if (!account.isOffline) {
-            if (compact) WithTooltip("Скин и плащ") {
-                IconButton(onClick = onSkin, modifier = Modifier.size(44.dp)) { Icon(AWIcons.Image, "Скин и плащ", tint = AWColors.TextMuted) }
-            } else AWButton("Скин и плащ", onClick = onSkin)
-        }
-        if (isSelected) {
-            Icon(Icons.Default.Check, null, tint = AWColors.Accent, modifier = Modifier.size(18.dp))
-        }
-        IconButton(onClick = onRemove, modifier = Modifier.size(28.dp)) {
-            Icon(Icons.Default.Delete, "Удалить", tint = AWColors.TextMuted, modifier = Modifier.size(16.dp))
-        }
-    }
     }
 }
