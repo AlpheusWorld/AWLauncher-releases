@@ -38,9 +38,9 @@ class SkinLibraryTest {
     }
 
     @Test fun `invalid identifiers cannot access files outside the collection`() = runBlocking {
-        val outside = directory.resolveSibling("outside.png")
+        val outside = directory.resolve("outside.png")
         Files.write(outside, image().png)
-        val library = SkinLibrary(directory)
+        val library = SkinLibrary(directory.resolve("collection"))
         assertThrows(IllegalArgumentException::class.java) { runBlocking { library.remove("../outside") } }
         assertThrows(IllegalArgumentException::class.java) { runBlocking { library.image(SavedSkin("../outside", "Bad", SkinModel.CLASSIC)) } }
         assertTrue(Files.exists(outside))
