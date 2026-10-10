@@ -28,7 +28,7 @@ public final class RuleSearch {
             }
             if (all) matches.add(new Match(entry.rule, score));
         }
-        matches.sort(Comparator.comparingInt(Match::score).reversed().thenComparing(m -> m.rule.number()));
+        matches.sort(Comparator.comparingInt(Match::score).reversed());
         return matches.stream().limit(500).toList();
     }
     public static String normalize(String text) { return Normalizer.normalize(text == null ? "" : text, Normalizer.Form.NFKC).toLowerCase(Locale.ROOT).replace('ё', 'е').strip(); }

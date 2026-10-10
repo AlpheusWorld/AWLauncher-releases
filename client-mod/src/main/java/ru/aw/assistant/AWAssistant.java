@@ -14,7 +14,7 @@ import ru.aw.assistant.ui.RulesScreen;
 public final class AWAssistant implements ClientModInitializer {
     public static KeyMapping OPEN;
     public static RuleRepository RULES;
-    public static boolean animations = true;
+    public static boolean animations = true, blur = true;
     @Override public void onInitializeClient() {
         RULES = new RuleRepository(FabricLoader.getInstance().getConfigDir());
         var category = KeyMapping.Category.register(Identifier.fromNamespaceAndPath("awassistant", "assistant"));
@@ -23,6 +23,6 @@ public final class AWAssistant implements ClientModInitializer {
             while (OPEN.consumeClick()) if (ClientBridge.screen(client) == null || ClientBridge.screen(client) instanceof net.minecraft.client.gui.screens.TitleScreen)
                 ClientBridge.screen(client, new RulesScreen(ClientBridge.screen(client)));
         });
-        ClientLifecycleEvents.CLIENT_STOPPING.register(client -> RULES.close());
+        ClientLifecycleEvents.CLIENT_STOPPING.register(client -> { RULES.close();ru.aw.assistant.ui.UiRenderer.close(); });
     }
 }
