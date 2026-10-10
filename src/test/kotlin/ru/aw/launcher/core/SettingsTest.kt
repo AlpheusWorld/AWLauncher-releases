@@ -21,6 +21,16 @@ class SettingsTest {
     }
 
     @Test
+    fun `old settings enable the companion and an explicit opt out survives persistence`() {
+        val old = Json.decodeFromString<LauncherSettings>("""{"memoryMb":3584,"language":"RU"}""")
+        assertEquals(true, old.companionModAutoDownload)
+        val encoded = Json.encodeToString(LauncherSettings.serializer(), old.copy(companionModAutoDownload = false))
+        val restored = Json.decodeFromString<LauncherSettings>(encoded)
+        assertEquals(false, restored.companionModAutoDownload)
+        assertEquals(3584, restored.memoryMb)
+    }
+
+    @Test
     fun `recommendations keep room for the OS even on small PCs`() {
         assertEquals(512, SettingsDefaults.recommendedMemory(1024))
         assertEquals(1024, SettingsDefaults.recommendedMemory(2048))

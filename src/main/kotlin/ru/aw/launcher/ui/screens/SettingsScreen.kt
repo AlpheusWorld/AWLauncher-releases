@@ -136,6 +136,18 @@ internal fun SettingsContent(state: LauncherState, section: Int) {
             }
 
             JvmArgumentsPanel(settings)
+            SettingsGroup(Modifier.fillMaxWidth()) {
+                Column {
+                    SectionTitle("Клиентский мод AWAssistant")
+                    SettingsRow("Автоматически скачивать AWAssistant", "Поиск правил в игре · Fabric 26.1.2 и 26.3", divider = false) {
+                        AWSwitch(settings.companionModAutoDownload, outlined = true) { checked ->
+                            Settings.update { it.copy(companionModAutoDownload = checked) }
+                        }
+                    }
+                    Text("При выключении новые файлы не скачиваются. Уже установленный мод можно отключить в списке модов сборки",
+                        color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall)
+                }
+            }
         }
         if (section == 3) DownloadsPanel(state, settings)
         if (section == 5) DiscordPanel(settings)

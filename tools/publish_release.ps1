@@ -48,8 +48,24 @@ $hashes = @('AWLauncher-Setup.exe','AWLauncher.msi','update.json','update.json.s
     (Get-FileHash -LiteralPath (Join-Path $output $_) -Algorithm SHA256).Hash.ToLowerInvariant() + '  ' + $_
 }
 [IO.File]::WriteAllText((Join-Path $output 'SHA256SUMS.txt'), ($hashes -join "`n") + "`n", [Text.UTF8Encoding]::new($false))
+$companionCatalog = Join-Path $projectRoot 'src/main/resources/companion/catalog.json'
+$companionAssets = @()
+foreach ($companion in (Get-Content -LiteralPath $companionCatalog -Raw | ConvertFrom-Json)) {
+    $name = ([Uri]$companion.url).Segments[-1]
+    $jar = Join-Path $projectRoot "client-mod/build/libs/$name"
+    if (-not (Test-Path -LiteralPath $jar -PathType Leaf)) { throw "Missing client companion: $name" }
+    if ((Get-Item -LiteralPath $jar).Length -ne $companion.size -or (Get-FileHash -LiteralPath $jar -Algorithm SHA256).Hash.ToLowerInvariant() -ne $companion.sha256) {
+        throw "Client companion differs from the pinned launcher catalog: $name"
+    }
+    Copy-Item -LiteralPath $jar -Destination (Join-Path $output $name) -Force
+    $companionAssets += $name
+}
+foreach ($name in $companionAssets) {
+    $hashes += (Get-FileHash -LiteralPath (Join-Path $output $name) -Algorithm SHA256).Hash.ToLowerInvariant() + '  ' + $name
+}
+[IO.File]::WriteAllText((Join-Path $output 'SHA256SUMS.txt'), ($hashes -join "`n") + "`n", [Text.UTF8Encoding]::new($false))
 if ($PrepareOnly) { Write-Output "Prepared and verified $tag at $output"; return }
-$files=@('AWLauncher-Setup.exe','AWLauncher.msi','update.json','update.json.sig','SHA256SUMS.txt','AWLauncher-third-party-sources.zip','OpenJDK-sources.part01','OpenJDK-sources.part02','OpenJDK-SOURCES.md')
+$files=@('AWLauncher-Setup.exe','AWLauncher.msi','update.json','update.json.sig','SHA256SUMS.txt','AWLauncher-third-party-sources.zip','OpenJDK-sources.part01','OpenJDK-sources.part02','OpenJDK-SOURCES.md') + $companionAssets
 foreach ($name in $files) { if (-not (Test-Path -LiteralPath (Join-Path $output $name) -PathType Leaf)) { throw "A required public release asset is missing: $name" } }
 
 # Credentials stay in memory and are only sent to GitHub's API/upload hosts.

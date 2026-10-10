@@ -13,7 +13,7 @@ plugins {
 }
 
 group = "ru.aw"
-version = "1.0.10"
+version = "1.0.11"
 
 kotlin {
     jvmToolchain(21)
@@ -189,6 +189,14 @@ tasks.register<JavaExec>("smokeLoaders") {
     mainClass.set("ru.aw.launcher.dev.LoaderSmokeKt")
     (findProperty("smokeHome") as String?)?.let { systemProperty("user.home", it) }
     args((findProperty("targets") as String? ?: "").split(',').filter { it.isNotBlank() })
+}
+
+tasks.register<JavaExec>("smokeCompanion") {
+    group = "verification"
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass.set("ru.aw.launcher.dev.CompanionSmokeKt")
+    systemProperty("user.home", layout.buildDirectory.dir("companion-smoke-home").get().asFile.absolutePath)
+    args((findProperty("gameVersion") as String?) ?: "26.1.2", file("client-mod/build/libs").absolutePath)
 }
 
 tasks.register<JavaExec>("smokeMicrosoftAuth") {

@@ -1009,5 +1009,15 @@
   "Текстура набора изменилась — требуется обновление каталога": "The pack texture changed — update the skin catalog",
   "Не удалось загрузить набор скинов": "Could not download the skin pack",
   "Не удалось загрузить набор скинов: HTTP {0}": "Could not download the skin pack: HTTP {0}",
-  "Набор скинов слишком большой": "The skin pack is too large"
+  "Набор скинов слишком большой": "The skin pack is too large",
+  "Клиентский мод AWAssistant": "AWAssistant client mod",
+  "Автоматически скачивать AWAssistant": "Automatically download AWAssistant",
+  "Поиск правил в игре · Fabric 26.1.2 и 26.3": "In-game rules search · Fabric 26.1.2 and 26.3",
+  "При выключении новые файлы не скачиваются. Уже установленный мод можно отключить в списке модов сборки": "When disabled, new files are not downloaded. Disable an installed copy in the instance mod list",
+  "Скачиваю клиентский мод AWAssistant": "Downloading the AWAssistant client mod",
+  "AWAssistant установлен вручную — автозагрузка его не заменит": "AWAssistant was installed manually — automatic downloads will not replace it",
+  "Не удалось скачать AWAssistant — игра запустится без него": "Could not download AWAssistant — Minecraft will start without it",
+  "Не совпадает контрольная сумма AWAssistant": "AWAssistant checksum mismatch",
+  "Файл AWAssistant не содержит клиентский мод": "The AWAssistant file does not contain the client mod",
+  "Для AWAssistant нужен Fabric Loader 0.19.3 или новее": "AWAssistant requires Fabric Loader 0.19.3 or newer"
 }

@@ -21,6 +21,7 @@ import ru.aw.launcher.instance.InstanceStore
 import ru.aw.launcher.instance.InstanceOptions
 import ru.aw.launcher.meta.LoaderKind
 import ru.aw.launcher.mods.GameOptions
+import ru.aw.launcher.mods.CompanionMod
 import ru.aw.launcher.net.DownloadProgress
 import ru.aw.launcher.net.Downloader
 import ru.aw.launcher.net.ProgressMerger
@@ -157,6 +158,10 @@ object GameLauncher {
             else withContext(Dispatchers.IO) { installer.resolve(profileId) }
 
             val installed = installer.install(version, gameDir, onStage, progress.sink("game"))
+            try { CompanionMod.ensure(versionId, loader, gameDir, settings.companionModAutoDownload, onStage, progress.sink("companion"), onNotice,
+                fabricVersion = version.libraries.firstOrNull { it.name.startsWith("net.fabricmc:fabric-loader:") }?.name?.substringAfterLast(':')) }
+            catch (failure: CancellationException) { throw failure }
+            catch (failure: Exception) { onNotice("Не удалось скачать AWAssistant — игра запустится без него"); Log.warn("AWAssistant download failed", failure) }
             PreparedLaunch(installed, gameDir, awaitJava(), settings.memoryMb, settings, options)
         }
     }

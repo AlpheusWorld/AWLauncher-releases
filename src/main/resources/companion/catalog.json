@@ -1,0 +1,18 @@
+[
+  {
+    "gameVersion": "26.1.2",
+    "version": "0.1.0",
+    "url": "https://github.com/AlpheusWorld/AWLauncher-releases/releases/download/v1.0.11/AWAssistant-fabric-26.1.2-0.1.0.jar",
+    "sha1": "1b576d65035abdede097c6918e5eb77d2d8c5c35",
+    "sha256": "26b9a58deae5926f998fb38063a247a011fca72f9c0366234635b6a1c4e35632",
+    "size": 1026206
+  },
+  {
+    "gameVersion": "26.3",
+    "version": "0.1.0",
+    "url": "https://github.com/AlpheusWorld/AWLauncher-releases/releases/download/v1.0.11/AWAssistant-fabric-26.3-0.1.0.jar",
+    "sha1": "9dd33c47ee39e9751ae0f1cd7a42f06acb308b6c",
+    "sha256": "b86d6bb6a44db08e5dde31dd7e38906854bc37c35416b529719c05ce37ed7362",
+    "size": 951592
+  }
+]

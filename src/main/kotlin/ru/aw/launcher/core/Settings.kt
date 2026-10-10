@@ -61,6 +61,7 @@ data class LauncherSettings(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val language: Language = Language.EN,
     val keepLauncherOpen: Boolean = false,
+    val companionModAutoDownload: Boolean = true,
     val libraryGroups: List<ru.aw.launcher.instance.LibraryGroup> = emptyList(),
     val discordPresence: Boolean = true,
     val discordShowLauncher: Boolean = true,
