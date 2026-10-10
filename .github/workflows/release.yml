@@ -32,15 +32,19 @@ jobs:
         with:
           python-version: '3.13'
 
-      - name: Set up Java 25 companion compiler
-        uses: actions/setup-java@v6
-        with:
-          distribution: temurin
-          java-version: '25.0.4.1+1'
-
-      - name: Record companion compiler path
+      - name: Set up pinned Java 25 companion compiler
         shell: pwsh
-        run: '"AW_JAVA25_HOME=$env:JAVA_HOME" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append'
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP 'awassistant-jdk25.zip'
+          $destination = Join-Path $env:RUNNER_TEMP 'awassistant-jdk25'
+          Invoke-WebRequest -Uri 'https://github.com/adoptium/temurin25-binaries/releases/download/jdk-25.0.4.1%2B1/OpenJDK25U-jdk_x64_windows_hotspot_25.0.4.1_1.zip' -OutFile $archive
+          if ((Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant() -ne '00c847d804f4a78e9f04f2683faf14fed898535b177b7fc704486cb0284e9283') {
+            throw 'Companion JDK checksum mismatch'
+          }
+          Expand-Archive -LiteralPath $archive -DestinationPath $destination
+          $compiler = Join-Path $destination 'jdk-25.0.4.1+1'
+          if (-not (Test-Path -LiteralPath (Join-Path $compiler 'bin/javac.exe'))) { throw 'Companion compiler was not extracted' }
+          "AW_JAVA25_HOME=$compiler" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Set up Java 21
         uses: actions/setup-java@v6
