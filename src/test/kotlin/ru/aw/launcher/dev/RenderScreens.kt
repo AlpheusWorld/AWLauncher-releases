@@ -267,7 +267,7 @@ fun main(args: Array<String>) {
         state.screen = Screen.ACCOUNTS
         render("accounts-redesign", 1280, 780) { AWTheme(ThemeMode.DARK) { App(state, onGameStarted = {}) } }
         render("accounts-redesign-small", 600, 540) { AWTheme(ThemeMode.DARK) { App(state, onGameStarted = {}) } }
-        for ((name, section) in listOf("appearance" to 0, "game" to 2, "downloads" to 3, "about" to 4)) {
+        for ((name, section) in listOf("appearance" to 0, "game" to 2, "downloads" to 3, "about" to 4, "discord" to 5)) {
             state.modal = Modal.Settings(section = section)
             render("settings-redesign-$name", 1280, 780) { AWTheme(ThemeMode.DARK) { App(state, onGameStarted = {}) } }
             render("settings-redesign-$name-small", 600, 540) { AWTheme(ThemeMode.DARK) { App(state, onGameStarted = {}) } }

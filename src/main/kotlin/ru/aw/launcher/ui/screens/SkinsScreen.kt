@@ -11,6 +11,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -167,19 +168,49 @@ internal fun SkinsScreen(state: LauncherState, preview: SkinImage? = null, initi
                 }
                 val gallery: @Composable (Modifier) -> Unit = { modifier ->
                     val grid = rememberLazyGridState()
+                    var anchoredSection by remember { mutableStateOf<String?>(null) }
+                    var anchorOffset by remember { mutableIntStateOf(0) }
+                    val density = LocalDensity.current
+                    val headings = buildList {
+                        var index = if (compact) 1 else 0
+                        if (query.isBlank() || matchingSaved.isNotEmpty()) {
+                            val count = if (savedOpen) matchingSaved.size + (if (query.isBlank()) 2 else 0) else 0
+                            add(SkinGridHeading("saved-heading", "Сохранённые скины", index, count, savedOpen))
+                            index += 1 + count
+                        }
+                        SkinCatalog.sections.forEach { (section, entries) ->
+                            val matches = entries.filter { query.isBlank() || it.name.contains(query.trim(), true) || section.contains(query.trim(), true) }
+                            if (matches.isNotEmpty()) {
+                                val expanded = openSections[section] ?: (query.isNotBlank() || section == "Стандартные скины")
+                                val count = if (expanded) matches.size else 0
+                                add(SkinGridHeading("section:$section", "$section · ${matches.size}", index, count, expanded))
+                                index += 1 + count
+                            }
+                        }
+                    }
+                    val toggleHeading: (SkinGridHeading) -> Unit = { heading ->
+                        anchorOffset = anchorSkinHeading(grid, heading)
+                        anchoredSection = heading.key
+                        if (heading.key == "saved-heading") savedOpen = !heading.expanded
+                        else openSections[heading.key.removePrefix("section:")] = !heading.expanded
+                    }
                     val bounds = remember { mutableStateMapOf<String, Rect>() }
                     var dragged by remember { mutableStateOf<String?>(null) }
                     var dragOffset by remember { mutableStateOf(Offset.Zero) }
                     Column(modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        AWTextField(query, onValueChange = { query = it; openSections.clear() }, placeholder = "Поиск скинов или набора…", modifier = Modifier.fillMaxWidth(), clearable = true)
-                        Box(Modifier.weight(1f).fillMaxWidth()) {
+                        AWTextField(query, onValueChange = { query = it; openSections.clear(); anchoredSection = null; grid.requestScrollToItem(0) }, placeholder = "Поиск скинов или набора…", modifier = Modifier.fillMaxWidth(), clearable = true)
+                        BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+                        val tileHeight = ((maxWidth.value - 12f - 12f * (columns - 1)) / columns) * 40f / 31f
+                        val tail = skinSectionTailPadding(headings, anchoredSection, maxHeight.value, tileHeight, columns,
+                            with(density) { anchorOffset.toDp().value })
                         LazyVerticalGrid(GridCells.Fixed(columns), state = grid, modifier = Modifier.fillMaxSize().padding(end = 12.dp),
+                            contentPadding = PaddingValues(bottom = tail.dp),
                             horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             if (compact) item("preview", span = { GridItemSpan(maxLineSpan) }) {
                                 previewContent(Modifier.fillMaxWidth().height(330.dp))
                             }
                             if (query.isBlank() || matchingSaved.isNotEmpty()) item("saved-heading", span = { GridItemSpan(maxLineSpan) }) {
-                                SkinSectionTitle("Сохранённые скины", savedOpen) { savedOpen = !savedOpen }
+                                SkinSectionTitle("Сохранённые скины", savedOpen) { toggleHeading(headings.first { it.key == "saved-heading" }) }
                             }
                             if (savedOpen) {
                                 if (query.isBlank()) {
@@ -242,7 +273,7 @@ internal fun SkinsScreen(state: LauncherState, preview: SkinImage? = null, initi
                                 if (matches.isNotEmpty()) {
                                     val expanded = openSections[section] ?: (query.isNotBlank() || section == "Стандартные скины")
                                     item("section:$section", span = { GridItemSpan(maxLineSpan) }) {
-                                        SkinSectionTitle("$section · ${matches.size}", expanded) { openSections[section] = !expanded }
+                                        SkinSectionTitle("$section · ${matches.size}", expanded) { toggleHeading(headings.first { it.key == "section:$section" }) }
                                     }
                                     if (expanded) items(matches, key = { it.id }) { skin ->
                                         SkinCard(skin.name, skin.model, choice == skin.id, !working,
@@ -256,6 +287,7 @@ internal fun SkinsScreen(state: LauncherState, preview: SkinImage? = null, initi
                                     Text("Скины не найдены", color = AWColors.TextMuted, style = MaterialTheme.typography.bodyMedium)
                                 }
                         }
+                        SkinPinnedHeading(grid, headings, toggleHeading)
                         VerticalScrollbar(rememberScrollbarAdapter(grid), Modifier.align(Alignment.CenterEnd).fillMaxHeight())
                         }
                     }
@@ -297,8 +329,8 @@ internal fun SkinsScreen(state: LauncherState, preview: SkinImage? = null, initi
 }
 
 @Composable
-private fun SkinSectionTitle(title: String, expanded: Boolean, onClick: () -> Unit) {
-    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+internal fun SkinSectionTitle(title: String, expanded: Boolean, onClick: () -> Unit) {
+    Row(Modifier.fillMaxWidth().height(44.dp).clickable(onClick = onClick).padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(title, color = AWColors.Text, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
         Icon(if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown, null, tint = AWColors.TextMuted)
     }
@@ -333,5 +365,42 @@ private fun SkinCard(name: String, model: SkinModel, chosen: Boolean, enabled: B
             }
         }
         Text(name, translate = false, color = AWColors.Text, style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+internal data class SkinGridHeading(val key: String, val title: String, val index: Int, val itemCount: Int, val expanded: Boolean)
+
+internal fun anchorSkinHeading(grid: LazyGridState, heading: SkinGridHeading): Int {
+    val offset = grid.layoutInfo.visibleItemsInfo.firstOrNull { it.key == heading.key }?.offset?.y?.coerceAtLeast(0) ?: 0
+    // Override key-based anchoring before removing the rows that currently own the viewport.
+    grid.requestScrollToItem(heading.index, -offset)
+    return offset
+}
+
+internal fun skinSectionTailPadding(headings: List<SkinGridHeading>, key: String?, viewport: Float,
+                                    tileHeight: Float, columns: Int, anchorOffset: Float = 0f): Float {
+    val index = headings.indexOfFirst { it.key == key }
+    if (index < 0) return 0f
+    val remaining = headings.drop(index)
+    val height = remaining.sumOf { heading ->
+        val rows = (heading.itemCount + columns - 1) / columns
+        (44f + rows * (tileHeight + 12f)).toDouble()
+    }.toFloat() + (remaining.size - 1) * 12f
+    // Only add the space needed to keep the clicked header in place at the end of the catalog.
+    return (viewport - height - anchorOffset).coerceAtLeast(0f)
+}
+
+@Composable
+internal fun SkinPinnedHeading(grid: LazyGridState, headings: List<SkinGridHeading>, onToggle: (SkinGridHeading) -> Unit) {
+    val pinned by remember(grid, headings) { derivedStateOf {
+        headings.lastOrNull { it.index <= grid.firstVisibleItemIndex }?.takeIf { heading ->
+            grid.layoutInfo.visibleItemsInfo.firstOrNull { it.key == heading.key }?.offset?.y?.let { it < 0 } ?: true
+        }
+    } }
+    pinned?.let { heading ->
+        Column(Modifier.fillMaxWidth().padding(end = 12.dp).background(AWColors.Surface).zIndex(2f)) {
+            SkinSectionTitle(heading.title, heading.expanded) { onToggle(heading) }
+            HorizontalDivider(color = AWColors.Outline)
+        }
     }
 }

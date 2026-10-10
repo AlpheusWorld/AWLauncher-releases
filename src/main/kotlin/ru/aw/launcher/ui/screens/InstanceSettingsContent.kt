@@ -23,6 +23,9 @@ import javax.swing.JFileChooser
 internal fun InstanceSettingsContent(state: LauncherState, entry: VersionEntry, section: Int = 0, modifier: Modifier = Modifier) {
     var name by remember(entry.title) { mutableStateOf(entry.title) }
     val defaults by Settings.state.collectAsState()
+    val fieldColors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AWColors.Accent,
+        unfocusedBorderColor = AWColors.TextMuted.copy(alpha = 0.55f), disabledBorderColor = AWColors.TextMuted.copy(alpha = 0.25f),
+        focusedContainerColor = AWColors.SurfaceHigh, unfocusedContainerColor = AWColors.SurfaceHigh)
     val options = state.selectedOptions
     val totalMemory = remember { SettingsDefaults.totalSystemMemoryMb() }
     val memoryLimit = remember(totalMemory) { SettingsDefaults.memoryLimit(totalMemory) }
@@ -78,16 +81,16 @@ internal fun InstanceSettingsContent(state: LauncherState, entry: VersionEntry, 
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text("Своя память", color = AWColors.Text, modifier = Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
-                            AWSwitch(ownMemory, enabled = enabled, animateChanges = false) { ownMemory = it }
+                            AWSwitch(ownMemory, enabled = enabled, animateChanges = false, outlined = true) { ownMemory = it }
                         }
                         OutlinedTextField(memoryText, onValueChange = { if (it.length <= 7 && it.all(Char::isDigit)) memoryText = it },
                             label = { Text("Память, МБ") }, enabled = ownMemory && enabled, isError = !validMemory,
                             supportingText = { Text(if (ownMemory) "От 512 до $memoryLimit МБ" else "Из общих настроек: ${defaults.memoryMb} МБ") },
-                            singleLine = true, shape = RoundedCornerShape(AWDimens.CornerMedium), modifier = Modifier.fillMaxWidth())
+                            singleLine = true, colors = fieldColors, shape = RoundedCornerShape(AWDimens.CornerMedium), modifier = Modifier.fillMaxWidth())
                         Text("Рекомендуется для этого ПК: ${formatMemory(recommended)}", color = AWColors.Accent, style = MaterialTheme.typography.bodySmall)
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             SettingsDefaults.memoryPresets(totalMemory).filter { it <= memoryLimit }.forEach { mb ->
-                                ChoiceChip(formatMemory(mb), selected = ownMemory && memoryText.toIntOrNull() == mb, enabled = enabled,
+                                ChoiceChip(formatMemory(mb), outlined = true, selected = ownMemory && memoryText.toIntOrNull() == mb, enabled = enabled,
                                     onClick = { ownMemory = true; memoryText = mb.toString() })
                             }
                             AWButton("Рекомендуемая", enabled = enabled, onClick = { ownMemory = true; memoryText = recommended.toString() })
@@ -98,11 +101,11 @@ internal fun InstanceSettingsContent(state: LauncherState, entry: VersionEntry, 
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text("Своя Java", color = AWColors.Text, modifier = Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
-                            AWSwitch(ownJava, enabled = enabled, animateChanges = false) { ownJava = it }
+                            AWSwitch(ownJava, enabled = enabled, animateChanges = false, outlined = true) { ownJava = it }
                         }
                         Text("По умолчанию лаунчер скачивает Java, подходящую версии Minecraft", color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall)
                         OutlinedTextField(javaPath, onValueChange = { javaPath = it }, label = { Text("Путь к Java или папке JDK") },
-                            singleLine = true, shape = RoundedCornerShape(AWDimens.CornerMedium), modifier = Modifier.fillMaxWidth(), enabled = ownJava && enabled)
+                            singleLine = true, colors = fieldColors, shape = RoundedCornerShape(AWDimens.CornerMedium), modifier = Modifier.fillMaxWidth(), enabled = ownJava && enabled)
                         AWButton("Выбрать Java", icon = AWIcons.Folder, enabled = ownJava && enabled, onClick = {
                             val chooser = JFileChooser().apply { fileSelectionMode = JFileChooser.FILES_AND_DIRECTORIES; dialogTitle = ru.aw.launcher.core.I18n.text("Выбрать Java") }
                             if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) javaPath = chooser.selectedFile.absolutePath
@@ -110,10 +113,10 @@ internal fun InstanceSettingsContent(state: LauncherState, entry: VersionEntry, 
                         if (!validJava) Text("Укажи путь к установленной Java", color = AWColors.Danger, style = MaterialTheme.typography.bodySmall)
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text("Свои аргументы JVM", color = AWColors.Text, modifier = Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
-                            AWSwitch(ownArguments, enabled = enabled, animateChanges = false) { ownArguments = it }
+                            AWSwitch(ownArguments, enabled = enabled, animateChanges = false, outlined = true) { ownArguments = it }
                         }
                         OutlinedTextField(arguments, onValueChange = { arguments = it }, enabled = ownArguments && enabled, isError = !validArguments,
-                            label = { Text("Аргументы JVM") }, shape = RoundedCornerShape(AWDimens.CornerMedium),
+                            label = { Text("Аргументы JVM") }, colors = fieldColors, shape = RoundedCornerShape(AWDimens.CornerMedium),
                             modifier = Modifier.fillMaxWidth().heightIn(min = 90.dp), textStyle = MaterialTheme.typography.bodySmall,
                             supportingText = { Text(if (validArguments) "Для значений с пробелами используй кавычки" else "Закрой кавычки в аргументах JVM") })
                     }
@@ -124,19 +127,19 @@ internal fun InstanceSettingsContent(state: LauncherState, entry: VersionEntry, 
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text("Свой размер окна", color = AWColors.Text, modifier = Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
-                            AWSwitch(ownWindow, enabled = enabled, animateChanges = false) { ownWindow = it }
+                            AWSwitch(ownWindow, enabled = enabled, animateChanges = false, outlined = true) { ownWindow = it }
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             OutlinedTextField(width, onValueChange = { if (it.length <= 5 && it.all(Char::isDigit)) width = it }, label = { Text("Ширина") },
-                                enabled = ownWindow && enabled, isError = !validWindow, singleLine = true, shape = RoundedCornerShape(AWDimens.CornerMedium), modifier = Modifier.weight(1f))
+                                enabled = ownWindow && enabled, isError = !validWindow, singleLine = true, colors = fieldColors, shape = RoundedCornerShape(AWDimens.CornerMedium), modifier = Modifier.weight(1f))
                             OutlinedTextField(height, onValueChange = { if (it.length <= 5 && it.all(Char::isDigit)) height = it }, label = { Text("Высота") },
-                                enabled = ownWindow && enabled, isError = !validWindow, singleLine = true, shape = RoundedCornerShape(AWDimens.CornerMedium), modifier = Modifier.weight(1f))
+                                enabled = ownWindow && enabled, isError = !validWindow, singleLine = true, colors = fieldColors, shape = RoundedCornerShape(AWDimens.CornerMedium), modifier = Modifier.weight(1f))
                         }
                         if (!validWindow) Text("Ширина: 320–16384, высота: 200–16384", color = AWColors.Danger, style = MaterialTheme.typography.bodySmall)
                         Text("Режим экрана", color = AWColors.Text, fontWeight = FontWeight.SemiBold)
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             listOf("Как в игре" to null, "В окне" to false, "Полный экран" to true).forEach { (label, value) ->
-                                ChoiceChip(label, selected = fullscreen == value, enabled = enabled, onClick = { fullscreen = value })
+                                ChoiceChip(label, outlined = true, selected = fullscreen == value, enabled = enabled, onClick = { fullscreen = value })
                             }
                         }
                     }

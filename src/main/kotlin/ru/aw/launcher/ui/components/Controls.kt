@@ -197,6 +197,7 @@ fun ChoiceChip(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     icon: ImageVector? = null,
+    outlined: Boolean = false,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
@@ -220,7 +221,11 @@ fun ChoiceChip(
             .height(44.dp)
             .clip(RoundedCornerShape(AWDimens.CornerMedium))
             .background(background)
-            .border(1.dp, if (selected) AWColors.Accent.copy(alpha = 0.30f) else Color.Transparent, RoundedCornerShape(AWDimens.CornerMedium))
+            .border(1.dp, when {
+                selected -> AWColors.Accent.copy(alpha = if (outlined) 0.9f else 0.3f)
+                outlined -> AWColors.TextMuted.copy(alpha = if (enabled) 0.55f else 0.25f)
+                else -> Color.Transparent
+            }, RoundedCornerShape(AWDimens.CornerMedium))
             .clickable(enabled = enabled, interactionSource = interaction, indication = null, onClick = onClick)
             .padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -303,13 +308,13 @@ fun AWButton(
 }
 
 @Composable
-fun AWSwitch(checked: Boolean, enabled: Boolean = true, animateChanges: Boolean = true, onChange: (Boolean) -> Unit) {
+fun AWSwitch(checked: Boolean, enabled: Boolean = true, animateChanges: Boolean = true, outlined: Boolean = false, onChange: (Boolean) -> Unit) {
     val colors = SwitchDefaults.colors(
         checkedThumbColor = AWColors.OnAccent,
         checkedTrackColor = AWColors.Accent,
         uncheckedThumbColor = AWColors.TextMuted,
         uncheckedTrackColor = AWColors.SurfaceHigh,
-        uncheckedBorderColor = AWColors.Outline,
+        uncheckedBorderColor = if (outlined) AWColors.TextMuted.copy(alpha = 0.65f) else AWColors.Outline,
     )
     // Each row starts at its actual state. Only subsequent state changes animate;
     // no Material thumb layout state can leak from a recycled lazy-list node.

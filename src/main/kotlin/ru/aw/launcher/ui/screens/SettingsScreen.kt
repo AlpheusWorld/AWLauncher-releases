@@ -106,8 +106,8 @@ internal fun SettingsContent(state: LauncherState, section: Int) {
             SettingsGroup(Modifier.fillMaxWidth()) {
                 Column {
                     SectionTitle("Поведение лаунчера")
-                    LabeledRow("Не закрывать лаунчер при запуске игры") {
-                        AWSwitch(settings.keepLauncherOpen) { checked ->
+                    SettingsRow("Не закрывать лаунчер при запуске игры", divider = false) {
+                        AWSwitch(settings.keepLauncherOpen, outlined = true) { checked ->
                             Settings.update { it.copy(keepLauncherOpen = checked) }
                         }
                     }
@@ -122,13 +122,13 @@ internal fun SettingsContent(state: LauncherState, section: Int) {
             SettingsGroup(Modifier.fillMaxWidth()) {
                 Column {
                     SectionTitle("Список версий")
-                    LabeledRow("Показывать снапшоты") {
-                        AWSwitch(settings.showSnapshots) { checked ->
+                    SettingsRow("Показывать снапшоты") {
+                        AWSwitch(settings.showSnapshots, outlined = true) { checked ->
                             Settings.update { it.copy(showSnapshots = checked) }
                         }
                     }
-                    LabeledRow("Показывать alpha и beta") {
-                        AWSwitch(settings.showOldVersions) { checked ->
+                    SettingsRow("Показывать alpha и beta", divider = false) {
+                        AWSwitch(settings.showOldVersions, outlined = true) { checked ->
                             Settings.update { it.copy(showOldVersions = checked) }
                         }
                     }
@@ -184,18 +184,17 @@ private fun DiscordPanel(settings: LauncherSettings) {
     }
     SettingsGroup(Modifier.fillMaxWidth()) {
         Column {
-            LabeledRow("Показывать активность в Discord", "Сборка, версия Minecraft и время игры") {
-                AWSwitch(settings.discordPresence) { value -> Settings.update { it.copy(discordPresence = value) } }
+            SettingsRow("Показывать активность в Discord", "Сборка, версия Minecraft и время игры") {
+                AWSwitch(settings.discordPresence, outlined = true) { value -> Settings.update { it.copy(discordPresence = value) } }
             }
-            HorizontalDivider(color = AWColors.Outline)
-            LabeledRow("Показывать открытый лаунчер", "Если выключить, активность появится только во время игры") {
-                AWSwitch(settings.discordShowLauncher, enabled = settings.discordPresence) { value -> Settings.update { it.copy(discordShowLauncher = value) } }
+            SettingsRow("Показывать открытый лаунчер", "Если выключить, активность появится только во время игры") {
+                AWSwitch(settings.discordShowLauncher, enabled = settings.discordPresence, outlined = true) { value -> Settings.update { it.copy(discordShowLauncher = value) } }
             }
-            LabeledRow("Показывать название сборки", "Для сборок из каталога добавится кнопка их страницы") {
-                AWSwitch(settings.discordShowInstance, enabled = settings.discordPresence) { value -> Settings.update { it.copy(discordShowInstance = value) } }
+            SettingsRow("Показывать название сборки", "Для сборок из каталога добавится кнопка их страницы") {
+                AWSwitch(settings.discordShowInstance, enabled = settings.discordPresence, outlined = true) { value -> Settings.update { it.copy(discordShowInstance = value) } }
             }
-            LabeledRow("Показывать адрес сервера", "Друзья увидят адрес; для публичных серверов загружается иконка") {
-                AWSwitch(settings.discordShowServer, enabled = settings.discordPresence) { value -> Settings.update { it.copy(discordShowServer = value) } }
+            SettingsRow("Показывать адрес сервера", "Друзья увидят адрес; для публичных серверов загружается иконка", divider = false) {
+                AWSwitch(settings.discordShowServer, enabled = settings.discordPresence, outlined = true) { value -> Settings.update { it.copy(discordShowServer = value) } }
             }
         }
     }
@@ -227,7 +226,7 @@ private fun AppearancePanel(settings: LauncherSettings) {
                     ThemeMode.LIGHT to "Светлая",
                     ThemeMode.OLED to "OLED · чёрная",
                 ).forEach { (mode, label) ->
-                    ChoiceChip(label, selected = settings.themeMode == mode, onClick = {
+                    ChoiceChip(label, outlined = true, selected = settings.themeMode == mode, onClick = {
                         Settings.update { it.copy(themeMode = mode) }
                     })
                 }
@@ -264,13 +263,13 @@ private fun MemoryPanel(settings: LauncherSettings) {
             Spacer(Modifier.height(12.dp))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 presets.filter { it <= limit }.forEach { mb ->
-                    ChoiceChip(formatMemory(mb), selected = settings.memoryMb == mb, onClick = {
+                    ChoiceChip(formatMemory(mb), outlined = true, selected = settings.memoryMb == mb, onClick = {
                         memoryText = mb.toString()
                         Settings.update { it.copy(memoryMb = mb) }
                     })
                 }
                 if (settings.memoryMb !in presets) {
-                    ChoiceChip("${formatMemory(settings.memoryMb)} (своё)", selected = true, onClick = {})
+                    ChoiceChip("${formatMemory(settings.memoryMb)} (своё)", outlined = true, selected = true, onClick = {})
                 }
             }
             Spacer(Modifier.height(14.dp))
@@ -278,6 +277,9 @@ private fun MemoryPanel(settings: LauncherSettings) {
                 value = memoryText,
                 onValueChange = { value -> if (value.length <= 7 && value.all(Char::isDigit)) memoryText = value },
                 label = { Text("Своя память, МБ") },
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AWColors.Accent,
+                    unfocusedBorderColor = AWColors.TextMuted.copy(alpha = 0.55f), focusedContainerColor = AWColors.SurfaceHigh,
+                    unfocusedContainerColor = AWColors.SurfaceHigh),
                 supportingText = { Text("От 512 до $limit МБ · оставляем память системе") },
                 isError = !validMemory,
                 singleLine = true,
@@ -358,7 +360,7 @@ private fun JvmArgumentsPanel(settings: LauncherSettings) {
                 shape = RoundedCornerShape(AWDimens.CornerMedium),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = AWColors.Accent,
-                    unfocusedBorderColor = Color.Transparent,
+                    unfocusedBorderColor = AWColors.TextMuted.copy(alpha = 0.55f),
                     focusedContainerColor = AWColors.SurfaceHigh,
                     unfocusedContainerColor = AWColors.SurfaceHigh,
                 ),
@@ -415,6 +417,14 @@ private fun DownloadsPanel(state: LauncherState, settings: LauncherSettings) {
 private fun SettingsGroup(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         content()
-        HorizontalDivider(color = AWColors.Outline.copy(alpha = 0.6f), modifier = Modifier.padding(top = 8.dp))
+        HorizontalDivider(color = AWColors.TextMuted.copy(alpha = 0.4f), modifier = Modifier.padding(top = 8.dp))
+    }
+}
+
+@Composable
+private fun SettingsRow(label: String, hint: String? = null, divider: Boolean = true, control: @Composable () -> Unit) {
+    Column(Modifier.fillMaxWidth()) {
+        LabeledRow(label, hint, control)
+        if (divider) HorizontalDivider(color = AWColors.TextMuted.copy(alpha = 0.3f))
     }
 }
