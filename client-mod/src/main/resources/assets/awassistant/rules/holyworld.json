@@ -1,0 +1,76 @@
+{
+  "id": "holyworld",
+  "name": "HolyWorld · классика · памятка",
+  "addresses": [
+    "holyworld.ru",
+    "hub.holyworld.ru",
+    "mc.holyworld.ru"
+  ],
+  "sourceUrl": "https://docs.google.com/document/d/12vLSs2pjWzoU2DOrFM_z4ftv2CVGzCCy4UO5w4W3sDE/edit",
+  "rules": [
+    {
+      "number": "2.2",
+      "title": "Передача аккаунта",
+      "category": "Игра",
+      "description": "Нельзя отдавать или продавать аккаунт",
+      "sanction": "Бессрочная блокировка в лобби",
+      "keywords": []
+    },
+    {
+      "number": "2.3",
+      "title": "Взлом и привязка",
+      "category": "Игра",
+      "description": "Нельзя взламывать чужие аккаунты и привязывать их",
+      "sanction": "Бессрочная блокировка IP в лобби",
+      "keywords": []
+    },
+    {
+      "number": "2.4",
+      "title": "Нечестное ПО",
+      "category": "Игра",
+      "description": "Запрещены программы с нечестным преимуществом",
+      "sanction": "Блокировка IP на тридцать суток",
+      "keywords": []
+    },
+    {
+      "number": "2.4.1",
+      "title": "Союз с нарушителем",
+      "category": "Игра",
+      "description": "Нельзя играть в команде с пользователем запрещённого ПО",
+      "sanction": "Блокировка IP на четырнадцать суток",
+      "keywords": []
+    },
+    {
+      "number": "2.7",
+      "title": "Подстрекательство",
+      "category": "Игра",
+      "description": "Нельзя склонять участников к нарушениям",
+      "sanction": "Блокировка на семь суток",
+      "keywords": []
+    },
+    {
+      "number": "2.10",
+      "title": "Нагрузка от построек",
+      "category": "Игра",
+      "description": "Нельзя создавать постройки, сильно нагружающие сервер",
+      "sanction": "Блокировка минимум на пятнадцать суток",
+      "keywords": []
+    },
+    {
+      "number": "2.13",
+      "title": "Ошибки игры",
+      "category": "Игра",
+      "description": "Нельзя использовать, распространять или скрывать баги",
+      "sanction": "Блокировка минимум на трое суток",
+      "keywords": []
+    },
+    {
+      "number": "2.17",
+      "title": "Выдача себя за персонал",
+      "category": "Игра",
+      "description": "Нельзя притворяться администрацией",
+      "sanction": "Блокировка на четырнадцать суток",
+      "keywords": []
+    }
+  ]
+}

@@ -1,273 +1,250 @@
 package ru.aw.assistant.ui;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.*;
 import net.minecraft.network.chat.Component;
-import ru.aw.assistant.ClientBridge;
-import com.mojang.blaze3d.platform.InputConstants;
 import ru.aw.assistant.AWAssistant;
+import ru.aw.assistant.ClientBridge;
 import ru.aw.assistant.rules.*;
 import java.nio.file.Path;
 import java.util.*;
 
 public final class RulesScreen extends Screen {
+    private static final int HEADER=100,ROW=74,FOOTER=32;
     private final Screen parent;
-    private final SearchInput input = new SearchInput();
-    private final AnimatedValue appearance = new AnimatedValue(0), expansion = new AnimatedValue(0), detailFade = new AnimatedValue(1);
-    private final AnimatedValue listMotion = new AnimatedValue(0), detailMotion = new AnimatedValue(0), menuMotion = new AnimatedValue(0);
-    private RuleRepository.Snapshot data = new RuleRepository.Snapshot(List.of(),List.of());
+    private final SearchInput input=new SearchInput();
+    private final AnimatedValue appearance=new AnimatedValue(0),expansion=new AnimatedValue(0),detailFade=new AnimatedValue(1);
+    private final AnimatedValue listMotion=new AnimatedValue(0),detailMotion=new AnimatedValue(0),menuMotion=new AnimatedValue(0);
+    private final Map<String,AnimatedValue> hover=new HashMap<>();
+    private RuleRepository.Snapshot data=new RuleRepository.Snapshot(List.of(),List.of());
     private RuleSearch index;
-    private List<RuleSearch.Match> matches = List.of();
-    private List<String> titleLines = List.of(), detailLines = List.of(), sanctionLines = List.of();
+    private List<RuleSearch.Match> matches=List.of();
     private List<List<String>> resultTitles=List.of();
-    private List<String> resultDescriptions=List.of();
-    private List<String> categories = List.of();
-    private String serverId = "", category;
-    private int serverOffset, categoryOffset;
-    private int selected, panelX, panelY, panelW=840, bodyH, leftW=300, resultTop, detailTop, detailsWidth;
-    private float scale=1, listTarget, detailTarget;
-    private boolean closing, loading, serverMenu, categoryMenu, settingsMenu, showSanctions;
-    private String message = "", lastMenu = "";
+    private List<String> resultDescriptions=List.of(),titleLines=List.of(),detailLines=List.of(),sanctionLines=List.of(),categories=List.of();
+    private String serverId="",category,message="",lastMenu="";
+    private int selected,serverOffset,categoryOffset,panelX,panelY,panelW=740,leftW=250,bodyH,resultTop,detailTop,detailsWidth,virtualWidth,virtualHeight;
+    private float scale=1,listTarget,detailTarget,dragX,dragY;
+    private double positionX=.5,positionY=.05;
+    private boolean closing,loading,refreshing,serverMenu,categoryMenu,settingsMenu,showSanctions,browsing,dragging,positionTouched;
     private long copiedUntil;
-    private final Map<String,AnimatedValue> hover = new HashMap<>();
 
-    public RulesScreen(Screen parent) { super(Minecraft.getInstance(),Minecraft.getInstance().font,Component.literal("AWAssistant"));this.parent=parent; }
-    @Override protected void init() { UiRenderer.prepare();layout(); if(index==null)reload(); }
-    private void layout() {
-        float pixels=Math.min(1f,Math.min((minecraft.getWindow().getWidth()-40)/780f,(minecraft.getWindow().getHeight()-48)/230f));
-        scale=pixels/(float)minecraft.getWindow().getGuiScale();
-        int virtualWidth=Math.round(width/scale),virtualHeight=Math.round(height/scale);
-        panelW=780;panelX=(virtualWidth-panelW)/2;panelY=24;
-        bodyH=Math.max(150,Math.min(430,virtualHeight-panelY-80));leftW=268;
-        resultTop=panelY+76;detailsWidth=panelW-leftW-46;
-        wrapDetails();
+    public RulesScreen(Screen parent){super(Minecraft.getInstance(),Minecraft.getInstance().font,Component.literal("Правила серверов"));this.parent=parent;}
+    @Override protected void init(){UiRenderer.prepare();layout();if(index==null)reload();}
+    private void layout(){
+        float pixels=Math.min(1f,Math.min((minecraft.getWindow().getWidth()-32)/740f,(minecraft.getWindow().getHeight()-32)/300f));
+        scale=pixels/minecraft.getWindow().getGuiScale();virtualWidth=Math.round(width/scale);virtualHeight=Math.round(height/scale);
+        bodyH=Math.max(170,Math.min(460,virtualHeight-HEADER-52));detailsWidth=panelW-leftW-44;
+        panelX=12+(int)Math.round(Math.max(0,virtualWidth-panelW-24)*positionX);
+        panelY=12+(int)Math.round(Math.max(0,virtualHeight-HEADER-bodyH-24)*positionY);
+        anchors();wrapDetails();
     }
-    private RuleBook currentBook() { return data.books().stream().filter(b->b.id().equals(serverId)).findFirst().orElse(null); }
-    private void reload() {
-        if (loading) return;loading=true;message="";
+    private void anchors(){resultTop=panelY+HEADER+12;}
+    private RuleBook currentBook(){return data.books().stream().filter(book->book.id().equals(serverId)).findFirst().orElse(null);}
+    private RuleBook.Rule selectedRule(){return matches.isEmpty()?null:matches.get(Math.min(selected,matches.size()-1)).rule();}
+    private void reload(){
+        if(loading)return;loading=true;message="";
         AWAssistant.RULES.reload().whenComplete((snapshot,failure)->minecraft.execute(()->{
-            if (ClientBridge.screen(minecraft)!=this) return;loading=false;
-            if (failure!=null) { message="Не удалось загрузить правила";return; }
+            if(ClientBridge.screen(minecraft)!=this)return;loading=false;
+            if(failure!=null){message="Не удалось загрузить правила";return;}
             data=snapshot;
-            if (currentBook()==null && !data.books().isEmpty()) {
-                String address=minecraft.getCurrentServer()==null ? "" : minecraft.getCurrentServer().ip.split(":",2)[0];
-                serverId=data.books().stream().filter(b->b.addresses().stream().anyMatch(a->a.equalsIgnoreCase(address)))
-                    .findFirst().orElse(data.books().getFirst()).id();
+            if(!positionTouched){var ui=AWAssistant.RULES.ui();positionX=ui.x();positionY=ui.y();AWAssistant.animations=ui.animations();AWAssistant.blur=ui.blur();layout();}
+            if(currentBook()==null&&!data.books().isEmpty()){
+                String address=minecraft.getCurrentServer()==null?"":minecraft.getCurrentServer().ip.toLowerCase(Locale.ROOT);
+                var fallback=data.books().stream().filter(book->!book.rules().isEmpty()).findFirst().orElse(data.books().getFirst());
+                serverId=data.books().stream().filter(book->book.addresses().stream().anyMatch(a->address.equals(a)||address.startsWith(a+":"))).findFirst().orElse(fallback).id();
             }
-            selectServer(serverId);
-            if (!data.errors().isEmpty()) message=data.errors().getFirst();
+            selectServer(serverId);if(!data.errors().isEmpty())message=data.errors().getFirst();
+            if(AWAssistant.RULES.refreshNeeded())refreshSources();
         }));
     }
-    private void selectServer(String id) {
-        serverId=id;var book=currentBook();index=book==null ? null : new RuleSearch(book);
-        categories=book==null ? List.of() : book.rules().stream().map(RuleBook.Rule::category).filter(s->!s.isBlank()).distinct().sorted().toList();
+    private void refreshSources(){
+        if(refreshing)return;refreshing=true;message="Обновляю правила с сайтов серверов…";
+        AWAssistant.RULES.refresh().whenComplete((snapshot,failure)->minecraft.execute(()->{
+            if(ClientBridge.screen(minecraft)!=this)return;refreshing=false;
+            if(failure!=null){message="Не удалось обновить правила; сохранены прежние";return;}
+            String selectedNumber=selectedRule()==null?"":selectedRule().number(),selectedCategory=category;
+            data=snapshot;selectServer(serverId);
+            if(categories.contains(selectedCategory)){category=selectedCategory;updateSearch();}
+            for(int i=0;i<matches.size();i++)if(matches.get(i).rule().number().equals(selectedNumber)){select(i);break;}
+            message=data.errors().isEmpty()?"Правила обновлены":data.errors().getFirst();
+        }));
+    }
+    private void selectServer(String id){
+        serverId=id;var book=currentBook();index=book==null?null:new RuleSearch(book);
+        categories=book==null?List.of():book.rules().stream().map(RuleBook.Rule::category).filter(value->!value.isBlank()).distinct().toList();
         category=null;serverMenu=false;updateSearch();
     }
-    private void updateSearch() {
-        matches=index==null ? List.of() : index.find(input.value(),category);copiedUntil=0;selected=0;listTarget=0;detailTarget=0;listMotion.snap(0);resultDescriptions=matches.stream().map(m->UiRenderer.ellipsis(font,m.rule().description().replace('\n',' '),leftW-50)).toList();resultTitles=matches.stream().map(m->UiRenderer.wrap(m.rule().title(),leftW-46,false).stream().limit(2).toList()).toList();wrapDetails();
-    }
-    private RuleBook.Rule selectedRule() { return matches.isEmpty() ? null : matches.get(Math.max(0,Math.min(selected,matches.size()-1))).rule(); }
-    private void wrapDetails() {
-        var rule=selectedRule();detailTarget=0;detailMotion.snap(0);
-        titleLines=rule==null ? List.of() : UiRenderer.wrap(rule.title(),Math.max(100,detailsWidth),true);
-        detailLines=rule==null ? List.of() : UiRenderer.wrap(rule.description(),Math.max(100,detailsWidth-10),false);
-        sanctionLines=rule==null ||rule.sanction().isBlank() ? List.of() : UiRenderer.wrap(rule.sanction(),Math.max(100,detailsWidth-32),false);
-    }
-    private void select(int next) { if(matches.isEmpty())return;int value=Math.max(0,Math.min(next,matches.size()-1));if(selected==value)return;selected=value;copiedUntil=0;detailFade.snap(0);wrapDetails(); }
-    @Override public boolean isPauseScreen() { return false; }
-    @Override public void extractBackground(GuiGraphicsExtractor g,int x,int y,float tick) { }
-    @Override public void onClose() { closing=true;serverMenu=false;categoryMenu=false;settingsMenu=false; }
-    @Override public void tick() { if(closing && appearance.value()<.015f) ClientBridge.screen(minecraft,parent); }
-    private float highlight(String key,boolean hovered) { return hover.computeIfAbsent(key,k->new AnimatedValue(0)).update(hovered?1:0,AWAssistant.animations); }
-    private void button(GuiGraphicsExtractor g,String key,String label,int x,int y,int w,double mx,double my,boolean active,float fade) {
-        float h=highlight(key,UiRenderer.hit(mx,my,x,y,w,30));
-        UiRenderer.round(g,x,y,w,30,6,UiRenderer.alpha(active?0x66304A3D:0x332B323A,(.75f+.2f*h)*fade));
-        if(key.equals("settings")) { for(int i=0;i<3;i++)g.fill(x+8+i*6,y+14,x+10+i*6,y+16,UiRenderer.alpha(UiRenderer.TEXT,fade)); }
-        else UiRenderer.small(g,UiRenderer.ellipsis(font,label,Math.round((w-16)/.85f)),x+8,y+7,active?UiRenderer.ACCENT:UiRenderer.TEXT,fade);
-    }
-    @Override public void extractRenderState(GuiGraphicsExtractor g,int mouseX,int mouseY,float tick) {
-        if(minecraft.level==null)extractPanorama(g,tick);
-        if(AWAssistant.blur)extractBlurredBackground(g);
-        float fade=appearance.update(closing?0:1,AWAssistant.animations);
-        float open=expansion.update(input.value().isBlank()?0:1,AWAssistant.animations);
-        float detailOpacity=detailFade.update(1,AWAssistant.animations);
-        float dy=(1-fade)*-10;
-        double mx=mouseX/scale,my=mouseY/scale-dy;
-        g.pose().pushMatrix();g.pose().scale(scale,scale);g.pose().translate(0,dy);
-        UiRenderer.panel(g,panelX,panelY,panelW,56+Math.round(bodyH*open),fade);
-        UiRenderer.brand(g,panelX+14,panelY+16,fade);
-        int searchW=panelW-390;
-        UiRenderer.round(g,panelX+48,panelY+10,searchW,36,6,UiRenderer.alpha(0x55353D45,fade));
-        UiRenderer.searchIcon(g,panelX+60,panelY+22,UiRenderer.alpha(UiRenderer.MUTED,fade));
-        String shown=input.value().isBlank()?"Найти правило, номер или наказание…":input.value();
-        shown=UiRenderer.ellipsis(font,shown,searchW-70);
-        if(input.selectedAll()) UiRenderer.round(g,panelX+80,panelY+19,Math.min(searchW-72,UiRenderer.width(shown)),25,3,UiRenderer.alpha(0x8858CC91,fade));
-        UiRenderer.text(g,font,shown,panelX+80,panelY+21,input.value().isBlank()?UiRenderer.MUTED:UiRenderer.TEXT,fade);
-        if(!input.value().isBlank() && (System.nanoTime()/500_000_000L)%2==0) {
-            int cx=panelX+80+Math.min(searchW-74,UiRenderer.width(input.value().substring(0,input.cursor())));g.fill(cx,panelY+22,cx+1,panelY+40,UiRenderer.alpha(UiRenderer.ACCENT,fade));
-        }
-        UiRenderer.cross(g,panelX+48+searchW-24,panelY+24,UiRenderer.alpha(UiRenderer.MUTED,fade));
-        button(g,"rules","Правила",panelX+panelW-326,panelY+13,72,mx,my,!showSanctions,fade);
-        button(g,"sanctions","Санкции",panelX+panelW-246,panelY+13,78,mx,my,showSanctions,fade);
+    private void updateSearch(){
         var book=currentBook();
-        button(g,"server",book==null?"Сервер":book.name(),panelX+panelW-160,panelY+13,106,mx,my,serverMenu,fade);
-        button(g,"settings","",panelX+panelW-46,panelY+13,32,mx,my,settingsMenu,fade);
-        if(open>.005f) {
-            g.enableScissor(panelX+1,panelY+56,panelX+panelW-1,panelY+56+Math.round(bodyH*open)-1);
-            g.fill(panelX+leftW,panelY+56,panelX+leftW+1,panelY+56+bodyH-34,UiRenderer.alpha(0xFF343D47,fade));
-            UiRenderer.small(g,loading?"Загружаю правила…":"Найдено: "+matches.size(),panelX+18,resultTop,UiRenderer.MUTED,fade);
-            button(g,"category",category==null?"Все категории":category,panelX+leftW-138,resultTop-5,124,mx,my,categoryMenu,fade);
-            int listY=resultTop+34, listHeight=bodyH-92;
-            float listOffset=listMotion.update(listTarget,AWAssistant.animations);
-            g.enableScissor(panelX+8,listY,panelX+leftW-8,listY+listHeight);
-            for(int i=Math.max(0,(int)(listOffset/96));i<matches.size();i++) {
-                int y=listY+i*96-Math.round(listOffset);if(y>listY+listHeight)break;
-                var rule=matches.get(i).rule();boolean hot=UiRenderer.hit(mx,my,panelX+12,y,leftW-24,88);
-                float h=highlight("result:"+i,hot);
-                UiRenderer.round(g,panelX+12,y,leftW-24,88,7,UiRenderer.alpha(i==selected?0x6633423C:0x44232B32,fade*(i==selected?1:.5f+.4f*h)));
-                UiRenderer.small(g,rule.number(),panelX+24,y+9,i==selected?UiRenderer.ACCENT:UiRenderer.MUTED,fade);
-                int ty=y+30;for(String line:resultTitles.get(i)){UiRenderer.text(g,font,line,panelX+24,ty,UiRenderer.TEXT,fade);ty+=18;}
-                UiRenderer.small(g,resultDescriptions.get(i),panelX+24,y+68,UiRenderer.MUTED,fade);
+        matches=browsing&&input.value().isBlank()&&book!=null?book.rules().stream().filter(rule->category==null||category.equals(rule.category())).limit(500).map(rule->new RuleSearch.Match(rule,0)).toList():index==null?List.of():index.find(input.value(),category);
+        selected=0;copiedUntil=0;listTarget=0;listMotion.snap(0);
+        resultTitles=matches.stream().map(match->UiRenderer.wrap(match.rule().title(),leftW-48,false).stream().limit(2).toList()).toList();
+        resultDescriptions=matches.stream().map(match->UiRenderer.ellipsis(font,match.rule().description().replace('\n',' '),leftW-48)).toList();wrapDetails();
+    }
+    private void wrapDetails(){
+        var rule=selectedRule();detailTarget=0;detailMotion.snap(0);
+        titleLines=rule==null?List.of():UiRenderer.wrap(rule.title(),detailsWidth,true);
+        detailLines=rule==null?List.of():UiRenderer.wrap(rule.description(),detailsWidth,false);
+        sanctionLines=rule==null||rule.sanction().isBlank()?List.of():UiRenderer.wrap(rule.sanction(),detailsWidth-28,false);
+    }
+    private void select(int value){if(matches.isEmpty())return;int next=Math.max(0,Math.min(value,matches.size()-1));if(next==selected)return;selected=next;copiedUntil=0;detailFade.snap(0);wrapDetails();}
+    private float highlight(String key,boolean active){return hover.computeIfAbsent(key,ignored->new AnimatedValue(0)).update(active?1:0,AWAssistant.animations);}
+    private void saveUi(){
+        positionX=(panelX-12)/(double)Math.max(1,virtualWidth-panelW-24);positionY=(panelY-12)/(double)Math.max(1,virtualHeight-HEADER-bodyH-24);
+        AWAssistant.RULES.saveUi(new RuleRepository.UiPreferences(positionX,positionY,AWAssistant.animations,AWAssistant.blur)).whenComplete((unused,failure)->{
+            if(failure!=null)minecraft.execute(()->message="Не удалось сохранить положение панели");
+        });
+    }
+    private int listTop(){return resultTop+36;}
+    private int listHeight(){return bodyH-80;}
+    private int detailHeight(){return Math.max(40,panelY+HEADER+bodyH-FOOTER-8-detailTop);}
+    private int copyTop(){return resultTop+42;}
+    private int modelHeight(){return (showSanctions?0:detailLines.size()*21)+(sanctionLines.isEmpty()?0:54+sanctionLines.size()*20);}
+    private boolean expanded(){return browsing||!input.value().isBlank();}
+    @Override public boolean isPauseScreen(){return false;}
+    @Override public void extractBackground(GuiGraphicsExtractor graphics,int x,int y,float tick){}
+    @Override public void onClose(){if(dragging)saveUi();closing=true;dragging=false;serverMenu=categoryMenu=settingsMenu=false;}
+    @Override public void tick(){if(closing&&appearance.value()<.015f)ClientBridge.screen(minecraft,parent);}
+
+    private void textButton(GuiGraphicsExtractor g,String key,String text,int x,int y,int w,double mx,double my,boolean active,float fade){
+        float h=highlight(key,UiRenderer.hit(mx,my,x,y,w,28));
+        if(h>.01f||active)UiRenderer.round(g,x,y,w,28,4,UiRenderer.alpha(active?0x44394149:0x223C4148,fade*Math.max(h,active?1:0)));
+        UiRenderer.small(g,UiRenderer.ellipsis(font,text,Math.round((w-16)/.85f)),x+8,y+6,active?UiRenderer.ACCENT:UiRenderer.TEXT,fade);
+    }
+    @Override public void extractRenderState(GuiGraphicsExtractor g,int mouseX,int mouseY,float tick){
+        if(minecraft.level==null)extractPanorama(g,tick);if(AWAssistant.blur)extractBlurredBackground(g);
+        float fade=appearance.update(closing?0:1,AWAssistant.animations),open=expansion.update(expanded()?1:0,AWAssistant.animations),details=detailFade.update(1,AWAssistant.animations);
+        float slide=(1-fade)*-8;double mx=mouseX/scale,my=mouseY/scale-slide;
+        g.pose().pushMatrix();g.pose().scale(scale,scale);g.pose().translate(0,slide);
+        UiRenderer.panel(g,panelX,panelY,panelW,HEADER+Math.round(bodyH*open),fade);
+        UiRenderer.brand(g,panelX+15,panelY+11,fade);
+        UiRenderer.bold(g,"Правила серверов",panelX+49,panelY+12,UiRenderer.TEXT,fade);
+        for(int i=0;i<3;i++){g.fill(panelX+panelW/2-8+i*6,panelY+9,panelX+panelW/2-6+i*6,panelY+11,UiRenderer.alpha(UiRenderer.MUTED,fade*.5f));}
+        textButton(g,"browse",expanded()?"Свернуть":"Все правила",panelX+panelW-212,panelY+8,108,mx,my,false,fade);
+        textButton(g,"settings","•••",panelX+panelW-88,panelY+8,30,mx,my,settingsMenu,fade);
+        float closeHover=highlight("close",UiRenderer.hit(mx,my,panelX+panelW-43,panelY+8,28,28));
+        UiRenderer.cross(g,panelX+panelW-34,panelY+17,UiRenderer.alpha(closeHover>.2?UiRenderer.TEXT:UiRenderer.MUTED,fade));
+        g.fill(panelX+1,panelY+43,panelX+panelW-1,panelY+44,UiRenderer.alpha(0xFF363B42,fade*.8f));
+        int searchX=panelX+16,searchY=panelY+54,searchW=panelW-202;
+        UiRenderer.round(g,searchX,searchY,searchW,34,4,UiRenderer.alpha(0xFF25292F,fade));
+        UiRenderer.searchIcon(g,searchX+11,searchY+10,UiRenderer.alpha(UiRenderer.MUTED,fade));
+        String query=input.value().isBlank()?"Найти правило или наказание…":input.value();query=UiRenderer.ellipsis(font,query,searchW-68);
+        if(input.selectedAll())UiRenderer.round(g,searchX+33,searchY+5,Math.min(searchW-66,UiRenderer.width(query)),25,2,UiRenderer.alpha(0x554DBD87,fade));
+        UiRenderer.text(g,font,query,searchX+33,searchY+8,input.value().isBlank()?UiRenderer.MUTED:UiRenderer.TEXT,fade);
+        if(!input.value().isBlank()&&(System.nanoTime()/500_000_000L)%2==0){int caret=searchX+33+Math.min(searchW-68,UiRenderer.width(input.value().substring(0,input.cursor())));g.fill(caret,searchY+7,caret+1,searchY+26,UiRenderer.alpha(UiRenderer.TEXT,fade));}
+        if(!input.value().isBlank())UiRenderer.cross(g,searchX+searchW-22,searchY+12,UiRenderer.alpha(UiRenderer.MUTED,fade));
+        var book=currentBook();textButton(g,"server",book==null?"Выбрать сервер":book.name(),panelX+panelW-174,searchY+3,158,mx,my,serverMenu,fade);
+        UiRenderer.chevron(g,panelX+panelW-30,searchY+15,UiRenderer.alpha(UiRenderer.MUTED,fade));
+        if(open>.005f){
+            g.enableScissor(panelX+1,panelY+HEADER,panelX+panelW-1,panelY+HEADER+Math.round(bodyH*open)-1);
+            g.fill(panelX+leftW,panelY+HEADER,panelX+leftW+1,panelY+HEADER+bodyH-FOOTER,UiRenderer.alpha(0xFF363B42,fade*.8f));
+            UiRenderer.small(g,loading?"Загрузка…":"Правила · "+matches.size(),panelX+16,resultTop+4,UiRenderer.MUTED,fade);
+            textButton(g,"category",category==null?"Все разделы":category,panelX+leftW-124,resultTop-3,108,mx,my,categoryMenu,fade);
+            float offset=listMotion.update(listTarget,AWAssistant.animations);
+            g.enableScissor(panelX+8,listTop(),panelX+leftW-8,listTop()+listHeight());
+            for(int i=Math.max(0,(int)(offset/ROW));i<matches.size();i++){
+                int y=listTop()+i*ROW-Math.round(offset);if(y>listTop()+listHeight())break;
+                var rule=matches.get(i).rule();float h=highlight("result:"+i,UiRenderer.hit(mx,my,panelX+8,y,leftW-16,ROW-2));
+                if(i==selected||h>.01f)UiRenderer.round(g,panelX+8,y,leftW-16,ROW-3,4,UiRenderer.alpha(i==selected?0xFF252B2D:0xFF24272E,fade*(i==selected?1:h)));
+                if(i==selected)g.fill(panelX+8,y+8,panelX+10,y+ROW-11,UiRenderer.alpha(UiRenderer.ACCENT,fade));
+                UiRenderer.small(g,rule.number(),panelX+22,y+5,i==selected?UiRenderer.ACCENT:UiRenderer.MUTED,fade);
+                int lineY=y+23;for(String line:resultTitles.get(i)){UiRenderer.text(g,font,line,panelX+22,lineY,UiRenderer.TEXT,fade);lineY+=18;}
+                if(resultTitles.get(i).size()==1)UiRenderer.small(g,resultDescriptions.get(i),panelX+22,y+48,UiRenderer.MUTED,fade);
             }
-            UiRenderer.scrollBar(g,panelX+leftW-11,listY,listHeight,matches.size()*96,listOffset,fade);
-            g.disableScissor();
+            UiRenderer.scrollBar(g,panelX+leftW-11,listTop(),listHeight(),matches.size()*ROW,offset,fade);g.disableScissor();
             int dx=panelX+leftW+22;
+            textButton(g,"rules","Правило",dx,resultTop-3,76,mx,my,!showSanctions,fade);
+            textButton(g,"sanctions","Наказание",dx+84,resultTop-3,100,mx,my,showSanctions,fade);
+            g.fill(dx+(showSanctions?92:8),resultTop+27,dx+(showSanctions?174:66),resultTop+29,UiRenderer.alpha(UiRenderer.ACCENT,fade));
             var rule=selectedRule();
-            if(rule==null) {
-                UiRenderer.text(g,font,book!=null &&book.rules().isEmpty()?"Для этого сервера правила ещё не загружены":"Ничего не найдено",dx,resultTop+60,UiRenderer.TEXT,fade);
-                UiRenderer.text(g,font,"Перетащи JSON в окно или добавь файл в папку правил",dx,resultTop+84,UiRenderer.MUTED,fade);
-                button(g,"folder","Папка правил",dx,resultTop+124,140,mx,my,false,fade);
-                button(g,"reload","Обновить",dx+150,resultTop+124,100,mx,my,false,fade);
-            } else {
-                UiRenderer.text(g,font,rule.number()+" · "+(book==null?"":book.name()),dx,resultTop+4,UiRenderer.ACCENT,fade*detailOpacity);
-                int titleY=resultTop+27;for(String line:titleLines){UiRenderer.bold(g,line,dx,titleY,UiRenderer.TEXT,fade*detailOpacity);titleY+=22;}
-                int tagWidth=Math.min(detailsWidth-50,UiRenderer.width(rule.category())+20);
-                UiRenderer.round(g,dx,titleY+9,tagWidth,25,5,UiRenderer.alpha(0x553D464F,fade*detailOpacity));
-                UiRenderer.small(g,UiRenderer.ellipsis(font,rule.category(),tagWidth-18),dx+10,titleY+12,UiRenderer.MUTED,fade*detailOpacity);
-                detailTop=titleY+51;
-                float copyHover=highlight("copy",UiRenderer.hit(mx,my,panelX+panelW-50,copyTop(),30,30));
-                UiRenderer.copyIcon(g,panelX+panelW-42,copyTop()+7,UiRenderer.alpha(copyHover>.2?UiRenderer.ACCENT:UiRenderer.MUTED,fade));
-                if(System.currentTimeMillis()<copiedUntil)UiRenderer.small(g,"Скопировано",panelX+panelW-144,copyTop()+7,UiRenderer.ACCENT,fade);
-                int detailHeight=Math.max(40,panelY+56+bodyH-42-detailTop);
-                float scroll=detailMotion.update(detailTarget,AWAssistant.animations);
-                g.enableScissor(dx,detailTop,panelX+panelW-18,detailTop+detailHeight);
-                int y=detailTop-Math.round(scroll);
-                if(!sanctionLines.isEmpty()) {
-                    int ph=40+sanctionLines.size()*20;
-                    UiRenderer.round(g,dx,y,detailsWidth,ph,7,UiRenderer.alpha(0x70633643,fade*detailOpacity));
-                    UiRenderer.small(g,"Наказание",dx+12,y+10,0xFFE98491,fade*detailOpacity);
-                    int sy=y+31;for(String line:sanctionLines) {if(sy>=detailTop-20&&sy<detailTop+detailHeight)UiRenderer.text(g,font,line,dx+12,sy,UiRenderer.TEXT,fade*detailOpacity);sy+=20;}
-                    y+=ph+18;
+            if(rule==null){
+                UiRenderer.bold(g,book!=null&&book.rules().isEmpty()?"Правила не загружены":"Ничего не найдено",dx,resultTop+62,UiRenderer.TEXT,fade);
+                int y=resultTop+97;for(String line:UiRenderer.wrap("Добавь набор правил или уточни запрос",detailsWidth,false)){UiRenderer.text(g,font,line,dx,y,UiRenderer.MUTED,fade);y+=21;}
+                textButton(g,"folder","Папка правил",dx,resultTop+147,132,mx,my,false,fade);textButton(g,"reload","Обновить",dx+142,resultTop+147,98,mx,my,false,fade);
+            }else{
+                UiRenderer.small(g,rule.number()+"  /  "+(book==null?"":book.name()),dx,resultTop+44,UiRenderer.ACCENT,fade*details);
+                float copying=highlight("copy",UiRenderer.hit(mx,my,panelX+panelW-49,copyTop(),28,28));
+                UiRenderer.copyIcon(g,panelX+panelW-41,copyTop()+6,UiRenderer.alpha(copying>.2?UiRenderer.TEXT:UiRenderer.MUTED,fade));
+                if(System.currentTimeMillis()<copiedUntil)UiRenderer.small(g,"Скопировано",panelX+panelW-141,copyTop()+6,UiRenderer.ACCENT,fade);
+                int y=resultTop+70;for(String line:titleLines){UiRenderer.bold(g,line,dx,y,UiRenderer.TEXT,fade*details);y+=23;}
+                if(!rule.category().isBlank()){UiRenderer.small(g,rule.category(),dx,y+5,UiRenderer.MUTED,fade*details);y+=29;}
+                detailTop=y+16;float scroll=detailMotion.update(detailTarget,AWAssistant.animations);
+                g.enableScissor(dx,detailTop,panelX+panelW-16,detailTop+detailHeight());y=detailTop-Math.round(scroll);
+                if(!sanctionLines.isEmpty()){
+                    int boxHeight=36+sanctionLines.size()*20;
+                    UiRenderer.round(g,dx,y,detailsWidth,boxHeight,4,UiRenderer.alpha(0xFF30242A,fade*details));
+                    g.fill(dx,y+5,dx+2,y+boxHeight-5,UiRenderer.alpha(0xFFC77E8B,fade*details));
+                    UiRenderer.small(g,"Наказание",dx+14,y+8,0xFFE49BA7,fade*details);
+                    int sy=y+29;for(String line:sanctionLines){if(sy>=detailTop-20&&sy<detailTop+detailHeight())UiRenderer.text(g,font,line,dx+14,sy,UiRenderer.TEXT,fade*details);sy+=20;}y+=boxHeight+18;
                 }
-                if(!showSanctions) for(String line:detailLines) {if(y>=detailTop-20&&y<detailTop+detailHeight)UiRenderer.text(g,font,line,dx,y,UiRenderer.TEXT,fade*detailOpacity);y+=21;}
-                else if(sanctionLines.isEmpty()) UiRenderer.text(g,font,"Наказание в этом правиле не указано",dx,y,UiRenderer.MUTED,fade);
-                UiRenderer.scrollBar(g,panelX+panelW-20,detailTop,detailHeight,modelHeight(),scroll,fade);
-                g.disableScissor();
+                if(!showSanctions)for(String line:detailLines){if(y>=detailTop-21&&y<detailTop+detailHeight())UiRenderer.text(g,font,line,dx,y,UiRenderer.TEXT,fade*details);y+=21;}
+                else if(sanctionLines.isEmpty())UiRenderer.text(g,font,"Наказание не указано в источнике",dx,y,UiRenderer.MUTED,fade);
+                UiRenderer.scrollBar(g,panelX+panelW-19,detailTop,detailHeight(),modelHeight(),scroll,fade);g.disableScissor();
             }
-            UiRenderer.small(g,message.isBlank()?"AWAssistant     "+AWAssistant.OPEN.getTranslatedKeyMessage().getString()+" · закрыть":UiRenderer.ellipsis(font,message,panelW-34),panelX+16,panelY+56+bodyH-22,UiRenderer.MUTED,fade);
+            int footer=panelY+HEADER+bodyH-FOOTER;
+            g.fill(panelX+1,footer,panelX+panelW-1,footer+1,UiRenderer.alpha(0xFF363B42,fade*.8f));
+            String status=message.isBlank()?(book!=null&&book.name().endsWith(" · памятка")?"Краткая памятка · полные условия в источнике":AWAssistant.OPEN.getTranslatedKeyMessage().getString()+" · закрыть"):message;
+            UiRenderer.small(g,UiRenderer.ellipsis(font,status,panelW-160),panelX+16,footer+9,UiRenderer.MUTED,fade);
+            if(book!=null&&!book.sourceUrl().isBlank())textButton(g,"source","Источник ↗",panelX+panelW-114,footer+2,98,mx,my,false,fade);
             g.disableScissor();
         }
         if(serverMenu)lastMenu="server";else if(categoryMenu)lastMenu="category";else if(settingsMenu)lastMenu="settings";
         float menu=menuMotion.update(serverMenu||categoryMenu||settingsMenu?1:0,AWAssistant.animations);
-        if(menu>.01f &&lastMenu.equals("server")) {
-            int x=panelX+panelW-210,y=panelY+58;UiRenderer.panel(g,x,y,190,Math.min(8,data.books().size())*36+12,fade*menu);
-            for(int i=0;i<Math.min(8,data.books().size());i++) button(g,"server:"+i,data.books().get(i+serverOffset).name(),x+6,y+6+i*36,178,mx,my,data.books().get(i+serverOffset).id().equals(serverId),fade*menu);
-        }
-        if(menu>.01f &&lastMenu.equals("category")) {
-            int x=panelX+leftW-210,y=resultTop+32;UiRenderer.panel(g,x,y,194,Math.min(8,categories.size()+1)*36+12,fade*menu);
-            button(g,"cat:all","Все категории",x+6,y+6,182,mx,my,category==null,fade*menu);
-            for(int i=0;i<Math.min(7,categories.size());i++) button(g,"cat:"+i,categories.get(i+categoryOffset),x+6,y+42+i*36,182,mx,my,categories.get(i+categoryOffset).equals(category),fade*menu);
-        }
-        if(menu>.01f &&lastMenu.equals("settings")) {
-            int x=panelX+panelW-234,y=panelY+58;UiRenderer.panel(g,x,y,222,156,fade*menu);
-            button(g,"animations","Анимации: "+(AWAssistant.animations?"вкл":"выкл"),x+6,y+6,210,mx,my,AWAssistant.animations,fade*menu);
-            button(g,"blur","Размытие: "+(AWAssistant.blur?"вкл":"выкл"),x+6,y+42,210,mx,my,AWAssistant.blur,fade*menu);
-            button(g,"folder-menu","Папка правил",x+6,y+78,210,mx,my,false,fade*menu);
-            button(g,"reload-menu","Обновить правила",x+6,y+114,210,mx,my,false,fade*menu);
+        if(menu>.01f){
+            if(lastMenu.equals("server")){int x=panelX+panelW-202,y=panelY+93;UiRenderer.panel(g,x,y,186,Math.min(8,data.books().size())*34+12,fade*menu);for(int i=0;i<Math.min(8,data.books().size());i++)textButton(g,"server:"+i,data.books().get(i+serverOffset).name(),x+6,y+6+i*34,174,mx,my,data.books().get(i+serverOffset).id().equals(serverId),fade*menu);}
+            else if(lastMenu.equals("category")){int x=panelX+leftW-196,y=resultTop+30;UiRenderer.panel(g,x,y,184,Math.min(8,categories.size()+1)*34+12,fade*menu);textButton(g,"all","Все разделы",x+6,y+6,172,mx,my,category==null,fade*menu);for(int i=0;i<Math.min(7,categories.size());i++)textButton(g,"category:"+i,categories.get(i+categoryOffset),x+6,y+40+i*34,172,mx,my,categories.get(i+categoryOffset).equals(category),fade*menu);}
+            else {int x=panelX+panelW-232,y=panelY+43;UiRenderer.panel(g,x,y,218,182,fade*menu);for(int i=0;i<5;i++)textButton(g,"setting:"+i,List.of("Анимации: "+(AWAssistant.animations?"вкл":"выкл"),"Размытие: "+(AWAssistant.blur?"вкл":"выкл"),"Вернуть в центр","Папка правил","Обновить правила").get(i),x+6,y+6+i*34,206,mx,my,false,fade*menu);}
         }
         g.pose().popMatrix();
     }
-    private int copyTop() { return resultTop-2; }
-    private int modelHeight() { return (showSanctions?0:detailLines.size()*21) + (sanctionLines.isEmpty()?0:58+sanctionLines.size()*20); }
-    @Override public boolean mouseScrolled(double x,double y,double horizontal,double vertical) {
-        x/=scale;y/=scale;
-        if(serverMenu){serverOffset=Math.max(0,Math.min(Math.max(0,data.books().size()-8),serverOffset-(int)Math.signum(vertical)));return true;}
-        if(categoryMenu){categoryOffset=Math.max(0,Math.min(Math.max(0,categories.size()-7),categoryOffset-(int)Math.signum(vertical)));return true;}
-        if(x<panelX+leftW) listTarget=Math.max(0,Math.min(Math.max(0,matches.size()*96-(bodyH-92)),listTarget-(float)vertical*44));
-        else detailTarget=Math.max(0,Math.min(Math.max(0,modelHeight()-Math.max(40,panelY+56+bodyH-42-detailTop)),detailTarget-(float)vertical*44));
-        return true;
-    }
-    @Override public boolean mouseClicked(MouseButtonEvent event,boolean doubleClick) {
-        double x=event.x()/scale,y=event.y()/scale;
-        if(event.button()!=InputConstants.MOUSE_BUTTON_LEFT)return true;
-        if(serverMenu) {
-            int sx=panelX+panelW-204,sy=panelY+64;
-            for(int i=0;i<Math.min(8,data.books().size());i++) if(UiRenderer.hit(x,y,sx,sy+i*36,178,30)){selectServer(data.books().get(i+serverOffset).id());return true;}
-            serverMenu=false;
-        }
-        if(categoryMenu) {
-            int cx=panelX+leftW-204,cy=resultTop+38;
-            if(UiRenderer.hit(x,y,cx,cy,182,30)) {category=null;categoryMenu=false;updateSearch();return true;}
-            for(int i=0;i<Math.min(7,categories.size());i++) if(UiRenderer.hit(x,y,cx,cy+36+i*36,182,30)){category=categories.get(i+categoryOffset);categoryMenu=false;updateSearch();return true;}
-            categoryMenu=false;
-        }
-        if(settingsMenu) {
-            int sx=panelX+panelW-228,sy=panelY+64;
-            if(UiRenderer.hit(x,y,sx,sy,210,30)){AWAssistant.animations=!AWAssistant.animations;return true;}
-            if(UiRenderer.hit(x,y,sx,sy+36,210,30)){AWAssistant.blur=!AWAssistant.blur;return true;}
-            if(UiRenderer.hit(x,y,sx,sy+72,210,30)){openFolder();return true;}
-            if(UiRenderer.hit(x,y,sx,sy+108,210,30)){reload();return true;}
-            settingsMenu=false;
-        }
-        if(UiRenderer.hit(x,y,panelX+panelW-160,panelY+13,106,30)){serverOffset=0;serverMenu=true;return true;}
-        if(UiRenderer.hit(x,y,panelX+panelW-46,panelY+13,32,30)){settingsMenu=true;return true;}
-        if(UiRenderer.hit(x,y,panelX+panelW-326,panelY+13,72,30)){showSanctions=false;detailTarget=0;return true;}
-        if(UiRenderer.hit(x,y,panelX+panelW-246,panelY+13,78,30)){showSanctions=true;detailTarget=0;return true;}
-        if(UiRenderer.hit(x,y,panelX+48+panelW-390-32,panelY+10,32,36)){input.value("");updateSearch();return true;}
-        if(input.value().isBlank())return true;
-        if(UiRenderer.hit(x,y,panelX+leftW-138,resultTop-5,124,30)){categoryOffset=0;categoryMenu=true;return true;}
-        int listY=resultTop+34;
-        if(UiRenderer.hit(x,y,panelX+12,listY,leftW-24,bodyH-92)){select((int)((y-listY+listMotion.value())/96));return true;}
+    @Override public boolean mouseClicked(MouseButtonEvent event,boolean doubleClick){
+        double x=event.x()/scale,y=event.y()/scale;if(event.button()!=InputConstants.MOUSE_BUTTON_LEFT)return true;
+        if(serverMenu){int sx=panelX+panelW-196,sy=panelY+99;for(int i=0;i<Math.min(8,data.books().size());i++)if(UiRenderer.hit(x,y,sx,sy+i*34,174,28)){selectServer(data.books().get(i+serverOffset).id());return true;}serverMenu=false;}
+        if(categoryMenu){int cx=panelX+leftW-190,cy=resultTop+36;if(UiRenderer.hit(x,y,cx,cy,172,28)){category=null;categoryMenu=false;updateSearch();return true;}for(int i=0;i<Math.min(7,categories.size());i++)if(UiRenderer.hit(x,y,cx,cy+34+i*34,172,28)){category=categories.get(i+categoryOffset);categoryMenu=false;updateSearch();return true;}categoryMenu=false;}
+        if(settingsMenu){int sx=panelX+panelW-226,sy=panelY+49;for(int i=0;i<5;i++)if(UiRenderer.hit(x,y,sx,sy+i*34,206,28)){switch(i){case 0->AWAssistant.animations=!AWAssistant.animations;case 1->AWAssistant.blur=!AWAssistant.blur;case 2->{positionX=.5;positionY=.05;positionTouched=true;layout();}case 3->openFolder();case 4->refreshSources();}if(i<3)saveUi();return true;}settingsMenu=false;}
+        if(UiRenderer.hit(x,y,panelX+panelW-43,panelY+8,28,28)){onClose();return true;}
+        if(UiRenderer.hit(x,y,panelX+panelW-88,panelY+8,30,28)){settingsMenu=true;return true;}
+        if(UiRenderer.hit(x,y,panelX+panelW-212,panelY+8,108,28)){browsing=!expanded();if(!browsing)input.value("");updateSearch();return true;}
+        if(UiRenderer.hit(x,y,panelX+panelW-174,panelY+57,158,28)){serverOffset=0;serverMenu=true;return true;}
+        if(UiRenderer.hit(x,y,panelX+panelW-224,panelY+54,34,34)){input.value("");updateSearch();return true;}
+        if(UiRenderer.hit(x,y,panelX+8,panelY+3,panelW-232,38)){dragging=true;positionTouched=true;dragX=(float)x-panelX;dragY=(float)y-panelY;return true;}
+        if(!expanded())return true;
+        if(UiRenderer.hit(x,y,panelX+leftW-124,resultTop-3,108,28)){categoryOffset=0;categoryMenu=true;return true;}
+        if(UiRenderer.hit(x,y,panelX+8,listTop(),leftW-16,listHeight())){select((int)((y-listTop()+listMotion.value())/ROW));return true;}
         int dx=panelX+leftW+22;
-        if(selectedRule()==null) {
-            if(UiRenderer.hit(x,y,dx,resultTop+124,140,30))openFolder();
-            else if(UiRenderer.hit(x,y,dx+150,resultTop+124,100,30))reload();
-        } else if(UiRenderer.hit(x,y,panelX+panelW-50,copyTop(),30,30)) {
-            var rule=selectedRule();minecraft.keyboardHandler.setClipboard(rule.number()+" "+rule.title()+"\n"+rule.description()+
-                (rule.sanction().isBlank()?"":"\nНаказание: "+rule.sanction()));copiedUntil=System.currentTimeMillis()+1800;
-        }
+        if(UiRenderer.hit(x,y,dx,resultTop-3,76,28)){showSanctions=false;detailTarget=0;detailMotion.snap(0);return true;}
+        if(UiRenderer.hit(x,y,dx+84,resultTop-3,100,28)){showSanctions=true;detailTarget=0;detailMotion.snap(0);return true;}
+        if(UiRenderer.hit(x,y,panelX+panelW-114,panelY+HEADER+bodyH-FOOTER+2,98,28)){openSource();return true;}
+        if(selectedRule()==null){if(UiRenderer.hit(x,y,dx,resultTop+147,132,28))openFolder();else if(UiRenderer.hit(x,y,dx+142,resultTop+147,98,28))refreshSources();}
+        else if(UiRenderer.hit(x,y,panelX+panelW-49,copyTop(),28,28)){var rule=selectedRule();minecraft.keyboardHandler.setClipboard(rule.number()+" "+rule.title()+"\n"+rule.description()+(rule.sanction().isBlank()?"":"\nНаказание: "+rule.sanction()));copiedUntil=System.currentTimeMillis()+1800;}
         return true;
     }
-    private void openFolder() { java.util.concurrent.CompletableFuture.runAsync(()-> { try {
-        if(java.awt.Desktop.isDesktopSupported()) java.awt.Desktop.getDesktop().open(AWAssistant.RULES.folder().toFile());
-    } catch(java.io.IOException failure){ minecraft.execute(()->message="Не удалось открыть папку правил"); } }); }
-    @Override public boolean charTyped(CharacterEvent event) {
-        if(event.isAllowedChatCharacter()) {input.insert(event.codepointAsString());updateSearch();}return true;
+    @Override public boolean mouseDragged(MouseButtonEvent event,double dx,double dy){
+        if(!dragging||event.button()!=InputConstants.MOUSE_BUTTON_LEFT)return false;
+        panelX=Math.max(12,Math.min(Math.max(12,virtualWidth-panelW-12),Math.round((float)(event.x()/scale)-dragX)));
+        panelY=Math.max(12,Math.min(Math.max(12,virtualHeight-HEADER-bodyH-12),Math.round((float)(event.y()/scale)-dragY)));
+        anchors();return true;
     }
-    @Override public boolean keyPressed(KeyEvent event) {
-        if(event.key()==InputConstants.KEY_ESCAPE) {
-            if(serverMenu||categoryMenu||settingsMenu){serverMenu=false;categoryMenu=false;settingsMenu=false;}
-            else if(!input.value().isBlank()){input.value("");updateSearch();}else onClose();return true;
-        }
+    @Override public boolean mouseReleased(MouseButtonEvent event){if(dragging&&event.button()==InputConstants.MOUSE_BUTTON_LEFT){dragging=false;saveUi();return true;}return false;}
+    @Override public boolean mouseScrolled(double x,double y,double horizontal,double vertical){
+        x/=scale;y/=scale;if(serverMenu){serverOffset=Math.max(0,Math.min(Math.max(0,data.books().size()-8),serverOffset-(int)Math.signum(vertical)));return true;}
+        if(categoryMenu){categoryOffset=Math.max(0,Math.min(Math.max(0,categories.size()-7),categoryOffset-(int)Math.signum(vertical)));return true;}
+        if(!expanded())return true;
+        if(x<panelX+leftW)listTarget=Math.max(0,Math.min(Math.max(0,matches.size()*ROW-listHeight()),listTarget-(float)vertical*40));
+        else detailTarget=Math.max(0,Math.min(Math.max(0,modelHeight()-detailHeight()),detailTarget-(float)vertical*40));return true;
+    }
+    @Override public boolean charTyped(CharacterEvent event){if(event.isAllowedChatCharacter()){input.insert(event.codepointAsString());updateSearch();}return true;}
+    @Override public boolean keyPressed(KeyEvent event){
+        if(event.key()==InputConstants.KEY_ESCAPE){if(serverMenu||categoryMenu||settingsMenu)serverMenu=categoryMenu=settingsMenu=false;else if(expanded()){input.value("");browsing=false;updateSearch();}else onClose();return true;}
         if(AWAssistant.OPEN.matches(event)){onClose();return true;}
-        if(event.key()==InputConstants.KEY_DOWN||event.key()==InputConstants.KEY_UP) {
-            select(selected+(event.key()==InputConstants.KEY_DOWN?1:-1));
-            int visible=bodyH-92;float top=selected*96,bottom=top+88;
-            if(top<listTarget)listTarget=top;else if(bottom>listTarget+visible)listTarget=bottom-visible;return true;
-        }
-        if(event.key()==InputConstants.KEY_RETURN){detailTarget=0;return true;}
-        String before=input.value();if(input.key(event,minecraft.keyboardHandler.getClipboard(),minecraft.keyboardHandler::setClipboard)) {
-            if(!before.equals(input.value()))updateSearch();return true;
-        }
-        return super.keyPressed(event);
+        if(event.key()==InputConstants.KEY_DOWN||event.key()==InputConstants.KEY_UP){select(selected+(event.key()==InputConstants.KEY_DOWN?1:-1));float top=selected*ROW,bottom=top+ROW-3;if(top<listTarget)listTarget=top;else if(bottom>listTarget+listHeight())listTarget=bottom-listHeight();return true;}
+        if(event.key()==InputConstants.KEY_RETURN){if(!expanded()){browsing=true;updateSearch();}detailTarget=0;detailMotion.snap(0);return true;}
+        String before=input.value();if(input.key(event,minecraft.keyboardHandler.getClipboard(),minecraft.keyboardHandler::setClipboard)){if(!before.equals(input.value()))updateSearch();return true;}return super.keyPressed(event);
     }
-    @Override public void onFilesDrop(List<Path> paths) {
-        message="Импортирую правила…";
-        AWAssistant.RULES.importFiles(paths).whenComplete((result,failure)->minecraft.execute(()->{
-            if(ClientBridge.screen(minecraft)!=this)return;
-            if(failure!=null)message="Не удалось импортировать JSON: "+(failure.getCause()==null?failure:failure.getCause()).getMessage();else reload();
-        }));
-    }
+    private void openFolder(){java.util.concurrent.CompletableFuture.runAsync(()->{try{if(java.awt.Desktop.isDesktopSupported())java.awt.Desktop.getDesktop().open(AWAssistant.RULES.folder().toFile());}catch(java.io.IOException failure){minecraft.execute(()->message="Не удалось открыть папку правил");}});}
+    private void openSource(){var book=currentBook();if(book==null)return;try{var uri=java.net.URI.create(book.sourceUrl());if(!"https".equals(uri.getScheme())||uri.getHost()==null)return;java.util.concurrent.CompletableFuture.runAsync(()->{try{if(java.awt.Desktop.isDesktopSupported())java.awt.Desktop.getDesktop().browse(uri);}catch(java.io.IOException failure){minecraft.execute(()->message="Не удалось открыть источник");}});}catch(IllegalArgumentException ignored){message="Некорректная ссылка источника";}}
+    @Override public void onFilesDrop(List<Path> paths){message="Импортирую правила…";AWAssistant.RULES.importFiles(paths).whenComplete((unused,failure)->minecraft.execute(()->{if(ClientBridge.screen(minecraft)!=this)return;if(failure!=null)message="Не удалось импортировать правила";else reload();}));}
 }

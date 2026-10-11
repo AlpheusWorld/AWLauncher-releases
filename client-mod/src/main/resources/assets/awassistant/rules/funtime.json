@@ -1,0 +1,75 @@
+{
+  "id": "funtime",
+  "name": "FunTime · памятка",
+  "addresses": [
+    "funtime.su",
+    "mc.funtime.su"
+  ],
+  "sourceUrl": "https://funtime.su/rules",
+  "rules": [
+    {
+      "number": "2.1",
+      "title": "Флуд и заглавные буквы",
+      "category": "Чат",
+      "description": "Капс, повторяющиеся и засоряющие чат сообщения запрещены",
+      "sanction": "",
+      "keywords": []
+    },
+    {
+      "number": "2.2",
+      "title": "Уважение к игрокам",
+      "category": "Чат",
+      "description": "Нельзя унижать и оскорблять других участников",
+      "sanction": "",
+      "keywords": []
+    },
+    {
+      "number": "2.4",
+      "title": "Сторонние ресурсы",
+      "category": "Чат",
+      "description": "Нельзя рекламировать и упоминать ресурсы вне проекта",
+      "sanction": "",
+      "keywords": []
+    },
+    {
+      "number": "2.6",
+      "title": "Родственники игроков",
+      "category": "Чат",
+      "description": "Нельзя упоминать или оскорблять родных и близких участников",
+      "sanction": "",
+      "keywords": []
+    },
+    {
+      "number": "3.2",
+      "title": "Доступ к аккаунту",
+      "category": "Аккаунт",
+      "description": "Передавать другим людям доступ к аккаунту нельзя",
+      "sanction": "",
+      "keywords": []
+    },
+    {
+      "number": "4.2",
+      "title": "Сделки за деньги",
+      "category": "Игра",
+      "description": "Нельзя покупать и продавать игровые ценности за реальную валюту",
+      "sanction": "",
+      "keywords": []
+    },
+    {
+      "number": "4.3",
+      "title": "Читы и автоматизация",
+      "category": "Игра",
+      "description": "Запрещены упрощающие игру программы и моды; исключения определены пунктами 4.12–4.13",
+      "sanction": "",
+      "keywords": []
+    },
+    {
+      "number": "4.8",
+      "title": "Ошибки сервера",
+      "category": "Игра",
+      "description": "Нельзя пользоваться багами или скрывать недоработки",
+      "sanction": "",
+      "keywords": []
+    }
+  ]
+}

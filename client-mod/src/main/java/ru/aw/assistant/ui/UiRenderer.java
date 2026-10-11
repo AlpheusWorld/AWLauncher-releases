@@ -21,9 +21,9 @@ public final class UiRenderer {
         }
     }
     public static void panel(GuiGraphicsExtractor g, int x, int y, int w, int h, float fade) {
-        for (int i=4; i>0; i--) round(g,x-i*2,y+i,w+i*4,h+i*2,12+i,alpha(0x13000000,fade));
-        round(g,x,y,w,h,12,alpha(0xFF56616A,fade*.25f));
-        round(g,x+1,y+1,w-2,h-2,11,alpha(0xCE14181D,fade));
+        for (int i=2; i>0; i--) round(g,x-i*2,y+i,w+i*4,h+i*2,12+i,alpha(0x13000000,fade));
+        round(g,x,y,w,h,8,alpha(0xFF68717C,fade*.3f));
+        round(g,x+1,y+1,w-2,h-2,7,alpha(0xF214171C,fade));
     }
     public static void text(GuiGraphicsExtractor g, Font font, String value, int x, int y, int color, float fade) {
         SmoothFont.draw(g,value,x,y,alpha(color,fade),false,1);
@@ -62,6 +62,7 @@ public final class UiRenderer {
         round(g,x,y,10,10,5,color); round(g,x+1,y+1,8,8,4,alpha(0xFF242B33,(color>>>24)/255f));
         for(int i=0;i<4;i++)g.fill(x+8+i,y+8+i,x+10+i,y+10+i,color);
     }
+    public static void chevron(GuiGraphicsExtractor g,int x,int y,int color) { for(int i=0;i<4;i++){g.fill(x+i,y+i,x+i+1,y+i+1,color);g.fill(x+7-i,y+i,x+8-i,y+i+1,color);} }
     public static void cross(GuiGraphicsExtractor g,int x,int y,int color) {
         for (int i=0;i<9;i++) { g.fill(x+i,y+i,x+i+1,y+i+1,color);g.fill(x+8-i,y+i,x+9-i,y+i+1,color); }
     }

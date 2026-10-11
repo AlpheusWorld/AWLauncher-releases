@@ -4,7 +4,7 @@ import java.util.zip.ZipFile
 
 plugins { id 'java' }
 group = 'ru.aw'
-version = '0.1.0'
+version = '0.1.1'
 def gameVersion = providers.gradleProperty('gameVersion').getOrElse('26.1.2')
 def releases = [
     '26.1.2': ['4e618f09a0c649dde3fdf829df443ce0b8831e65', '0.155.3+26.1.2'],

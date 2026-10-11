@@ -20,6 +20,8 @@ fun main(args: Array<String>) {
     Files.deleteIfExists(game.resolve("awassistant-smoke.ok")); Files.deleteIfExists(game.resolve("awassistant-smoke.fail"))
     Files.createDirectories(game.resolve("mods"))
     for (name in listOf("AWAssistant-fabric-$version-0.1.0.jar", "AWAssistant-smoke-$version-0.1.0.jar"))
+        Files.deleteIfExists(game.resolve("mods").resolve(name))
+    for (name in listOf("AWAssistant-fabric-$version-0.1.1.jar", "AWAssistant-smoke-$version-0.1.1.jar"))
         Files.copy(artifacts.resolve(name), game.resolve("mods").resolve(name), StandardCopyOption.REPLACE_EXISTING)
     val rules = Files.createDirectories(game.resolve("config/awassistant/rules"))
     val titles=listOf("Поиск правил серверов", "Навигация по результатам", "Загрузка и обновление наборов", "Описание и наказания",
