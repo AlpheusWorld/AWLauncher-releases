@@ -12,6 +12,13 @@ import kotlin.io.path.exists
 import kotlin.io.path.writeText
 
 class ModManagerTest {
+    @Test
+    fun `universal Fabric release does not require NeoForge only KotlinLangForge`() {
+        assertFalse(ModManager.dependencyApplies(listOf("forge", "neoforge"), listOf("fabric")))
+        assertTrue(ModManager.dependencyApplies(listOf("forge", "neoforge"), listOf("neoforge")))
+        assertTrue(ModManager.dependencyApplies(listOf("fabric", "quilt"), listOf("fabric")))
+        assertTrue(ModManager.dependencyApplies(emptyList(), listOf("fabric")))
+    }
 
     @Test
     fun `explicit versions must match the selected project game and loader`() {

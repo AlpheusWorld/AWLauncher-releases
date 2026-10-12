@@ -17,6 +17,27 @@ import java.nio.file.Path
 
 class BuildMigrationTest {
     @Test
+    fun `retry can disable one failed compatible mod and finish migration`() = runBlocking {
+        val failed = mod("zoomify.jar")
+        val other = mod("other.jar").let {
+            Files.write(it.file, byteArrayOf(7))
+            it.copy(sha1 = sha1Of(it.file))
+        }
+        val candidate = Modrinth.Version("new", "project", gameVersions = listOf("1.21.1"),
+            loaders = listOf("fabric"), files = listOf(Modrinth.VersionFile("https://example.org/new.jar", "new.jar")))
+        val initial = BuildMigration.plan(root, "1.20.1", "1.21.1", LoaderKind.FABRIC,
+            listOf(failed, other), mapOf(failed.sha1 to candidate), BuildMigration.fingerprint(root))
+        val retry = BuildMigration.disableFailedMod(initial, MigrationModFailure(failed.fileName, "Zoomify", IOException("dependency")))
+        assertNull(retry.mods.first().replacement)
+        assertEquals(initial.fingerprint, retry.fingerprint)
+        var committed = false
+        BuildMigration.apply(retry, setOf(other.fileName), {}, {}, prepareGame = {}, commitVersion = { committed = true })
+        assertTrue(committed)
+        assertFalse(Files.exists(failed.file))
+        assertTrue(Files.exists(root.resolve("mods/zoomify.jar.disabled")))
+        assertTrue(Files.exists(other.file))
+    }
+    @Test
     fun `compatible disabled mods get new files without enabling them`() = runBlocking {
         val item = mod("old.jar.disabled", enabled = false)
         val payload = "compatible new mod".toByteArray()

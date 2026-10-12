@@ -84,7 +84,7 @@ $headers=@{ Authorization="Bearer $token"; Accept='application/vnd.github+json';
 try {
     $repositoryInfo = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repository" -Headers $headers
     if ($repositoryInfo.private) { throw 'Auto-update assets must be published in a public repository' }
-    $body = @{ tag_name=$tag; target_commitish='main'; name="AWLauncher $Version"; body=(Get-Content -LiteralPath $Notes -Raw);
+    $body = @{ tag_name=$tag; target_commitish=(git rev-parse HEAD).Trim(); name="AWLauncher $Version"; body=(Get-Content -LiteralPath $Notes -Raw);
         draft=$true; prerelease=$false } | ConvertTo-Json
     $existing=Invoke-RestMethod -Uri "https://api.github.com/repos/$Repository/releases?per_page=100" -Headers $headers -TimeoutSec 30
     $release=$existing | Where-Object { $_.tag_name -eq $tag } | Select-Object -First 1

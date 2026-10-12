@@ -111,7 +111,9 @@ sealed interface Modal {
     data class Icon(val entry: VersionEntry) : Modal
     data class Groups(val entryKeys: List<String> = emptyList()) : Modal
     data class Duplicate(val entry: VersionEntry) : Modal
-    data class Migrate(val entry: VersionEntry) : Modal
+    data class Migrate(val entry: VersionEntry, val plan: ru.aw.launcher.instance.MigrationPlan? = null,
+                       val keepEnabled: Set<String> = emptySet(),
+                       val failure: ru.aw.launcher.instance.MigrationModFailure? = null) : Modal
     data class DeleteMany(val entries: List<VersionEntry>) : Modal
     data class ImportDirectory(val directory: Path) : Modal
     data class Settings(val entry: VersionEntry? = null, val section: Int = 0) : Modal
@@ -1121,12 +1123,12 @@ class LauncherState(
             fail("Выбери доступную версию Minecraft с этим загрузчиком"); return
         }
         modal = null
-        startJob(entry, "pack", "Новая версия · ${entry.title}", "migration:${entry.key}") {
+        startJob(entry, "migration", "Новая версия · ${entry.title}", "migration:${entry.key}") {
             if (runningGames.any { it.isAlive }) throw IOException("Закрой Minecraft перед изменением версии сборки")
             val current = entryByKey(entry.key) ?: throw IOException("Сборка больше не найдена")
             if (current.id != plan.sourceVersion || gameDirOf(current).toAbsolutePath().normalize() != plan.directory)
                 throw IOException("Сборка изменилась. Проверь моды ещё раз")
-            val backup = ru.aw.launcher.instance.BuildMigration.apply(plan, keepEnabled, onStage = { text ->
+            val backup = try { ru.aw.launcher.instance.BuildMigration.apply(plan, keepEnabled, onStage = { text ->
                 stageChanged(text)
                 if (text == "Применяю новую версию сборки") downloads.reportCancellable(false)
             }, onProgress = { progress = it },
@@ -1136,7 +1138,10 @@ class LauncherState(
                     entry.build?.let { LocalBuilds.changeGameVersion(it.id, plan.sourceVersion, plan.targetVersion) }
                         ?: entry.pack?.let { Modpacks.changeGameVersion(it, plan.targetVersion) }
                         ?: throw IOException("У этой версии нет отдельного профиля сборки")
-                })
+                }) } catch (failure: ru.aw.launcher.instance.MigrationModFailure) {
+                modal = Modal.Migrate(entry, plan, keepEnabled, failure)
+                throw failure
+            }
             builds = withContext(Dispatchers.IO) { LocalBuilds.list() }
             packs = withContext(Dispatchers.IO) { Modpacks.list() }
             contentModels.remove(entry.key)
@@ -1593,6 +1598,7 @@ class LauncherState(
             "reinstall" to "Переустановка не удалась",
             "fix mods" to "Моды не исправлены",
             "pack" to "Сборка не установилась",
+            "migration" to "Обновление сборки прервано",
         )
         const val NO_VERSIONS = "Не удалось получить список версий. Проверьте интернет и перезапустите лаунчер."
     }

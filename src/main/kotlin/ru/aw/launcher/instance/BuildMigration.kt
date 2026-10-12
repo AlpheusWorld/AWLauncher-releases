@@ -28,10 +28,17 @@ import kotlin.io.path.exists
 data class MigrationMod(val item: InstalledItem, val replacement: Modrinth.Version?, val reason: String?)
 data class MigrationPlan(val directory: Path, val sourceVersion: String, val targetVersion: String,
                          val loader: LoaderKind, val mods: List<MigrationMod>, val fingerprint: Map<String, String>)
+class MigrationModFailure(val fileName: String, val modTitle: String, cause: Exception) :
+    IOException("$modTitle: ${cause.message ?: "Не удалось обновить мод"}", cause)
 
 /** Downloads into staging, then replaces this profile's mods without touching worlds or configs. */
 object BuildMigration {
     private val metadata = listOf(InstanceStore.FILE_NAME, Modpacks.MANIFEST)
+    fun disableFailedMod(plan: MigrationPlan, failure: MigrationModFailure): MigrationPlan =
+        plan.copy(mods = plan.mods.map { mod ->
+            if (mod.item.fileName == failure.fileName) mod.copy(replacement = null, reason = "Будет отключён: ${failure.cause?.message.orEmpty()}")
+            else mod
+        })
 
     suspend fun analyze(directory: Path, sourceVersion: String, targetVersion: String, loader: LoaderKind): MigrationPlan =
         withContext(Dispatchers.IO) {
@@ -98,8 +105,11 @@ object BuildMigration {
             for (mod in plan.mods.filter { it.item.enabled && it.replacement != null }) {
                 val version = mod.replacement!!
                 onStage("Обновляю ${mod.item.title}")
-                ModManager.install(stage, plan.loader, plan.targetVersion, version.projectId, mod.item.title,
-                    present, selectedVersion = version, onProgress = onProgress)
+                try {
+                    ModManager.install(stage, plan.loader, plan.targetVersion, version.projectId, mod.item.title,
+                        present, selectedVersion = version, onProgress = onProgress)
+                } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                catch (failure: Exception) { throw MigrationModFailure(mod.item.fileName, mod.item.title, failure) }
                 present += ModManager.scan(stage, plan.loader, plan.targetVersion, identifyRemote = false)
                     .filter { it.enabled }.mapNotNull { it.projectId }
             }

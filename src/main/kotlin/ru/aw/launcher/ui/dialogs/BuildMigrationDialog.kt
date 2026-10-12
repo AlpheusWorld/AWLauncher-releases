@@ -28,20 +28,28 @@ import ru.aw.launcher.ui.theme.AWColors
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun BuildMigrationDialog(state: LauncherState, entry: VersionEntry, previewPlan: MigrationPlan? = null) {
+internal fun BuildMigrationDialog(state: LauncherState, entry: VersionEntry, previewPlan: MigrationPlan? = null,
+                                 initialKeep: Set<String> = emptySet(),
+                                 failure: ru.aw.launcher.instance.MigrationModFailure? = null) {
     val scope = rememberCoroutineScope()
     val candidates = state.versions.filter { it.id != entry.id && state.loaderSupport.supports(entry.loader, it.id) && state.isVersionVisible(it) }
     var target by remember { mutableStateOf(previewPlan?.targetVersion ?: candidates.firstOrNull()?.id.orEmpty()) }
     var query by remember { mutableStateOf("") }
     var menu by remember { mutableStateOf(false) }
     var plan by remember { mutableStateOf(previewPlan) }
-    var keep by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var keep by remember { mutableStateOf(initialKeep) }
     var checking by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var job by remember { mutableStateOf<Job?>(null) }
     AWDialog("Изменить версию Minecraft", onDismiss = { state.modal = null }, width = 760.dp, scrollable = true,
         subtitle = "${entry.title} · ${entry.id} · ${entry.loader.label}", actions = {
             AWButton("Отмена", onClick = { state.modal = null })
+            if (failure != null && plan != null) {
+                AWButton("Отключить ${failure.modTitle} и продолжить", style = ButtonStyle.PRIMARY,
+                    enabled = !state.libraryEntryBusy(entry), onClick = {
+                        state.migrateBuild(entry, BuildMigration.disableFailedMod(plan!!, failure), keep - failure.fileName)
+                    })
+            }
             AWButton(if (plan == null) "Проверить моды" else "Обновить эту сборку", style = ButtonStyle.PRIMARY,
                 enabled = target.isNotBlank() && !checking && !state.libraryEntryBusy(entry), onClick = {
                     val ready = plan
@@ -60,6 +68,11 @@ internal fun BuildMigrationDialog(state: LauncherState, entry: VersionEntry, pre
                 })
         }) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            failure?.let {
+                Text(it.message.orEmpty(), color = AWColors.Danger, translate = false)
+                Text("Обновление не завершено. Прежняя сборка сохранена. Можно отключить этот мод и продолжить",
+                    color = AWColors.TextSoft, style = MaterialTheme.typography.bodySmall)
+            }
             Text("Обновляется эта сборка. Папка, миры и история сохранятся", color = AWColors.TextSoft,
                 style = MaterialTheme.typography.bodySmall)
             Text("Новая версия Minecraft", color = AWColors.TextMuted, style = MaterialTheme.typography.labelLarge)

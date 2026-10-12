@@ -186,8 +186,11 @@ object ModManager {
                 .distinct()
                 .toList()
             if (needed.isEmpty()) break
-            val names = remote("dependency titles") { ContentCatalog.titles(needed) }.orEmpty()
-            frontier = needed.mapNotNull { id ->
+            val projects = remote("dependency platforms") { Modrinth.projects(needed.filterNot(CurseForge::owns)) }
+                .orEmpty().associateBy { it.id }
+            val names = projects.mapValues { it.value.title } +
+                remote("dependency titles") { ContentCatalog.titles(needed.filter(CurseForge::owns)) }.orEmpty()
+            frontier = needed.filter { dependencyApplies(projects[it]?.loaders.orEmpty(), loaders) }.mapNotNull { id ->
                 val version = find(id)
                 if (version == null) skipped += names[id] ?: id
                 version?.also { chosen[id] = it }
@@ -280,6 +283,8 @@ object ModManager {
             "Эта версия несовместима с выбранной сборкой"
         }
     }
+    internal fun dependencyApplies(platforms: List<String>, selected: List<String>): Boolean =
+        platforms.isEmpty() || platforms.any { it in selected }
 
     suspend fun update(mod: InstalledItem, onProgress: (DownloadProgress) -> Unit = {}) = withContext(Dispatchers.IO) {
         val version = mod.update ?: return@withContext
