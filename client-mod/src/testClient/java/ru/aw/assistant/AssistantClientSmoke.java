@@ -17,16 +17,22 @@ public final class AssistantClientSmoke implements ClientModInitializer {
     private String originalClipboard;
     private boolean captured;
     private int baselineFps,expandedFps,clearFps;
+    private long lastTick,firstOpenGap;
     @Override public void onInitializeClient() {
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             try {
                 ticks++;
                 var screen=ClientBridge.screen(client);
+                long now=System.nanoTime();
+                if(stage==1 &&lastTick!=0)firstOpenGap=Math.max(firstOpenGap,now-lastTick);
+                lastTick=now;
                 if(stage==0 && screen instanceof TitleScreen && ClientBridge.ready(client)) {
                     if(!AWAssistant.OPEN.getTranslatedKeyMessage().getString().equals("F8"))throw new IllegalStateException("The registered binding is not the native F8 key");
                     baselineFps=client.getFps();originalClipboard=client.keyboardHandler.getClipboard();
                     net.minecraft.client.KeyMapping.click(ClientBridge.keyboard().getOrCreate(InputConstants.KEY_F8));stage=1;since=ticks;
                 } else if(stage==1 &&screen instanceof RulesScreen &&ticks-since>40) {
+                    if(firstOpenGap>500_000_000L)throw new IllegalStateException("First opening blocked game ticks for "+firstOpenGap/1_000_000.0+" ms");
+                    verifyWrapping();
                     capture(client,"compact.png");
                     stage=11;since=ticks;
                 } else if(stage==11 &&screen instanceof RulesScreen &&ticks-since>8 &&captured) {
@@ -83,7 +89,7 @@ public final class AssistantClientSmoke implements ClientModInitializer {
                     screen.keyPressed(new KeyEvent(InputConstants.KEY_F8,0,0));stage=5;since=ticks;
                 } else if(stage==5 &&screen instanceof TitleScreen &&ticks-since>15) {
                     client.keyboardHandler.setClipboard(originalClipboard);
-                    Files.writeString(client.gameDirectory.toPath().resolve("awassistant-smoke.ok"),"Hotkey, Russian input, search, arrow/Enter/Escape, separate scrolling, copy, servers, categories, dragging, saved position, official rules, GUI scaling and native rendering verified; FPS title="+baselineFps+", assistant="+expandedFps+", no blur="+clearFps);client.stop();stage=6;
+                    Files.writeString(client.gameDirectory.toPath().resolve("awassistant-smoke.ok"),"Hotkey, Russian input, search, arrow/Enter/Escape, separate scrolling, copy, servers, categories, dragging, saved position, official rules, GUI scaling and native rendering verified; FPS title="+baselineFps+", assistant="+expandedFps+", no blur="+clearFps+"; first-open tick gap ms="+firstOpenGap/1_000_000.0);client.stop();stage=6;
                 }
                 if(ticks>1600 &&stage!=6)throw new IllegalStateException("Client UI verification timed out at stage "+stage);
             } catch(Exception failure) {
@@ -108,6 +114,14 @@ public final class AssistantClientSmoke implements ClientModInitializer {
         click(screen,(x+left-80)*scale,(top+10)*scale);
         click(screen,(x+left-80)*scale,(top+36+34+15)*scale);
         if(!field(screen,"category").equals("Проверка"))throw new IllegalStateException("Category selector did not apply the filter");
+    }
+    private void verifyWrapping(){
+        String word="СверхдлинноеСловоБезПробелов".repeat(15)+"😀";
+        var lines=ru.aw.assistant.ui.UiRenderer.wrap(word,180,false);
+        if(!String.join("",lines).equals(word))throw new IllegalStateException("Wrapping lost Unicode characters");
+        for(var line:lines)if(ru.aw.assistant.ui.UiRenderer.width(line)>180)throw new IllegalStateException("Wrapped line exceeds its width");
+        var paragraphs=ru.aw.assistant.ui.UiRenderer.wrap("Первый абзац\n\nВторой абзац",180,false);
+        if(!paragraphs.contains(""))throw new IllegalStateException("Wrapping lost the blank paragraph");
     }
     private void verifyDragging(net.minecraft.client.gui.screens.Screen screen) throws ReflectiveOperationException {
         float scale=((Number)field(screen,"scale")).floatValue();

@@ -3,6 +3,9 @@ import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 public final class ClientBridge {
+    public static java.nio.IntBuffer pixelBuffer(com.mojang.blaze3d.platform.NativeImage pixels) {
+        return org.lwjgl.system.MemoryUtil.memIntBuffer(pixels.getPointer(),pixels.getWidth()*pixels.getHeight());
+    }
     public static net.minecraft.client.renderer.texture.DynamicTexture smoothTexture(com.mojang.blaze3d.platform.NativeImage pixels) {
         return new net.minecraft.client.renderer.texture.DynamicTexture(()->"AWAssistant Onest atlas",pixels) {
             { this.sampler=com.mojang.blaze3d.systems.RenderSystem.getSamplerCache().getClampToEdge(com.mojang.blaze3d.textures.FilterMode.LINEAR); }

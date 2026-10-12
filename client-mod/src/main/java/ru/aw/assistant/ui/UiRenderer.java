@@ -29,6 +29,8 @@ public final class UiRenderer {
         SmoothFont.draw(g,value,x,y,alpha(color,fade),false,1);
     }
     public static void prepare() { SmoothFont.prepare(); }
+    public static void preload() { SmoothFont.preload(); }
+    public static boolean ready() { return SmoothFont.ready(); }
     public static void close() { SmoothFont.close(); }
     public static int width(String text) { return SmoothFont.width(text,false,1); }
     public static java.util.List<String> wrap(String text,int width,boolean bold) { return SmoothFont.wrap(text,width,bold,bold?1.12f:1); }

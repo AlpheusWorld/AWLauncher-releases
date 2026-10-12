@@ -16,6 +16,7 @@ public final class AWAssistant implements ClientModInitializer {
     public static RuleRepository RULES;
     public static boolean animations = true, blur = true;
     @Override public void onInitializeClient() {
+        ru.aw.assistant.ui.UiRenderer.preload();
         RULES = new RuleRepository(FabricLoader.getInstance().getConfigDir());
         var category = KeyMapping.Category.register(Identifier.fromNamespaceAndPath("awassistant", "assistant"));
         OPEN = KeyMappingHelper.registerKeyMapping(new KeyMapping("key.awassistant.open", ClientBridge.keyboard(), InputConstants.KEY_F8, category));

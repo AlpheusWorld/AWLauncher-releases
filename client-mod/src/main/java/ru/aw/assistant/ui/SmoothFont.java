@@ -15,7 +15,9 @@ import java.util.List;
 /** Cached supersampled lines: one GUI operation per line, with a bounded texture budget. */
 final class SmoothFont {
     private static final int SAMPLE=3, PAD=2, LIMIT=8*1024*1024;
-    private static final FontRenderContext CONTEXT=new FontRenderContext(null,true,true);
+    private static FontRenderContext CONTEXT;
+    private record Faces(java.awt.Font regular,java.awt.Font bold,FontRenderContext context) {}
+    private static java.util.concurrent.CompletableFuture<Faces> prepared;
     private record Key(String text,boolean bold) {}
     private record Line(Identifier texture,int width,int height,float left,float top,int bytes) {}
     private static final LinkedHashMap<Key,Line> lines=new LinkedHashMap<>(64,.75f,true);
@@ -23,15 +25,36 @@ final class SmoothFont {
     private static java.awt.Font regular,bold;
     private static int bytes,serial;
 
+    static synchronized void preload() {
+        if(prepared!=null)return;
+        prepared=java.util.concurrent.CompletableFuture.supplyAsync(()->{
+            try(var input=Objects.requireNonNull(SmoothFont.class.getResourceAsStream("/assets/awassistant/font/onest.ttf"))) {
+                var regular=java.awt.Font.createFont(java.awt.Font.TRUETYPE_FONT,input).deriveFont(java.awt.Font.PLAIN,15f*SAMPLE);
+                var bold=regular.deriveFont(java.awt.Font.BOLD);
+                var image=new BufferedImage(4096,72,BufferedImage.TYPE_INT_ARGB);
+                var graphics=image.createGraphics();
+                try {
+                    graphics.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+                    for(var face:List.of(regular,bold)) {
+                        graphics.setFont(face);
+                        graphics.drawString("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдеёжзийклмнопрстуфхцчшщъыьэюя",0,54);
+                    }
+                } finally {graphics.dispose();}
+                return new Faces(regular,bold,new FontRenderContext(null,true,true));
+            } catch(Exception failure) {throw new IllegalStateException("Could not load bundled Onest",failure);}
+        });
+    }
     static void prepare() {
         if(regular!=null)return;
-        try(var input=Objects.requireNonNull(SmoothFont.class.getResourceAsStream("/assets/awassistant/font/onest.ttf"))) {
-            regular=java.awt.Font.createFont(java.awt.Font.TRUETYPE_FONT,input).deriveFont(java.awt.Font.PLAIN,15f*SAMPLE);
-            bold=regular.deriveFont(java.awt.Font.BOLD);
-        } catch(Exception failure) {throw new IllegalStateException("Could not load bundled Onest",failure);}
+        preload();
+        if(!prepared.isDone())return;
+        var faces=prepared.join();regular=faces.regular;bold=faces.bold;CONTEXT=faces.context;
     }
+    static boolean ready() {prepare();return regular!=null;}
     static int width(String text,boolean heavy,float size) {
-        prepare();var key=new Key(text,heavy);Float advance=measures.get(key);
+        prepare();
+        if(regular==null)return (int)Math.ceil(Minecraft.getInstance().font.width(text)*size*15/9);
+        var key=new Key(text,heavy);Float advance=measures.get(key);
         if(advance==null) {
             advance=(float)(heavy?bold:regular).getStringBounds(text,CONTEXT).getWidth()/SAMPLE;
             measures.put(key,advance);
@@ -55,7 +78,9 @@ final class SmoothFont {
         net.minecraft.client.renderer.texture.DynamicTexture upload=null;
         var id=Identifier.fromNamespaceAndPath("awassistant","text_"+(serial++));
         try {
-            for(int y=0;y<h;y++)for(int x=0;x<w;x++)pixels.setPixel(x,y,image.getRGB(x,y));
+            int[] colors=image.getRGB(0,0,w,h,null,0,w);
+            var target=ClientBridge.pixelBuffer(pixels);
+            for(int color:colors)target.put(color&0xFF00FF00|(color&0xFF0000)>>>16|(color&0xFF)<<16);
             upload=ClientBridge.smoothTexture(pixels);
             Minecraft.getInstance().getTextureManager().register(id,upload);
         } catch(RuntimeException failure) {if(upload!=null)upload.close();else pixels.close();throw failure;}
@@ -64,7 +89,12 @@ final class SmoothFont {
     }
     static void draw(GuiGraphicsExtractor g,String text,int x,int y,int color,boolean heavy,float size) {
         if(text.isBlank()||(color>>>24)==0)return;
-        prepare();var key=new Key(text,heavy);var line=lines.get(key);
+        prepare();
+        if(regular==null) {
+            g.pose().pushMatrix();g.pose().translate(x,y);g.pose().scale(size*15/9,size*15/9);
+            g.text(Minecraft.getInstance().font,text,0,0,color,false);g.pose().popMatrix();return;
+        }
+        var key=new Key(text,heavy);var line=lines.get(key);
         if(line==null) {
             line=raster(key);lines.put(key,line);bytes+=line.bytes;
             var oldest=lines.entrySet().iterator();
@@ -83,13 +113,15 @@ final class SmoothFont {
             if(paragraph.isBlank()){result.add("");continue;}
             for(String word:paragraph.split("\\s+")) {
                 if(word.isEmpty())continue;
-                if(line.length()>0&&width(line+word,heavy,size)>width){result.add(line.toString().stripTrailing());line.setLength(0);}
+                String candidate=line.isEmpty()?word:line+" "+word;
+                if(width(candidate,heavy,size)<=width){if(!line.isEmpty())line.append(' ');line.append(word);continue;}
+                if(!line.isEmpty()){result.add(line.toString());line.setLength(0);}
+                if(width(word,heavy,size)<=width){line.append(word);continue;}
                 for(int code:word.codePoints().toArray()) {
                     String character=Character.toString(code);
                     if(width(line+character,heavy,size)>width&&!line.isEmpty()){result.add(line.toString());line.setLength(0);}
                     line.append(character);
                 }
-                line.append(' ');
             }
             if(!line.isEmpty()){result.add(line.toString().stripTrailing());line.setLength(0);}
         }

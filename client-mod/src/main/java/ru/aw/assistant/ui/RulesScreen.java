@@ -30,9 +30,10 @@ public final class RulesScreen extends Screen {
     private double positionX=.5,positionY=.05;
     private boolean closing,loading,refreshing,serverMenu,categoryMenu,settingsMenu,showSanctions,browsing,dragging,positionTouched;
     private long copiedUntil;
+    private boolean fontsReady;
 
     public RulesScreen(Screen parent){super(Minecraft.getInstance(),Minecraft.getInstance().font,Component.literal("Правила серверов"));this.parent=parent;}
-    @Override protected void init(){UiRenderer.prepare();layout();if(index==null)reload();}
+    @Override protected void init(){UiRenderer.prepare();fontsReady=UiRenderer.ready();layout();if(index==null)reload();}
     private void layout(){
         float pixels=Math.min(1f,Math.min((minecraft.getWindow().getWidth()-32)/740f,(minecraft.getWindow().getHeight()-32)/300f));
         scale=pixels/minecraft.getWindow().getGuiScale();virtualWidth=Math.round(width/scale);virtualHeight=Math.round(height/scale);
@@ -66,7 +67,9 @@ public final class RulesScreen extends Screen {
             if(ClientBridge.screen(minecraft)!=this)return;refreshing=false;
             if(failure!=null){message="Не удалось обновить правила; сохранены прежние";return;}
             String selectedNumber=selectedRule()==null?"":selectedRule().number(),selectedCategory=category;
-            data=snapshot;selectServer(serverId);
+            var previous=currentBook();data=snapshot;
+            if(Objects.equals(previous,currentBook())){message=data.errors().isEmpty()?"Правила обновлены":data.errors().getFirst();return;}
+            selectServer(serverId);
             if(categories.contains(selectedCategory)){category=selectedCategory;updateSearch();}
             for(int i=0;i<matches.size();i++)if(matches.get(i).rule().number().equals(selectedNumber)){select(i);break;}
             message=data.errors().isEmpty()?"Правила обновлены":data.errors().getFirst();
@@ -81,6 +84,9 @@ public final class RulesScreen extends Screen {
         var book=currentBook();
         matches=browsing&&input.value().isBlank()&&book!=null?book.rules().stream().filter(rule->category==null||category.equals(rule.category())).limit(500).map(rule->new RuleSearch.Match(rule,0)).toList():index==null?List.of():index.find(input.value(),category);
         selected=0;copiedUntil=0;listTarget=0;listMotion.snap(0);
+        wrapResults();
+    }
+    private void wrapResults(){
         resultTitles=matches.stream().map(match->UiRenderer.wrap(match.rule().title(),leftW-48,false).stream().limit(2).toList()).toList();
         resultDescriptions=matches.stream().map(match->UiRenderer.ellipsis(font,match.rule().description().replace('\n',' '),leftW-48)).toList();wrapDetails();
     }
@@ -107,7 +113,10 @@ public final class RulesScreen extends Screen {
     @Override public boolean isPauseScreen(){return false;}
     @Override public void extractBackground(GuiGraphicsExtractor graphics,int x,int y,float tick){}
     @Override public void onClose(){if(dragging)saveUi();closing=true;dragging=false;serverMenu=categoryMenu=settingsMenu=false;}
-    @Override public void tick(){if(closing&&appearance.value()<.015f)ClientBridge.screen(minecraft,parent);}
+    @Override public void tick(){
+        if(!fontsReady&&UiRenderer.ready()){fontsReady=true;layout();wrapResults();}
+        if(closing&&appearance.value()<.015f)ClientBridge.screen(minecraft,parent);
+    }
 
     private void textButton(GuiGraphicsExtractor g,String key,String text,int x,int y,int w,double mx,double my,boolean active,float fade){
         float h=highlight(key,UiRenderer.hit(mx,my,x,y,w,28));
