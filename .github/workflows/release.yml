@@ -105,10 +105,13 @@ jobs:
             git config user.name 'github-actions[bot]'
             git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
             git add -- $path
-            git commit -m 'Pin companion checksums from release build'
-            if ($LASTEXITCODE -ne 0) { throw 'Could not record companion catalog' }
-            git push origin HEAD:main
-            if ($LASTEXITCODE -ne 0) { throw 'Could not publish companion catalog' }
+            git diff --cached --quiet -- $path
+            if ($LASTEXITCODE -eq 1) {
+              git commit -m 'Pin companion checksums from release build'
+              if ($LASTEXITCODE -ne 0) { throw 'Could not record companion catalog' }
+              git push origin HEAD:main
+              if ($LASTEXITCODE -ne 0) { throw 'Could not publish companion catalog' }
+            } elseif ($LASTEXITCODE -ne 0) { throw 'Could not compare companion catalog' }
           }
 
       - name: Retain companion build for verification
