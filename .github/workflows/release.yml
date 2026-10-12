@@ -75,6 +75,50 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw "Client companion build failed: $gameVersion" }
           }
 
+      - name: Pin companion files produced by this release
+        shell: pwsh
+        run: |
+          $path = 'src/main/resources/companion/catalog.json'
+          $catalog = @(Get-Content -LiteralPath $path -Raw | ConvertFrom-Json)
+          foreach ($entry in $catalog) {
+            $name = ([Uri]$entry.url).Segments[-1]
+            $jar = Join-Path $PWD "client-mod/build/libs/$name"
+            $zip = [IO.Compression.ZipFile]::OpenRead($jar)
+            try {
+              $infoEntry = $zip.GetEntry('fabric.mod.json')
+              if (-not $infoEntry) { throw "Missing companion metadata: $name" }
+              $reader = [IO.StreamReader]::new($infoEntry.Open())
+              try { $info = $reader.ReadToEnd() | ConvertFrom-Json } finally { $reader.Dispose() }
+            } finally { $zip.Dispose() }
+            if ($info.id -ne 'awassistant' -or $info.version -ne $entry.version -or $info.depends.minecraft -ne $entry.gameVersion) {
+              throw "Unexpected companion build: $name"
+            }
+            $entry.size = (Get-Item -LiteralPath $jar).Length
+            $entry.sha1 = (Get-FileHash -LiteralPath $jar -Algorithm SHA1).Hash.ToLowerInvariant()
+            $entry.sha256 = (Get-FileHash -LiteralPath $jar -Algorithm SHA256).Hash.ToLowerInvariant()
+          }
+          [IO.File]::WriteAllText((Join-Path $PWD $path), ($catalog | ConvertTo-Json -Depth 5) + "`n", [Text.UTF8Encoding]::new($false))
+          if (git status --porcelain -- $path) {
+            git fetch origin main
+            if ($LASTEXITCODE -ne 0) { throw 'Could not check release branch' }
+            if ((git rev-parse origin/main) -ne $env:GITHUB_SHA) { throw 'Release branch changed during the build' }
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add -- $path
+            git commit -m 'Pin companion checksums from release build'
+            if ($LASTEXITCODE -ne 0) { throw 'Could not record companion catalog' }
+            git push origin HEAD:main
+            if ($LASTEXITCODE -ne 0) { throw 'Could not publish companion catalog' }
+          }
+
+      - name: Retain companion build for verification
+        uses: actions/upload-artifact@v4
+        with:
+          name: companion-build
+          path: client-mod/build/libs/AWAssistant-fabric-*.jar
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Verify launcher and update integrity
         run: .\gradlew.bat test -PnoDeploy --no-daemon
 
