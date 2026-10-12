@@ -32,7 +32,11 @@ $release=[IO.File]::ReadAllText((Join-Path $JavaHome 'release'))
 $jdkVersion=[regex]::Match($release,'IMPLEMENTOR_VERSION="Temurin-([^"\r\n]+)"').Groups[1].Value
 if(-not $jdkVersion) { throw 'Public release sources require the matching Eclipse Temurin runtime' }
 $jdkTag=[Uri]::EscapeDataString('jdk-'+$jdkVersion)
-$assets=(Invoke-RestMethod -Uri "https://api.github.com/repos/adoptium/temurin21-binaries/releases/tags/$jdkTag").assets
+$apiHeaders=@{Accept='application/vnd.github+json';'User-Agent'='AWLauncher-release-publisher'}
+if(-not [string]::IsNullOrWhiteSpace($env:GH_TOKEN)) { $apiHeaders.Authorization="Bearer $env:GH_TOKEN" }
+try {
+    $assets=(Invoke-RestMethod -Uri "https://api.github.com/repos/adoptium/temurin21-binaries/releases/tags/$jdkTag" -Headers $apiHeaders -TimeoutSec 30).assets
+} finally { $apiHeaders=$null }
 $sourceAsset=$assets | Where-Object { $_.name -match '^OpenJDK21U-jdk-sources_.+\.tar\.gz$' } | Select-Object -First 1
 $checksumAsset=$assets | Where-Object { $_.name -eq $sourceAsset.name+'.sha256.txt' } | Select-Object -First 1
 if(-not $sourceAsset -or -not $checksumAsset) { throw 'Matching OpenJDK source release is unavailable' }
