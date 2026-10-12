@@ -19,10 +19,10 @@ fun main(args: Array<String>) {
     System.getenv("AW_JAVA25_HOME")?.let { sdk -> ru.aw.launcher.instance.InstanceStore.update(game) { it.copy(javaPath = sdk) } }
     Files.deleteIfExists(game.resolve("awassistant-smoke.ok")); Files.deleteIfExists(game.resolve("awassistant-smoke.fail"))
     Files.createDirectories(game.resolve("mods"))
-    for (oldVersion in listOf("0.1.0","0.1.1"))
+    for (oldVersion in listOf("0.1.0","0.1.1","0.1.2"))
         for (name in listOf("AWAssistant-fabric-$version-$oldVersion.jar", "AWAssistant-smoke-$version-$oldVersion.jar"))
             Files.deleteIfExists(game.resolve("mods").resolve(name))
-    for (name in listOf("AWAssistant-fabric-$version-0.1.2.jar", "AWAssistant-smoke-$version-0.1.2.jar"))
+    for (name in listOf("AWAssistant-fabric-$version-0.1.3.jar", "AWAssistant-smoke-$version-0.1.3.jar"))
         Files.copy(artifacts.resolve(name), game.resolve("mods").resolve(name), StandardCopyOption.REPLACE_EXISTING)
     val rules = Files.createDirectories(game.resolve("config/awassistant/rules"))
     val titles=listOf("Поиск правил серверов", "Навигация по результатам", "Загрузка и обновление наборов", "Описание и наказания",

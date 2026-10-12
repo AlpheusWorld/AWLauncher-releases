@@ -14,7 +14,7 @@ import ru.aw.assistant.ui.RulesScreen;
 public final class AWAssistant implements ClientModInitializer {
     public static KeyMapping OPEN;
     public static RuleRepository RULES;
-    public static boolean animations = true, blur = true;
+    public static boolean animations = true, blur = true, smartSearch=true;
     @Override public void onInitializeClient() {
         ru.aw.assistant.ui.UiRenderer.preload();
         RULES = new RuleRepository(FabricLoader.getInstance().getConfigDir());

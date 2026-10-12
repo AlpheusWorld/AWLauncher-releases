@@ -31,7 +31,8 @@ final class BuiltinRules {
     );
     private static final Pattern NUMBER = Pattern.compile("(?m)^\\h*(\\d{1,2}(?:\\.\\d{1,3}){1,4})\\.?\\h*(?:>\\h*)?(?=\\p{L}|[«\"(])");
     private static final Pattern SECTION = Pattern.compile("(?m)^\\h*(\\d{1,2})\\.\\h+([^\\n]{3,100})$");
-    private static final Pattern SANCTION = Pattern.compile("(?iu)\\[([^]\\n]*(?:бан|мут|блокиров|кик|предупрежд|удален|сняти|отключен)[^]\\n]*)]|\\(([^)\\n]*(?:бан|мут|блокиров|кик|предупрежд|сняти)[^)\\n]*)\\)|(?:^|\\n)\\h*[-—]?\\h*(Наказание[^\\n]*)");
+    private static final String PENALTY="бан|мут|блокиров|кик|предупрежд|удал|снят|снос|отключ|штраф|изъят|обнул|тюрьм|лишени|заключ|ограничен|навсегда|перманент|наказани|санкци";
+    private static final Pattern SANCTION = Pattern.compile("(?iu)\\[([^]\\n]*(?:"+PENALTY+")[^]\\n]*)]|\\(([^)\\n]*(?:"+PENALTY+")[^)\\n]*)\\)|(?:^|\\n)\\h*[-—–]?\\h*((?:Наказание|Санкция|Санкции)[^\\n]*)");
     private static final HttpClient HTTP = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).followRedirects(HttpClient.Redirect.NEVER).build();
     private static final int LIMIT = 4 * 1024 * 1024;
 
@@ -47,8 +48,13 @@ final class BuiltinRules {
         var titles = new HashMap<String, String>();
         for (var rule : bundled(source).rules()) titles.put(rule.number(), rule.title());
         var rules = book.rules().stream().map(rule -> new RuleBook.Rule(rule.number(), titles.getOrDefault(rule.number(), rule.title()),
-            rule.category(), rule.description(), rule.sanction(), rule.keywords())).toList();
+            rule.category(), rule.description(), rule.sanction().isBlank()?extractSanctions(rule.description()):rule.sanction(), rule.keywords())).toList();
         return new RuleBook(book.id(), book.name(), book.addresses(), book.sourceUrl(), rules);
+    }
+    static String extractSanctions(String text){
+        var values=new LinkedHashSet<String>();var match=SANCTION.matcher(text);
+        while(match.find())for(int group=1;group<=3;group++)if(match.group(group)!=null)values.add(match.group(group).strip());
+        return String.join("\n",values);
     }
 
     static CompletableFuture<RuleBook> download(Source source) {
@@ -137,7 +143,7 @@ final class BuiltinRules {
             while (penalties.find()) for (int group = 1; group <= 3; group++) if (penalties.group(group) != null) sanctions.add(penalties.group(group).strip());
             // Duplicate headings on official pages (e.g. FunTime 5.9) must not hide the actual rule.
             var previous = rules.get(numbers.get(i));
-            if (previous != null) { body = previous.description() + "\n" + body; title = previous.title(); }
+            if (previous != null) { body = previous.description() + "\n" + body; title = previous.title(); if(!previous.sanction().isBlank())sanctions.add(previous.sanction()); }
             rules.put(numbers.get(i), new RuleBook.Rule(numbers.get(i), title, category, body, String.join("\n", sanctions), List.of()));
         }
         if (rules.size() < 10) throw new IOException("Полный текст правил не найден; сохранена памятка");

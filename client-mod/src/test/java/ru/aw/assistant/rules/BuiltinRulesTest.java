@@ -8,6 +8,24 @@ import java.util.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class BuiltinRulesTest {
+    @Test void commercialQueriesWorkForEachBundledServerThatHasCommerceRules() throws Exception {
+        for(var source:BuiltinRules.SOURCES) {
+            if(source.id().equals("reallyworld"))continue;
+            var book=BuiltinRules.bundled(source);
+            var result=new RuleSearch(book).find("фанпей",null);
+            assertFalse(result.isEmpty(),source.name());
+            assertTrue(result.getFirst().rule().description().contains("реаль")||result.getFirst().rule().description().contains("денеж")||result.getFirst().rule().description().contains("деньг"),source.name());
+        }
+    }
+    @Test void finesAndConfiscationAreExtractedWithoutInventingDurations() throws Exception {
+        var source=BuiltinRules.SOURCES.stream().filter(s->s.id().equals("holyworld")).findFirst().orElseThrow();
+        var text=new StringBuilder("1. Правила:\n");
+        for(int i=1;i<=10;i++)text.append("1.").append(i).append(" Условие ").append(i).append(i==1?" [Штраф 5000 монет]":i==2?" (Изъятие игровых ценностей)":"").append("\n");
+        var parsed=BuiltinRules.parse(source,text.toString());
+        assertEquals("Штраф 5000 монет",parsed.rules().get(0).sanction());
+        assertEquals("Изъятие игровых ценностей",parsed.rules().get(1).sanction());
+        assertTrue(parsed.rules().get(2).sanction().isBlank());
+    }
     @TempDir Path temporary;
     @Test void fiveBuiltinsHaveRealNumbersAndDistinctSources() throws Exception {
         try (var repository = new RuleRepository(temporary)) {

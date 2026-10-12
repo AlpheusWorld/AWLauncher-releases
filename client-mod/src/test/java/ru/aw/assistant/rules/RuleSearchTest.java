@@ -7,6 +7,23 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 class RuleSearchTest {
+    @Test void commerceSlangAndRussianCasesFindTheRuleNotUnrelatedMentions() {
+        var book=new RuleBook("test","Test",List.of(),"",List.of(
+            new RuleBook.Rule("1.5","Игровой ник","Аккаунт","Нельзя использовать название читов в нике","Предупреждение",List.of()),
+            new RuleBook.Rule("2.2","Читы и запрещённые программы","Игра","Использование читов запрещено","Бан 14 дней",List.of()),
+            new RuleBook.Rule("2.4","Коммерческая деятельность","Игра","Нельзя продавать игровые ценности за реальную валюту","Бан",List.of()),
+            new RuleBook.Rule("3.1","Рынок","Игра","Разрешена продажа ресурсов за игровые монеты","",List.of())));
+        var search=new RuleSearch(book);
+        assertEquals("2.2",search.find("читов",null).getFirst().rule().number());
+        assertEquals("2.2",search.find("читы",null).getFirst().rule().number());
+        for(String term:List.of("фанпей","фанпэй","FunPay","можно продавать на фанпей")) {
+            assertEquals("2.4",search.find(term,null).getFirst().rule().number());
+            assertFalse(search.find(term,null).stream().anyMatch(m->m.rule().number().equals("3.1")));
+        }
+        assertTrue(search.find("фанпей",null,false).isEmpty());
+        assertTrue(search.find("фанпей","Аккаунт").isEmpty());
+        assertEquals("2.2",search.find("2.2",null).getFirst().rule().number());
+    }
     @TempDir Path temporary;
     private RuleBook book(String id) { return new RuleBook(id,"Test",List.of(),"",List.of(
         new RuleBook.Rule("2.1","Запрещённые модификации","Игра","Использование читов","Блокировка",List.of("читы","софт")),

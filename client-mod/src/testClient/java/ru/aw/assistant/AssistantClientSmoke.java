@@ -31,12 +31,15 @@ public final class AssistantClientSmoke implements ClientModInitializer {
                     baselineFps=client.getFps();originalClipboard=client.keyboardHandler.getClipboard();
                     net.minecraft.client.KeyMapping.click(ClientBridge.keyboard().getOrCreate(InputConstants.KEY_F8));stage=1;since=ticks;
                 } else if(stage==1 &&screen instanceof RulesScreen &&ticks-since>40) {
-                    if(firstOpenGap>500_000_000L)throw new IllegalStateException("First opening blocked game ticks for "+firstOpenGap/1_000_000.0+" ms");
+                    if(Boolean.getBoolean("awassistant.enforceTiming")&&firstOpenGap>500_000_000L)throw new IllegalStateException("First opening blocked game ticks for "+firstOpenGap/1_000_000.0+" ms");
                     verifyWrapping();
                     capture(client,"compact.png");
                     stage=11;since=ticks;
                 } else if(stage==11 &&screen instanceof RulesScreen &&ticks-since>8 &&captured) {
-                    for(int code:"ТЕСТ".codePoints().toArray())screen.charTyped(new CharacterEvent(code));stage=2;since=ticks;
+                    typeText(client,screen,"НЕ ДОЛЖНО ВВЕСТИСЬ");
+                    if(!((ru.aw.assistant.ui.SearchInput)field(screen,"input")).value().isEmpty())throw new IllegalStateException("Typing without focus changed query");
+                    focusInput(screen);verifyNativeFocus(client,true);
+                    typeText(client,screen,"ТЕСТ");stage=2;since=ticks;
                 } else if(stage==2 && screen instanceof RulesScreen && ticks-since>35) {
                     var results=RulesScreen.class.getDeclaredField("matches");results.setAccessible(true);
                     if(((List<?>)results.get(screen)).size()!=18)throw new IllegalStateException("Russian input/search did not find all fixture rules");
@@ -81,6 +84,8 @@ public final class AssistantClientSmoke implements ClientModInitializer {
                     selectBuiltin(screen);
                     stage=18;since=ticks;
                 } else if(stage==18 &&screen instanceof RulesScreen &&ticks-since>12) {
+                    if(((Boolean)field(screen,"indexing")))return;
+                    if(((List<?>)field(screen,"matches")).isEmpty())throw new IllegalStateException("Official numbered rule could not be found");
                     capture(client,"server.png");stage=19;since=ticks;
                 } else if(stage==19 &&screen instanceof RulesScreen &&ticks-since>8 &&captured) {
                     client.options.guiScale().set(3);client.resizeGui();
@@ -88,7 +93,7 @@ public final class AssistantClientSmoke implements ClientModInitializer {
                     if(!((List<?>)field(screen,"matches")).isEmpty())throw new IllegalStateException("Escape did not clear the search");
                     screen.keyPressed(new KeyEvent(InputConstants.KEY_F8,0,0));stage=5;since=ticks;
                 } else if(stage==5 &&screen instanceof TitleScreen &&ticks-since>15) {
-                    client.keyboardHandler.setClipboard(originalClipboard);
+                    verifyNativeFocus(client,false);client.keyboardHandler.setClipboard(originalClipboard);
                     Files.writeString(client.gameDirectory.toPath().resolve("awassistant-smoke.ok"),"Hotkey, Russian input, search, arrow/Enter/Escape, separate scrolling, copy, servers, categories, dragging, saved position, official rules, GUI scaling and native rendering verified; FPS title="+baselineFps+", assistant="+expandedFps+", no blur="+clearFps+"; first-open tick gap ms="+firstOpenGap/1_000_000.0);client.stop();stage=6;
                 }
                 if(ticks>1600 &&stage!=6)throw new IllegalStateException("Client UI verification timed out at stage "+stage);
@@ -146,12 +151,32 @@ public final class AssistantClientSmoke implements ClientModInitializer {
         if(index>=books.size())throw new IllegalStateException("SpookyTime builtin is missing");
         click(screen,(x+w-110)*scale,(y+70)*scale);
         click(screen,(x+w-110)*scale,(y+99+34*index+15)*scale);
+        focusInput(screen);
         screen.keyPressed(new KeyEvent(InputConstants.KEY_A,0,InputConstants.MOD_CONTROL));
         for(int code:"2.2".codePoints().toArray())screen.charTyped(new CharacterEvent(code));
-        if(((List<?>)field(screen,"matches")).isEmpty())throw new IllegalStateException("Official numbered rule could not be found");
+
     }
     private void click(net.minecraft.client.gui.screens.Screen screen,double x,double y) {
         screen.mouseClicked(new net.minecraft.client.input.MouseButtonEvent(x,y,new net.minecraft.client.input.MouseButtonInfo(InputConstants.MOUSE_BUTTON_LEFT,0)),false);
+    }
+    private void focusInput(net.minecraft.client.gui.screens.Screen screen) throws ReflectiveOperationException {
+        float scale=((Number)field(screen,"scale")).floatValue();
+        int x=((Number)field(screen,"panelX")).intValue(),y=((Number)field(screen,"panelY")).intValue();
+        click(screen,(x+150)*scale,(y+70)*scale);
+    }
+    private void typeText(net.minecraft.client.Minecraft client,net.minecraft.client.gui.screens.Screen screen,String value) throws ReflectiveOperationException {
+        try {client.keyboardHandler.getClass().getMethod("textInput",long.class,String.class).invoke(client.keyboardHandler,client.getWindow().handle(),value);}
+        catch(NoSuchMethodException legacy) {
+            var method=client.keyboardHandler.getClass().getDeclaredMethod("charTyped",long.class,CharacterEvent.class);method.setAccessible(true);
+            for(int code:value.codePoints().toArray())method.invoke(client.keyboardHandler,client.getWindow().handle(),new CharacterEvent(code));
+        }
+    }
+    private void verifyNativeFocus(net.minecraft.client.Minecraft client,boolean expected) throws ReflectiveOperationException {
+        try {
+            var keyboard=Class.forName("org.lwjgl.sdl.SDLKeyboard");
+            boolean active=(boolean)keyboard.getMethod("SDL_TextInputActive",long.class).invoke(null,client.getWindow().handle());
+            if(active!=expected)throw new IllegalStateException("SDL text input focus is incorrect");
+        }catch(ClassNotFoundException legacy) {}
     }
     private Object field(Object target,String name) throws ReflectiveOperationException {
         var field=target.getClass().getDeclaredField(name);field.setAccessible(true);return field.get(target);

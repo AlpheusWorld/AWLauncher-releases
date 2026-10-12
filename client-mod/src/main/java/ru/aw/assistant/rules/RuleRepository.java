@@ -8,7 +8,8 @@ import java.util.concurrent.*;
 
 public final class RuleRepository implements AutoCloseable {
     public record Snapshot(List<RuleBook> books, List<String> errors) {}
-    public record UiPreferences(double x,double y,boolean animations,boolean blur) {
+    public record UiPreferences(double x,double y,boolean animations,boolean blur,boolean smartSearch) {
+        public UiPreferences(double x,double y,boolean animations,boolean blur){this(x,y,animations,blur,true);}
         public UiPreferences { x=Double.isFinite(x)?Math.max(0,Math.min(1,x)):.5;y=Double.isFinite(y)?Math.max(0,Math.min(1,y)):.05; }
     }
     private volatile UiPreferences ui=new UiPreferences(.5,.05,true,true);
@@ -28,7 +29,8 @@ public final class RuleRepository implements AutoCloseable {
     private void loadUi() throws IOException {
         if(uiLoaded)return;var json=readUiJson();
         try { ui=new UiPreferences(json.has("x")?json.get("x").getAsDouble():.5,json.has("y")?json.get("y").getAsDouble():.05,
-            !json.has("animations")||json.get("animations").getAsBoolean(),!json.has("blur")||json.get("blur").getAsBoolean());uiLoaded=true; }
+            !json.has("animations")||json.get("animations").getAsBoolean(),!json.has("blur")||json.get("blur").getAsBoolean(),
+            !json.has("smartSearch")||json.get("smartSearch").getAsBoolean());uiLoaded=true; }
         catch(RuntimeException invalid){throw new IOException("Некорректные настройки помощника",invalid);}
     }
     public CompletableFuture<Void> saveUi(UiPreferences preferences) {
@@ -37,6 +39,7 @@ public final class RuleRepository implements AutoCloseable {
             try {
                 Files.createDirectories(folder.getParent());var json=readUiJson();
                 json.addProperty("x",preferences.x());json.addProperty("y",preferences.y());json.addProperty("animations",preferences.animations());json.addProperty("blur",preferences.blur());
+                json.addProperty("smartSearch",preferences.smartSearch());
                 var temporary=Files.createTempFile(folder.getParent(),"ui-",".tmp");
                 try { Files.writeString(temporary,new com.google.gson.Gson().toJson(json),StandardCharsets.UTF_8);
                     try { Files.move(temporary,uiFile(),StandardCopyOption.REPLACE_EXISTING,StandardCopyOption.ATOMIC_MOVE); }

@@ -3,6 +3,8 @@ import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 public final class ClientBridge {
+    public static void focusText(Screen owner,boolean focused){Minecraft.getInstance().onTextInputFocusChange(owner,focused);}
+    public static void textArea(int x,int y,int width,int height){Minecraft.getInstance().textInputManager().setTextInputArea(x,y,x+width,y+height);}
     public static java.nio.IntBuffer pixelBuffer(com.mojang.blaze3d.platform.NativeImage pixels) {
         return pixels.getPixelBytes().order(java.nio.ByteOrder.nativeOrder()).asIntBuffer();
     }
