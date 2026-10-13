@@ -63,6 +63,7 @@ class CurseForgeTest {
 
     @Test fun `resource packs shaders and archive extensions use their own compatibility`() {
         assertEquals(listOf("minecraft"), CurseForge.mapFile(file, "resourcepack").loaders)
+        assertEquals(listOf("datapack"), CurseForge.mapFile(file.copy(fileName = "pack.zip"), "datapack").loaders)
         assertEquals(listOf("iris", "optifine"), CurseForge.mapFile(file, "shader").loaders)
         assertTrue(ContentCatalog.isPackFile("cf:51", "pack.zip"))
         assertFalse(ContentCatalog.isPackFile("cf:51", "pack.mrpack"))

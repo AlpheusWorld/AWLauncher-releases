@@ -33,6 +33,8 @@ import ru.aw.launcher.ui.ModIcons
 import ru.aw.launcher.ui.VersionEntry
 import ru.aw.launcher.ui.components.*
 import ru.aw.launcher.ui.components.LocalizedText as Text
+import ru.aw.launcher.core.Language
+import ru.aw.launcher.core.Settings
 import ru.aw.launcher.ui.theme.AWColors
 import ru.aw.launcher.ui.theme.AWDimens
 import java.io.IOException
@@ -44,6 +46,7 @@ import java.nio.file.attribute.BasicFileAttributes
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 import kotlin.coroutines.coroutineContext
 
 internal data class ScreenshotFolder(val key: String, val label: String, val gameDir: Path)
@@ -87,6 +90,7 @@ internal suspend fun scanScreenshots(folders: List<ScreenshotFolder>): Screensho
 @Composable
 @OptIn(ExperimentalLayoutApi::class)
 fun ScreenshotsScreen(state: LauncherState, entry: VersionEntry? = null) {
+    val language = LocalLanguage.current
     val entries = if (entry != null) listOf(entry) else (state.buildChoices() + listOfNotNull(state.currentEntry())).distinctBy { it.key }
     val folders = entries.map { ScreenshotFolder(it.key, it.title, state.gameDirOf(it)) }
         .distinctBy { it.gameDir.toAbsolutePath().normalize() }
@@ -136,14 +140,14 @@ fun ScreenshotsScreen(state: LauncherState, entry: VersionEntry? = null) {
                         folders.forEach { folder -> AWMenuItem(folder.label, translate = false, onClick = { group = folder.key; menu = false }) }
                     }
                 }
-                AWButton("Обновить", icon = Icons.Default.Refresh, enabled = !loading, onClick = { revision++ })
+                AWButton("Обновить список", icon = Icons.Default.Refresh, enabled = !loading, onClick = { revision++ })
             }
         }
         if (selected != null) {
             ScreenshotImage(selected, Modifier.weight(1f).fillMaxWidth(), full = true)
             Text(selected.path.fileName.toString(), translate = false, color = AWColors.Text, fontWeight = FontWeight.Bold,
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text("${selected.folder.label} · ${screenshotDate(selected.modified)} · ${selectedIndex + 1} / ${files.size}",
+            Text("${selected.folder.label} · ${screenshotDate(selected.modified, language)} · ${selectedIndex + 1} / ${files.size}",
                 translate = false, color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 AWButton("Предыдущее", enabled = selectedIndex > 0, onClick = { selectedPath = files[selectedIndex - 1].path.toString() })
@@ -171,20 +175,20 @@ fun ScreenshotsScreen(state: LauncherState, entry: VersionEntry? = null) {
                                     maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 Text(file.folder.label, translate = false, color = AWColors.TextSoft, style = MaterialTheme.typography.bodySmall,
                                     maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                Text(screenshotDate(file.modified), translate = false, color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall)
+                                Text(screenshotDate(file.modified, language), translate = false, color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall)
                             }
                         }
                     }
                 }
             }
-            scan?.errors?.takeIf { it.isNotEmpty() }?.let { Text(it.joinToString("\n"), translate = false,
+            scan?.errors?.take(3)?.forEach { message -> Text(message,
                 color = AWColors.Warning, style = MaterialTheme.typography.bodySmall, maxLines = 3, overflow = TextOverflow.Ellipsis) }
         }
     }
 }
 
-private fun screenshotDate(time: Long): String = Instant.ofEpochMilli(time).atZone(ZoneId.systemDefault())
-    .format(DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm"))
+internal fun screenshotDate(time: Long, language: Language = Settings.current.language): String = Instant.ofEpochMilli(time).atZone(ZoneId.systemDefault())
+    .format(DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT).withLocale(language.locale))
 
 @Composable
 private fun ScreenshotImage(file: ScreenshotFile, modifier: Modifier, full: Boolean = false) {

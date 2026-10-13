@@ -57,6 +57,7 @@ fun InstanceScreen(state: LauncherState, initialTab: Int = 0) {
         return
     }
     val model = state.contentModel(entry)
+    DataPackWorldDialog(model, state.gameDirOf(entry))
     var tab by rememberSaveable(entry.key) { mutableStateOf(initialTab) }
     var menu by remember { mutableStateOf(false) }
     LaunchedEffect(model) { model.ensureScanned() }
@@ -137,7 +138,7 @@ private fun InstanceContent(state: LauncherState, entry: VersionEntry, model: Co
     FileDropArea(Modifier.fillMaxSize(), enabled = !busy, label = "Отпусти файлы, чтобы добавить их в сборку", onFiles = { files ->
         if (files.all { it.fileName.toString().endsWith(".jar", true) } && entry.loader.isModded) model.addFiles(files, ContentKind.MOD)
         else if (files.all { it.fileName.toString().endsWith(".zip", true) }) {
-            if (kind == ContentKind.SHADER || kind == ContentKind.RESOURCE_PACK) model.addFiles(files, kind) else droppedFiles = files
+            if (kind == ContentKind.SHADER || kind == ContentKind.RESOURCE_PACK || kind == ContentKind.DATA_PACK) model.addFiles(files, kind) else droppedFiles = files
         } else state.fail("Добавляй моды .jar или наборы ресурсов и шейдеры .zip", entry)
     }) {
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -148,6 +149,7 @@ private fun InstanceContent(state: LauncherState, entry: VersionEntry, model: Co
                 state.openCatalog(entry, when (kind) {
                     ContentKind.SHADER -> CatalogTab.SHADERS
                     ContentKind.RESOURCE_PACK -> CatalogTab.RESOURCE_PACKS
+                    ContentKind.DATA_PACK -> CatalogTab.DATA_PACKS
                     else -> if (entry.loader.isModded) CatalogTab.MODS else CatalogTab.RESOURCE_PACKS
                 })
             })
@@ -219,7 +221,7 @@ private fun InstanceContent(state: LauncherState, entry: VersionEntry, model: Co
                                     if (!narrow) Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                         Text(item.versionNumber.ifBlank { "Неизвестно" }, color = AWColors.Text, style = MaterialTheme.typography.bodyMedium,
                                             maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Medium, translate = item.versionNumber.isBlank())
-                                        Text(item.fileName, color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall, maxLines = 1,
+                                        Text(listOfNotNull(item.worldName, item.fileName).joinToString(" · "), color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall, maxLines = 1,
                                             overflow = TextOverflow.Ellipsis, translate = false)
                                     }
                                     Row(Modifier.width(140.dp), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
@@ -257,6 +259,7 @@ private fun InstanceContent(state: LauncherState, entry: VersionEntry, model: Co
             Text("Файлов: ${files.size}", color = AWColors.TextMuted)
             AWButton("Ресурспаки", modifier = Modifier.fillMaxWidth(), onClick = { model.addFiles(files, ContentKind.RESOURCE_PACK); droppedFiles = null })
             AWButton("Шейдеры", modifier = Modifier.fillMaxWidth(), onClick = { model.addFiles(files, ContentKind.SHADER); droppedFiles = null })
+            AWButton("Датапаки", modifier = Modifier.fillMaxWidth(), onClick = { model.addFiles(files, ContentKind.DATA_PACK); droppedFiles = null })
         }
     } }
     if (adding) AWDialog("Добавить файлы", onDismiss = { adding = false }, width = 430.dp) {

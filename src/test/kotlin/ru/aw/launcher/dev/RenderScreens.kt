@@ -128,7 +128,8 @@ fun main(args: Array<String>) {
         )
         try {
             var time = 0L
-            while (time < SETTLE_NANOS) {
+            val settle = if (name.startsWith("datapack-world-")) 3_000_000_000L else SETTLE_NANOS
+            while (time < settle) {
                 scene.render(time).close()
                 Thread.sleep(16)
                 time += FRAME_NANOS
@@ -361,7 +362,7 @@ fun main(args: Array<String>) {
     }
     state.modal = null
 
-    for (tab in listOf(CatalogTab.MODS, CatalogTab.SHADERS, CatalogTab.INSTALLED)) {
+    for (tab in listOf(CatalogTab.MODS, CatalogTab.SHADERS, CatalogTab.DATA_PACKS, CatalogTab.INSTALLED)) {
         state.openCatalog(tab = tab)
         render("catalog-${tab.name.lowercase()}", 1040, 660) { AWTheme { App(state, onGameStarted = {}) } }
     }
@@ -387,6 +388,24 @@ fun main(args: Array<String>) {
     withBuilds.screen = Screen.BUILDS
     render("builds-profiles", 1280, 780) { AWTheme { App(withBuilds, onGameStarted = {}) } }
 
+    if (selectedScreens?.any { it.startsWith("datapack-world-") } == true) {
+        val game = withBuilds.gameDirOf(withBuilds.entryFor(localBuild))
+        for (name in listOf("Survival", "Creative")) Files.createDirectories(game.resolve("saves/$name"))
+            .resolve("level.dat").let { Files.writeString(it, "isolated preview world") }
+        val model = withBuilds.contentModel(withBuilds.entryFor(localBuild))
+        model.dataPackRequest = Modrinth.SearchHit("preview-datapack", title = "Example datapack", projectType = "datapack") to null
+        for (language in listOf(Language.RU, Language.EN)) {
+            Settings.update { it.copy(language = language) }
+            render("datapack-world-${language.tag}", 1000, 650) { AWTheme(ThemeMode.OLED) {
+                Box(Modifier.fillMaxSize().background(ru.aw.launcher.ui.theme.AWColors.Background)) {
+                    ru.aw.launcher.ui.screens.DataPackWorldDialog(model, game)
+                }
+            } }
+        }
+        model.dataPackRequest = null
+        Settings.update { it.copy(language = Language.RU) }
+    }
+
     if (selectedScreens?.any { it.startsWith("screenshots-") } == true) {
         val screenshotDir = Files.createDirectories(withBuilds.gameDirOf(withBuilds.entryFor(localBuild)).resolve("screenshots"))
         for (index in 1..4) {
@@ -398,6 +417,11 @@ fun main(args: Array<String>) {
         withBuilds.screen = Screen.SCREENSHOTS
         render("screenshots-gallery", 1280, 780) { AWTheme(ThemeMode.OLED) { App(withBuilds, onGameStarted = {}) } }
         render("screenshots-small", 600, 540) { AWTheme(ThemeMode.OLED) { App(withBuilds, onGameStarted = {}) } }
+        for (language in listOf(Language.EN, Language.ZH_CN)) {
+            Settings.update { it.copy(language = language) }
+            render("screenshots-gallery-${language.tag}", 1280, 780) { AWTheme(ThemeMode.OLED) { App(withBuilds, onGameStarted = {}) } }
+        }
+        Settings.update { it.copy(language = Language.RU) }
     }
 
     if (selectedScreens == null || selectedScreens.any { it.startsWith("instance-") || it == "import-profiles" }) {

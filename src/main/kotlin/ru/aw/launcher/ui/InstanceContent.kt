@@ -42,6 +42,8 @@ internal class ContentModel(
         set(value) { currentProgress = value; activeReport?.progress(value) }
     var message by mutableStateOf<String?>(null)
     var error by mutableStateOf<String?>(null)
+    var dataPackRequest by mutableStateOf<Pair<Modrinth.SearchHit, Modrinth.Version?>?>(null)
+    var dataPackFiles by mutableStateOf<List<Path>?>(null)
     private var scanJob: Job? = null
     private var scanGeneration = 0L
     private var scannedAt = 0L
@@ -49,7 +51,7 @@ internal class ContentModel(
         private set
 
     val installedProjects: Set<String> get() = installed.values.flatten().mapNotNull { it.projectId }.toSet()
-    val updates: List<InstalledItem> get() = installed[ContentKind.MOD].orEmpty().filter { it.update != null }
+    val updates: List<InstalledItem> get() = installed.values.flatten().filter { it.update != null }
     val migrating: Boolean get() = downloads?.contains("migration:$entryKey") == true
     fun waiting(key: String): Boolean = downloads?.items?.any {
         it.key == "content:$entryKey:$key" && it.status == DownloadStatus.WAITING
@@ -108,13 +110,22 @@ internal class ContentModel(
 
     private suspend fun scanAll(remote: Boolean = true): Map<ContentKind, List<InstalledItem>> = coroutineScope {
         ContentKind.entries.associateWith { kind -> async {
-            ModManager.scan(dir, loader, gameVersion, kind, withUpdates = remote && kind == ContentKind.MOD && loader.isModded, identifyRemote = remote)
+            ModManager.scan(dir, loader, gameVersion, kind, withUpdates = remote && (kind != ContentKind.MOD || loader.isModded), identifyRemote = remote)
         } }.mapValues { it.value.await() }
     }
 
-    fun addFiles(files: List<Path>, kind: ContentKind) = work(ALL) {
+    fun addFiles(files: List<Path>, kind: ContentKind, world: Path? = null) {
+        if (kind == ContentKind.DATA_PACK && world == null) { if (!migrating && working.isEmpty()) dataPackFiles = files; return }
+        work(ALL) {
         withContext(Dispatchers.IO) {
-            val destination = kind.dir(dir).createDirectories()
+            val destination = if (kind == ContentKind.DATA_PACK) {
+                val selected = requireNotNull(world).toAbsolutePath().normalize()
+                if (selected !in ModManager.dataPackWorlds(dir)) throw IOException("Выбери существующий мир этой сборки")
+                val folder = kind.dir(selected)
+                if (Files.exists(folder, java.nio.file.LinkOption.NOFOLLOW_LINKS) &&
+                    !Files.isDirectory(folder, java.nio.file.LinkOption.NOFOLLOW_LINKS)) throw IOException("Некорректная папка датапаков")
+                folder.createDirectories()
+            } else kind.dir(dir).createDirectories()
             val incoming = files.map { file ->
                 ensureActive()
                 if (!Files.isRegularFile(file) || !file.fileName.toString().endsWith(kind.extension, ignoreCase = true))
@@ -128,13 +139,26 @@ internal class ContentModel(
                 throw IOException("В выбранных файлах есть одинаковые имена")
             incoming.forEach { (source, target) ->
                 ensureActive()
-                Files.copy(source, target)
+                if (kind == ContentKind.DATA_PACK) {
+                    val staged = target.resolveSibling(target.fileName.toString() + ".download")
+                    try {
+                        Files.copy(source, staged, StandardCopyOption.REPLACE_EXISTING)
+                        ModManager.normalizeDataPack(staged)
+                        Files.move(staged, target)
+                    } finally { Files.deleteIfExists(staged) }
+                } else Files.copy(source, target)
             }
         }
         message = "Добавлено файлов: ${files.size}"
+        }
     }
 
-    fun install(kind: ContentKind, hit: Modrinth.SearchHit, version: Modrinth.Version? = null) = work(hit.projectId, "${hit.title} · $entryTitle") {
+    fun install(kind: ContentKind, hit: Modrinth.SearchHit, version: Modrinth.Version? = null, world: Path? = null) {
+        if (kind == ContentKind.DATA_PACK && world == null) {
+            if (!migrating && ALL !in working) dataPackRequest = hit to version
+            return
+        }
+        work(hit.projectId, "${hit.title} · $entryTitle") {
         version?.let { ModManager.requireCompatibleVersion(it, hit.projectId, gameVersion, ModManager.catalogLoaders(kind, loader)) }
         message = when (kind) {
             ContentKind.SHADER -> {
@@ -148,6 +172,10 @@ internal class ContentModel(
                 ModManager.installResourcePack(dir, gameVersion, hit.projectId, hit.title, selectedVersion = version) { progress = it }
                 "${hit.title} установлен и включён"
             }
+            ContentKind.DATA_PACK -> {
+                ModManager.installDataPack(dir, requireNotNull(world), gameVersion, hit.projectId, hit.title, version) { progress = it }
+                "${hit.title} добавлен в мир ${world.fileName}. Открой мир заново, чтобы загрузить датапак"
+            }
             ContentKind.MOD -> {
                 val current = installed[ContentKind.MOD].orEmpty().firstOrNull { it.projectId == hit.projectId }
                 val titles = if (current != null && version != null) {
@@ -157,6 +185,7 @@ internal class ContentModel(
                 if (titles.size <= 1) "${hit.title} установлен" else "Установлено: ${titles.joinToString()}"
             }
         }
+        }
     }
 
     fun update(mod: InstalledItem) = work(mod.rowKey, "${mod.title} · $entryTitle") {
@@ -164,7 +193,7 @@ internal class ContentModel(
         message = "${mod.title} обновлён до ${mod.update?.versionNumber.orEmpty()}".trimEnd()
     }
 
-    fun updateAll() = work(ALL, "Обновление модов · $entryTitle") {
+    fun updateAll() = work(ALL, "Обновление проектов · $entryTitle") {
         var pending = updates
         var done = 0
         var skipped = emptyList<String>()
@@ -185,9 +214,9 @@ internal class ContentModel(
             skipped = reasons
         } while (pending.isNotEmpty() && done > before)
         if (skipped.isEmpty()) {
-            message = "Обновлено модов: $done"
+            message = "Обновлено проектов: $done"
         } else {
-            error = (listOf("Обновлено модов: $done") + skipped).joinToString(". ")
+            error = (listOf("Обновлено проектов: $done") + skipped).joinToString(". ")
         }
     }
 
@@ -261,11 +290,12 @@ internal class ContentModel(
 
     private suspend fun updateWithDependencies(mod: InstalledItem) {
         val version = mod.update ?: return
-        if (CurseForge.owns(version.projectId)) {
-            val present = installedProjects + version.projectId
+        if (mod.kind == ContentKind.MOD && CurseForge.owns(version.projectId)) {
+            val present = (installedProjects + version.projectId).toMutableSet()
             for (dependency in version.dependencies.filter { it.type == "required" }) {
                 val id = dependency.projectId ?: continue
-                if (id !in present) ModManager.install(dir, loader, gameVersion, id, id, present) { progress = it }
+                if (id !in present) ModManager.install(dir, loader, gameVersion, id, id, present,
+                    onInstalled = { present += it }) { progress = it }
             }
         }
         ModManager.update(mod) { progress = it }

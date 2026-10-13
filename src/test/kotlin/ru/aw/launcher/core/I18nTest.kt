@@ -5,6 +5,17 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 
 class I18nTest {
+    @Test fun `screenshots and datapacks are translated in every supported locale`() {
+        assertEquals("Screenshots", I18n.text("Скриншоты", Language.EN))
+        assertEquals("All instances", I18n.text("Все сборки", Language.EN))
+        assertEquals("Screenshots: 17", I18n.text("Скриншотов: 17", Language.EN))
+        assertEquals("Could not read the screenshots folder: My world", I18n.text("Не удалось прочитать папку скриншотов: My world", Language.EN))
+        for (language in Language.entries.filter { it != Language.RU }) {
+            assertNotEquals("Скриншоты", I18n.text("Скриншоты", language), language.tag)
+            assertNotEquals("Все сборки", I18n.text("Все сборки", language), language.tag)
+            assertNotEquals("Датапаки", I18n.text("Датапаки", language), language.tag)
+        }
+    }
     @Test
     fun `UI text changes language and retains dynamic values`() {
         assertEquals("Настройки", I18n.text("Настройки", Language.RU))

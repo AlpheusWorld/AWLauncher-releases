@@ -36,6 +36,14 @@ import javax.imageio.ImageIO
 import java.util.UUID
 
 class ScreenshotsTest {
+    @Test fun `screenshot dates use the chosen language`() {
+        val date = java.time.Instant.parse("2026-01-15T12:00:00Z").toEpochMilli()
+        val english = screenshotDate(date, ru.aw.launcher.core.Language.EN)
+        val russian = screenshotDate(date, ru.aw.launcher.core.Language.RU)
+        assertTrue(english.contains("Jan"), english)
+        assertNotEquals(english, russian)
+        assertFalse(english.any { it in 'А'..'я' })
+    }
     @TempDir lateinit var root: Path
 
     @Test fun `gallery combines folders without duplicates and sorts newest first`() = runBlocking {

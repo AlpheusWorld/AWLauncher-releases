@@ -5,6 +5,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.JsonObject
 import ru.aw.launcher.core.Log
 import ru.aw.launcher.core.Storage
 import ru.aw.launcher.core.sha1Of
@@ -19,6 +20,10 @@ import java.nio.file.FileSystemException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
+import java.nio.file.LinkOption.NOFOLLOW_LINKS
+import java.util.zip.ZipFile
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.io.path.createDirectories
@@ -44,6 +49,7 @@ data class InstalledItem(
     val rowKey: String = file.toString(),
 ) {
     val fileName: String get() = file.name
+    val worldName: String? get() = if (kind == ContentKind.DATA_PACK) file.parent?.parent?.fileName?.toString() else null
 }
 
 object ModManager {
@@ -78,6 +84,7 @@ object ModManager {
         ContentKind.MOD -> loadersFor(kind)
         ContentKind.SHADER -> listOf("iris", "optifine")
         ContentKind.RESOURCE_PACK -> listOf("minecraft")
+        ContentKind.DATA_PACK -> listOf("datapack")
     }
 
     fun shaderLoader(kind: LoaderKind): LoaderKind? = when (kind) {
@@ -97,9 +104,13 @@ object ModManager {
         identifyRemote: Boolean = true,
     ): List<InstalledItem> =
         withContext(Dispatchers.IO) {
-            val dir = content.dir(gameDir)
-            if (!dir.isDirectory()) return@withContext emptyList()
-            val files = dir.listDirectoryEntries().filter { isContent(it, content) }
+            val directories = if (content == ContentKind.DATA_PACK) dataPackWorlds(gameDir).flatMap {
+                listOf(content.dir(it), it.resolve("aw-disabled-datapacks"))
+            }
+                else listOf(content.dir(gameDir))
+            val files = directories.filter { Files.isDirectory(it, NOFOLLOW_LINKS) }.flatMap { dir ->
+                dir.listDirectoryEntries().filter { !Files.isSymbolicLink(it) && isContent(it, content) }
+            }
             if (files.isEmpty()) return@withContext emptyList()
 
             val sums = files.associateWith { file -> if (file.isDirectory()) "" else runCatching { hashOf(file) }.getOrDefault("") }
@@ -107,19 +118,17 @@ object ModManager {
             val options = InstanceStore.get(gameDir)
             val records = options.catalogMods.associateBy { it.fileName }
             val tracked = files.mapNotNull { file ->
-                records["${content.folder}/${file.name.removeSuffix(DISABLED)}"]?.takeIf { it.sha1 == sums[file] }
+                records[gameDir.toAbsolutePath().normalize().relativize(file.toAbsolutePath().normalize()).toString()
+                    .replace('\\', '/').replace("/aw-disabled-datapacks/", "/datapacks/").removeSuffix(DISABLED)]?.takeIf { it.sha1 == sums[file] }
             }.associateBy { it.sha1 }
             val versions = (if (identifyRemote) remote("identify mods") { Modrinth.versionsByHash(known.filter { it !in tracked }) }.orEmpty() else emptyMap()) +
                 tracked.mapValues { (_, record) -> Modrinth.Version(id = record.versionId, projectId = record.projectId,
                     name = record.title, versionNumber = record.versionNumber, datePublished = record.datePublished) }
-            val projects = (if (identifyRemote) remote("mod titles") { Modrinth.projects(versions.values.map { it.projectId }.filterNot(CurseForge::owns).distinct()) }
+            val projects = (if (identifyRemote) remote("mod titles") { Modrinth.projects(versions.filterKeys { it !in tracked }.values.map { it.projectId }.filterNot(CurseForge::owns).distinct()) }
                 .orEmpty() else emptyList()).associateBy { it.id }
-            val loaders = loadersFor(kind)
-            val updates = if (withUpdates && content == ContentKind.MOD && versions.isNotEmpty()) {
-                val latest = remote("mod updates") { Modrinth.latestVersions(versions.filterValues { !CurseForge.owns(it.projectId) }.keys, loaders, gameVersion) }.orEmpty() +
-                    tracked.mapNotNull { (sha1, record) -> remote("CurseForge updates") {
-                        newestRelease(ContentCatalog.versions(record.projectId, loaders, gameVersion).filter { it.primaryFile != null })
-                    }?.let { sha1 to it } }.toMap()
+            val loaders = catalogLoaders(content, kind)
+            val updates = if (withUpdates && versions.isNotEmpty()) {
+                val latest = ContentCatalog.updates(versions, loaders, gameVersion).versions
                 stableUpdates(versions, latest, loaders, gameVersion)
             } else {
                 emptyMap()
@@ -137,6 +146,7 @@ object ModManager {
                     ContentKind.MOD -> file.name.endsWith(".jar")
                     ContentKind.SHADER -> file.name == shader
                     ContentKind.RESOURCE_PACK -> "file/${file.name}" in resourcePacks
+                    ContentKind.DATA_PACK -> file.parent.fileName.toString() == "datapacks" && !file.name.endsWith(DISABLED)
                 }
                 InstalledItem(
                     file = file,
@@ -155,6 +165,8 @@ object ModManager {
 
     private fun isContent(file: Path, content: ContentKind): Boolean = when (content) {
         ContentKind.MOD -> file.name.endsWith(".jar") || file.name.endsWith(".jar$DISABLED")
+        ContentKind.DATA_PACK -> file.name.endsWith(".zip") || file.name.endsWith(".zip$DISABLED") ||
+            (file.isDirectory() && Files.isRegularFile(file.resolve("pack.mcmeta"), NOFOLLOW_LINKS))
         else -> file.name.endsWith(content.extension) || file.isDirectory()
     }
 
@@ -166,6 +178,7 @@ object ModManager {
         title: String,
         present: Set<String>,
         selectedVersion: Modrinth.Version? = null,
+        onInstalled: (Set<String>) -> Unit = {},
         onProgress: (DownloadProgress) -> Unit = {},
     ): List<String> = withContext(Dispatchers.IO) {
         val loaders = loadersFor(kind)
@@ -222,6 +235,7 @@ object ModManager {
         clearBlocked(gameDir)
         val titles = remote("installed titles") { ContentCatalog.titles(chosen.keys) }.orEmpty()
         chosen.values.forEach { version -> rememberCatalog(gameDir, ContentKind.MOD, version, titles[version.projectId] ?: title) }
+        onInstalled(chosen.keys.toSet())
         Log.info("mods installed into $dir: ${tasks.joinToString { it.dest.name }}")
         chosen.keys.map { titles[it] ?: it }
     }
@@ -254,6 +268,87 @@ object ModManager {
     ) {
         val name = downloadPack(gameDir, ContentKind.RESOURCE_PACK, gameVersion, projectId, title, onProgress, selectedVersion)
         GameOptions.setResourcePack(gameDir, name, enabled = true)
+    }
+
+    fun dataPackWorlds(gameDir: Path): List<Path> {
+        val saves = gameDir.toAbsolutePath().normalize().resolve("saves")
+        if (!Files.isDirectory(saves, NOFOLLOW_LINKS)) return emptyList()
+        return Files.list(saves).use { paths -> paths.filter {
+            Files.isDirectory(it, NOFOLLOW_LINKS) && Files.isRegularFile(it.resolve("level.dat"), NOFOLLOW_LINKS)
+        }.sorted().toList() }
+    }
+
+    suspend fun installDataPack(
+        gameDir: Path, world: Path, gameVersion: String, projectId: String, title: String,
+        selectedVersion: Modrinth.Version? = null, onProgress: (DownloadProgress) -> Unit = {},
+    ) = withContext(Dispatchers.IO) {
+        val targetWorld = world.toAbsolutePath().normalize()
+        if (targetWorld !in dataPackWorlds(gameDir)) throw IOException("Выбери существующий мир этой сборки")
+        val version = selectedVersion?.also { requireCompatibleVersion(it, projectId, gameVersion, listOf("datapack")) }
+            ?: Modrinth.pick(ContentCatalog.versions(projectId, listOf("datapack"), gameVersion).filter { it.primaryFile != null })
+            ?: throw IOException("$title пока нет для $gameVersion")
+        val file = version.primaryFile ?: throw IOException("У $title нет файла для скачивания")
+        val name = ContentKind.DATA_PACK.safeName(file.filename) ?: throw IOException("Выбери ZIP-версию датапака")
+        val dir = targetWorld.resolve("datapacks")
+        if (Files.exists(dir, NOFOLLOW_LINKS) && !Files.isDirectory(dir, NOFOLLOW_LINKS))
+            throw IOException("Папка датапаков содержит ссылку или неподдерживаемый файл")
+        dir.createDirectories()
+        val target = dir.resolve(name)
+        val current = InstanceStore.get(gameDir).catalogMods.filter { it.projectId == projectId &&
+            it.fileName.startsWith("saves/${targetWorld.fileName}/datapacks/") }
+        if (Files.exists(target, NOFOLLOW_LINKS) && current.none { it.fileName.endsWith("/$name") })
+            throw IOException("В этом мире уже есть файл $name")
+        val download = dir.resolve("$name.download")
+        try {
+            Downloader().run(listOf(DownloadTask(file.url, download, file.sha1, file.size, label = name)), onProgress)
+            normalizeDataPack(download)
+            Files.move(download, target, StandardCopyOption.REPLACE_EXISTING)
+            current.filter { !it.fileName.endsWith("/$name") }.forEach { record ->
+                val oldName = ContentKind.DATA_PACK.safeName(record.fileName.substringAfterLast('/')) ?: return@forEach
+                dir.resolve(oldName).deleteIfExists(); dir.resolve(oldName + DISABLED).deleteIfExists()
+            }
+            rememberCatalog(gameDir, ContentKind.DATA_PACK, version, title, directory = dir)
+        } finally { download.deleteIfExists() }
+    }
+
+    internal fun normalizeDataPack(path: Path) {
+        val normalized = path.resolveSibling(path.name + ".normalized")
+        try {
+            ZipFile(path.toFile()).use { zip ->
+                val entries = zip.entries().asSequence().toList()
+                if (entries.size > 10_000 || entries.any { it.size > 64L * 1024 * 1024 } ||
+                    entries.sumOf { maxOf(0, it.size) } > 256L * 1024 * 1024) throw IOException("Архив датапака слишком большой")
+                val metadata = zip.getEntry("pack.mcmeta") ?: entries.singleOrNull {
+                    it.name.endsWith("/pack.mcmeta") && it.name.count { c -> c == '/' } == 1
+                } ?: throw IOException("В архиве датапака нет pack.mcmeta")
+                val text = zip.getInputStream(metadata).use { it.readNBytes(1024 * 1024 + 1) }
+                if (text.size > 1024 * 1024 || runCatching {
+                    (ru.aw.launcher.core.Json.parseToJsonElement(text.decodeToString()) as? JsonObject)?.get("pack") is JsonObject
+                }.getOrDefault(false).not()) throw IOException("Некорректная структура архива датапака")
+                val prefix = metadata.name.removeSuffix("pack.mcmeta")
+                if (entries.any { entry -> entry.name.startsWith('/') || '\\' in entry.name || ':' in entry.name ||
+                    entry.name.trimEnd('/').split('/').any { it == ".." || it == "." || it.isBlank() } ||
+                    (prefix.isNotEmpty() && !entry.name.startsWith(prefix)) }) throw IOException("Некорректная структура архива датапака")
+                if (prefix.isEmpty()) return
+                ZipOutputStream(Files.newOutputStream(normalized)).use { output ->
+                    var total = 0L
+                    val buffer = ByteArray(8192)
+                    for (entry in entries.filterNot { it.isDirectory }) {
+                        output.putNextEntry(ZipEntry(entry.name.removePrefix(prefix)))
+                        zip.getInputStream(entry).use { input ->
+                            while (true) {
+                                val read = input.read(buffer); if (read < 0) break
+                                total += read
+                                if (total > 256L * 1024 * 1024) throw IOException("Архив датапака слишком большой")
+                                output.write(buffer, 0, read)
+                            }
+                        }
+                        output.closeEntry()
+                    }
+                }
+            }
+            Files.move(normalized, path, StandardCopyOption.REPLACE_EXISTING)
+        } finally { normalized.deleteIfExists() }
     }
 
     private suspend fun downloadPack(
@@ -289,12 +384,14 @@ object ModManager {
     suspend fun update(mod: InstalledItem, onProgress: (DownloadProgress) -> Unit = {}) = withContext(Dispatchers.IO) {
         val version = mod.update ?: return@withContext
         val file = version.primaryFile ?: throw IOException("У ${version.name} нет файла для скачивания")
-        val name = ContentKind.MOD.safeName(file.filename)
+        val name = mod.kind.safeName(file.filename)
             ?: throw IOException("Недопустимое имя файла: ${file.filename}")
         val target = mod.file.resolveSibling(if (mod.enabled) name else name + DISABLED)
         val download = mod.file.resolveSibling("$name.download")
         Downloader().run(listOf(DownloadTask(file.url, download, file.sha1, file.size, label = name)), onProgress)
-        if (mod.enabled) {
+        if (mod.kind == ContentKind.DATA_PACK) try { normalizeDataPack(download) }
+            catch (e: Exception) { download.deleteIfExists(); throw e }
+        if (mod.enabled && mod.kind == ContentKind.MOD) {
             val conflicts = ModCompat.read(download)
                 ?.let { ModCompat.conflicts(it, ModCompat.enabledIn(mod.file.parent, except = setOf(mod.file))) }
                 .orEmpty()
@@ -311,7 +408,17 @@ object ModManager {
             if (target != mod.file) mod.file.deleteIfExists()
         }
         gameDirOf(mod)?.let(::clearBlocked)
-        gameDirOf(mod)?.let { dir -> rememberCatalog(dir, ContentKind.MOD, version, mod.title, mod.iconUrl) }
+        if (mod.enabled) gameDirOf(mod)?.let { dir ->
+            when (mod.kind) {
+                ContentKind.RESOURCE_PACK -> {
+                    if (target != mod.file) GameOptions.setResourcePack(dir, mod.fileName, false)
+                    GameOptions.setResourcePack(dir, target.name, true)
+                }
+                ContentKind.SHADER -> GameOptions.setShader(dir, target.name)
+                else -> Unit
+            }
+        }
+        gameDirOf(mod)?.let { dir -> rememberCatalog(dir, mod.kind, version, mod.title, mod.iconUrl, mod.file.parent) }
         Log.info("mod updated: ${mod.fileName} -> ${target.name}")
     }
 
@@ -329,7 +436,7 @@ object ModManager {
                 val jars = dir.listDirectoryEntries("*.jar").mapNotNull { jar -> ModCompat.read(jar)?.let { jar to it } }
                 val conflict = ModCompat.conflictsAmong(jars.map { it.second }).firstOrNull() ?: return@withContext changes
                 changes += replaceOneSide(conflict, jars, kind, gameVersion, rejected, onProgress)
-                    ?: throw IOException("${conflict.text}. Подходящей версии на Modrinth нет — выключи один из них в «Моды»")
+                    ?: throw IOException("${conflict.text}. Подходящей версии в каталогах нет — выключи один из них в «Моды»")
             }
             if (ModCompat.conflictsIn(dir).isNotEmpty()) throw IOException("Не получилось развести все моды — выключи лишние в «Моды»")
             changes
@@ -351,7 +458,11 @@ object ModManager {
         onProgress: (DownloadProgress) -> Unit,
     ): String? {
         val sides = listOf(conflict.mod, conflict.other).mapNotNull { meta -> jars.firstOrNull { it.second == meta } }
-        val known = Modrinth.versionsByHash(sides.map { hashOf(it.first) })
+        val records = sides.firstOrNull()?.first?.parent?.parent?.let { InstanceStore.get(it).catalogMods }.orEmpty()
+        val tracked = sides.mapNotNull { (file, _) -> records.firstOrNull {
+            it.fileName == "mods/${file.name}" && it.sha1 == hashOf(file)
+        } }.associate { it.sha1 to Modrinth.Version(it.versionId, it.projectId, datePublished = it.datePublished) }
+        val known = Modrinth.versionsByHash(sides.map { hashOf(it.first) }.filter { it !in tracked }) + tracked
         val ordered = sides.mapNotNull { side -> known[hashOf(side.first)]?.let { side to it } }
             .sortedBy { (_, version) -> if (version.versionType == "release") 1 else 0 }
         val loaders = loadersFor(kind)
@@ -419,9 +530,14 @@ object ModManager {
         val gameDir = gameDirOf(item) ?: return item
         var file = item.file
         when (item.kind) {
-            ContentKind.MOD -> {
+            ContentKind.MOD, ContentKind.DATA_PACK -> {
                 val base = item.fileName.removeSuffix(DISABLED)
-                val target = item.file.resolveSibling(if (enabled) base else base + DISABLED)
+                val target = if (item.kind == ContentKind.DATA_PACK && item.file.isDirectory()) {
+                    val parent = item.file.parent.parent.resolve(if (enabled) "datapacks" else "aw-disabled-datapacks")
+                    if (Files.exists(parent, NOFOLLOW_LINKS) && !Files.isDirectory(parent, NOFOLLOW_LINKS))
+                        throw IOException("Некорректная папка датапаков")
+                    parent.createDirectories().resolve(base)
+                } else item.file.resolveSibling(if (enabled) base else base + DISABLED)
                 locked(item) { Files.move(item.file, target, StandardCopyOption.REPLACE_EXISTING) }
                 file = target
                 clearBlocked(gameDir)
@@ -436,24 +552,26 @@ object ModManager {
         locked(item) { if (item.file.isDirectory()) Storage.discard(item.file) else item.file.deleteIfExists() }
         val gameDir = gameDirOf(item) ?: return
         when (item.kind) {
-            ContentKind.MOD -> clearBlocked(gameDir)
+            ContentKind.MOD, ContentKind.DATA_PACK -> clearBlocked(gameDir)
             ContentKind.SHADER -> if (item.enabled) GameOptions.setShader(gameDir, null)
             ContentKind.RESOURCE_PACK -> GameOptions.setResourcePack(gameDir, item.fileName, enabled = false)
         }
     }
 
-    private fun gameDirOf(item: InstalledItem): Path? = item.file.parent?.parent
+    private fun gameDirOf(item: InstalledItem): Path? = if (item.kind == ContentKind.DATA_PACK)
+        item.file.parent?.parent?.parent?.parent else item.file.parent?.parent
 
-    internal fun rememberCatalog(gameDir: Path, kind: ContentKind, version: Modrinth.Version, title: String, iconUrl: String? = null) {
-        if (!CurseForge.owns(version.projectId)) return
+    internal fun rememberCatalog(gameDir: Path, kind: ContentKind, version: Modrinth.Version, title: String, iconUrl: String? = null,
+                                 directory: Path = kind.dir(gameDir)) {
         val file = version.primaryFile ?: return
         val name = kind.safeName(file.filename) ?: return
-        val path = kind.dir(gameDir).resolve(name).let { if (it.exists()) it else it.resolveSibling(name + DISABLED) }
-        val icon = iconUrl ?: remote("CurseForge icon") { CurseForge.projectInfo(version.projectId).logo?.url }
-        val record = ManagedMod(version.projectId, version.id, "${kind.folder}/$name", hashOf(path), title,
+        val path = directory.resolve(name).let { if (it.exists()) it else it.resolveSibling(name + DISABLED) }
+        val icon = iconUrl ?: if (CurseForge.owns(version.projectId)) remote("CurseForge icon") { CurseForge.projectInfo(version.projectId).logo?.url } else null
+        val relative = gameDir.toAbsolutePath().normalize().relativize(directory.toAbsolutePath().normalize()).toString().replace('\\', '/')
+        val record = ManagedMod(version.projectId, version.id, "$relative/$name", hashOf(path), title,
             version.versionNumber, version.datePublished, icon)
         InstanceStore.update(gameDir) { options -> options.copy(catalogMods = options.catalogMods.filterNot {
-            it.fileName == record.fileName || (it.projectId == record.projectId && it.fileName.startsWith("${kind.folder}/"))
+            it.fileName == record.fileName || (it.projectId == record.projectId && it.fileName.startsWith("$relative/"))
         } + record) }
     }
 

@@ -16,6 +16,19 @@ import java.nio.file.Files
 import java.nio.file.Path
 
 class BuildMigrationTest {
+    @Test fun `CurseForge compatible candidates are included in migration and failures stay distinguishable`() {
+        val item = mod().copy(projectId = "cf:51", versionId = "cf:51:100")
+        val version = Modrinth.Version("cf:51:102", "cf:51", gameVersions = listOf("1.21.1"), loaders = listOf("fabric"),
+            files = listOf(Modrinth.VersionFile("https://edge.forgecdn.net/files/0/102/new.jar", "new.jar")))
+        val ready = BuildMigration.plan(root, "1.20.1", "1.21.1", LoaderKind.FABRIC, listOf(item),
+            mapOf(item.sha1 to version), BuildMigration.fingerprint(root))
+        assertEquals(version, ready.mods.single().replacement)
+        val missing = BuildMigration.plan(root, "1.20.1", "1.21.1", LoaderKind.FABRIC, listOf(item), emptyMap(), ready.fingerprint)
+        assertTrue(missing.mods.single().reason!!.contains("CurseForge"))
+        val offline = BuildMigration.plan(root, "1.20.1", "1.21.1", LoaderKind.FABRIC, listOf(item), emptyMap(), ready.fingerprint,
+            mapOf(item.sha1 to "CurseForge: offline"))
+        assertTrue(offline.mods.single().reason!!.startsWith("Не удалось проверить"))
+    }
     @Test
     fun `retry can disable one failed compatible mod and finish migration`() = runBlocking {
         val failed = mod("zoomify.jar")

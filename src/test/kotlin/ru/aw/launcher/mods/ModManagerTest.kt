@@ -12,6 +12,72 @@ import kotlin.io.path.exists
 import kotlin.io.path.writeText
 
 class ModManagerTest {
+    private fun datapack(path: Path, prefix: String = ""): Path {
+        java.util.zip.ZipOutputStream(java.nio.file.Files.newOutputStream(path)).use { zip ->
+            for ((name, text) in mapOf("pack.mcmeta" to "{\"pack\":{\"pack_format\":61,\"description\":\"Test\"}}",
+                "data/test/function/hello.mcfunction" to "say hello")) {
+                zip.putNextEntry(java.util.zip.ZipEntry(prefix + name)); zip.write(text.toByteArray()); zip.closeEntry()
+            }
+        }
+        return path
+    }
+
+    @Test fun `wrapped datapacks are normalized and unsafe archives rejected`(@TempDir game: Path) {
+        val valid = datapack(game.resolve("wrapped.zip"), "Test/")
+        ModManager.normalizeDataPack(valid)
+        java.util.zip.ZipFile(valid.toFile()).use { zip ->
+            assertTrue(zip.getEntry("pack.mcmeta") != null)
+            assertTrue(zip.getEntry("data/test/function/hello.mcfunction") != null)
+        }
+        val bad = datapack(game.resolve("unsafe.zip"), "../")
+        org.junit.jupiter.api.assertThrows<java.io.IOException> { ModManager.normalizeDataPack(bad) }
+        assertFalse(game.resolve("unsafe.zip.normalized").exists())
+        val absent = datapack(game.resolve("no-metadata.zip"), "one/two/")
+        org.junit.jupiter.api.assertThrows<java.io.IOException> { ModManager.normalizeDataPack(absent) }
+    }
+
+    @Test fun `datapacks install only in the selected world and retain metadata when disabled`(@TempDir game: Path) = kotlinx.coroutines.runBlocking {
+        val first = game.resolve("saves/First").createDirectories().also { it.resolve("level.dat").writeText("world") }
+        val second = game.resolve("saves/Second").createDirectories().also { it.resolve("level.dat").writeText("world") }
+        game.resolve("saves/NotAWorld").createDirectories()
+        assertEquals(listOf(first, second), ModManager.dataPackWorlds(game))
+        val payload = java.nio.file.Files.readAllBytes(datapack(game.resolve("source.zip"), "Example/"))
+        val server = com.sun.net.httpserver.HttpServer.create(java.net.InetSocketAddress("127.0.0.1", 0), 0)
+        server.createContext("/pack.zip") { response ->
+            response.sendResponseHeaders(200, payload.size.toLong()); response.responseBody.use { it.write(payload) }; response.close()
+        }
+        server.start()
+        try {
+            val version = Modrinth.Version("new", "test-datapack", gameVersions = listOf("26.3"), loaders = listOf("datapack"),
+                files = listOf(Modrinth.VersionFile("http://127.0.0.1:${server.address.port}/pack.zip", "pack.zip",
+                    size = payload.size.toLong(), hashes = mapOf("sha1" to ru.aw.launcher.core.sha1Of(payload.inputStream())))))
+            org.junit.jupiter.api.assertThrows<java.io.IOException> {
+                ModManager.installDataPack(game, game.resolve("outside"), "26.3", version.projectId, "Test", version)
+            }
+            ModManager.installDataPack(game, first, "26.3", version.projectId, "Test", version)
+            assertFalse(second.resolve("datapacks").exists())
+            assertFalse(game.resolve("datapacks").exists())
+            val item = ModManager.scan(game, LoaderKind.VANILLA, "26.3", ContentKind.DATA_PACK, identifyRemote = false).single()
+            assertEquals("First", item.worldName); assertEquals("test-datapack", item.projectId)
+            val disabled = ModManager.setEnabled(item, false)
+            assertTrue(disabled.fileName.endsWith(".disabled")); assertFalse(disabled.enabled)
+            assertEquals(item.projectId, ModManager.scan(game, LoaderKind.VANILLA, "26.3", ContentKind.DATA_PACK,
+                identifyRemote = false).single().projectId)
+            ModManager.setEnabled(disabled, true)
+            assertTrue(first.resolve("datapacks/pack.zip").exists())
+            val folder = first.resolve("datapacks/local").createDirectories()
+            folder.resolve("pack.mcmeta").writeText("{\"pack\":{}}")
+            val local = ModManager.scan(game, LoaderKind.VANILLA, "26.3", ContentKind.DATA_PACK, identifyRemote = false)
+                .first { it.file == folder }
+            val moved = ModManager.setEnabled(local, false)
+            assertFalse(folder.exists())
+            assertEquals("aw-disabled-datapacks", moved.file.parent.fileName.toString())
+            assertFalse(ModManager.scan(game, LoaderKind.VANILLA, "26.3", ContentKind.DATA_PACK, identifyRemote = false)
+                .first { it.file == moved.file }.enabled)
+            ModManager.setEnabled(moved, true)
+            assertTrue(folder.resolve("pack.mcmeta").exists())
+        } finally { server.stop(0) }
+    }
     @Test
     fun `universal Fabric release does not require NeoForge only KotlinLangForge`() {
         assertFalse(ModManager.dependencyApplies(listOf("forge", "neoforge"), listOf("fabric")))

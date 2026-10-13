@@ -10,6 +10,7 @@ import ru.aw.launcher.core.Storage
 import ru.aw.launcher.core.sha1Of
 import ru.aw.launcher.meta.LoaderKind
 import ru.aw.launcher.mods.ContentKind
+import ru.aw.launcher.mods.ContentCatalog
 import ru.aw.launcher.mods.InstalledItem
 import ru.aw.launcher.mods.ModManager
 import ru.aw.launcher.mods.Modrinth
@@ -48,14 +49,16 @@ object BuildMigration {
             val installed = ModManager.scan(root, loader, sourceVersion).map { item ->
                 item.copy(sha1 = before.getValue("mods/${item.file.fileName}"))
             }
-            val candidates = if (loader.isModded) Modrinth.latestVersions(installed.map { it.sha1 }, ModManager.loadersFor(loader), targetVersion)
-                else emptyMap()
+            val lookup = if (loader.isModded) ContentCatalog.updates(installed.associate { item ->
+                item.sha1 to Modrinth.Version(item.versionId.orEmpty(), item.projectId.orEmpty())
+            }, ModManager.loadersFor(loader), targetVersion) else ContentCatalog.UpdateLookup(emptyMap(), emptyMap())
             if (fingerprint(root) != before) throw IOException("Сборка изменилась во время проверки. Проверь моды ещё раз")
-            plan(root, sourceVersion, targetVersion, loader, installed, candidates, before)
+            plan(root, sourceVersion, targetVersion, loader, installed, lookup.versions, before, lookup.failures)
         }
 
     internal fun plan(directory: Path, sourceVersion: String, targetVersion: String, loader: LoaderKind,
-                      installed: List<InstalledItem>, candidates: Map<String, Modrinth.Version>, fingerprint: Map<String, String>): MigrationPlan {
+                      installed: List<InstalledItem>, candidates: Map<String, Modrinth.Version>, fingerprint: Map<String, String>,
+                      failures: Map<String, String> = emptyMap()): MigrationPlan {
         val allowed = ModManager.loadersFor(loader)
         return MigrationPlan(directory, sourceVersion, targetVersion, loader, installed.map { item ->
             val version = candidates[item.sha1]?.takeIf {
@@ -64,8 +67,9 @@ object BuildMigration {
             }
             MigrationMod(item, version, if (version != null) null else when {
                 !loader.isModded -> "Vanilla не загружает моды"
-                item.projectId == null -> "Мод не найден на Modrinth или не распознан"
-                else -> "На Modrinth нет подходящей версии для $targetVersion и ${loader.label}"
+                item.sha1 in failures -> "Не удалось проверить совместимость: ${failures[item.sha1]}"
+                item.projectId == null -> "Мод не распознан; совместимость не подтверждена"
+                else -> "На ${ContentCatalog.source(item.projectId).label} нет подходящей версии для $targetVersion и ${loader.label}"
             })
         }, fingerprint)
     }
@@ -107,11 +111,9 @@ object BuildMigration {
                 onStage("Обновляю ${mod.item.title}")
                 try {
                     ModManager.install(stage, plan.loader, plan.targetVersion, version.projectId, mod.item.title,
-                        present, selectedVersion = version, onProgress = onProgress)
+                        present, selectedVersion = version, onInstalled = { present += it }, onProgress = onProgress)
                 } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
                 catch (failure: Exception) { throw MigrationModFailure(mod.item.fileName, mod.item.title, failure) }
-                present += ModManager.scan(stage, plan.loader, plan.targetVersion, identifyRemote = false)
-                    .filter { it.enabled }.mapNotNull { it.projectId }
             }
             for (mod in plan.mods.filter { !it.item.enabled && it.replacement != null }) {
                 val version = mod.replacement!!

@@ -92,7 +92,7 @@ internal fun BuildMigrationDialog(state: LauncherState, entry: VersionEntry, pre
                     }
                 }
             }
-            if (checking) Text("Проверяю совместимость модов на Modrinth…", color = AWColors.Accent)
+            if (checking) Text("Проверяю совместимость модов на Modrinth и CurseForge…", color = AWColors.Accent)
             error?.let { Text(it, color = AWColors.Danger, style = MaterialTheme.typography.bodySmall, translate = false) }
             plan?.let { ready ->
                 val missing = ready.mods.filter { it.replacement == null }
@@ -119,7 +119,7 @@ internal fun BuildMigrationDialog(state: LauncherState, entry: VersionEntry, pre
                                 overflow = TextOverflow.Ellipsis, translate = false)
                             Text(mod.replacement?.let { "${mod.item.versionNumber.ifBlank { mod.item.fileName }} → ${it.versionNumber}" }
                                 ?: mod.reason.orEmpty(), color = if (mod.replacement == null) AWColors.Warning else AWColors.Accent,
-                                style = MaterialTheme.typography.bodySmall, translate = false)
+                                style = MaterialTheme.typography.bodySmall, translate = mod.replacement == null)
                             if (!mod.item.enabled) Text("Мод был отключён", color = AWColors.TextMuted, style = MaterialTheme.typography.labelSmall)
                         }
                     }

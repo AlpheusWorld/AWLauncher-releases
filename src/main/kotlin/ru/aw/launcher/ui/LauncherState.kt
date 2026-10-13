@@ -103,7 +103,7 @@ data class VersionGroup(
     val entries: List<VersionEntry>,
 )
 
-enum class CatalogTab { PACKS, MODS, SHADERS, RESOURCE_PACKS, INSTALLED }
+enum class CatalogTab { PACKS, MODS, SHADERS, RESOURCE_PACKS, DATA_PACKS, INSTALLED }
 
 sealed interface Modal {
     data class Delete(val entry: VersionEntry) : Modal

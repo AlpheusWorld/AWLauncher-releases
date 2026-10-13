@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -66,6 +67,7 @@ import ru.aw.launcher.ui.components.ButtonStyle
 import ru.aw.launcher.ui.components.ChoiceChip
 import ru.aw.launcher.ui.components.ContentRow
 import ru.aw.launcher.ui.components.AWButton
+import ru.aw.launcher.ui.components.AWDialog
 import ru.aw.launcher.ui.components.AWDropdownMenu
 import ru.aw.launcher.ui.components.AWIcons
 import ru.aw.launcher.ui.components.AWMenuItem
@@ -88,15 +90,17 @@ private val CatalogTab.kind: ContentKind?
         CatalogTab.MODS -> ContentKind.MOD
         CatalogTab.SHADERS -> ContentKind.SHADER
         CatalogTab.RESOURCE_PACKS -> ContentKind.RESOURCE_PACK
+        CatalogTab.DATA_PACKS -> ContentKind.DATA_PACK
         CatalogTab.PACKS, CatalogTab.INSTALLED -> null
     }
 
 private val CatalogTab.title: String
     get() = when (this) {
-        CatalogTab.PACKS -> "Сборки"
+        CatalogTab.PACKS -> "Модпаки"
         CatalogTab.MODS -> "Моды"
         CatalogTab.SHADERS -> "Шейдеры"
         CatalogTab.RESOURCE_PACKS -> "Ресурспаки"
+        CatalogTab.DATA_PACKS -> "Датапаки"
         CatalogTab.INSTALLED -> "Установленные"
     }
 
@@ -105,6 +109,7 @@ internal val ContentKind.title: String
         ContentKind.MOD -> "Моды"
         ContentKind.SHADER -> "Шейдеры"
         ContentKind.RESOURCE_PACK -> "Ресурспаки"
+        ContentKind.DATA_PACK -> "Датапаки"
     }
 
 private val ContentKind.searchHint: String
@@ -112,6 +117,7 @@ private val ContentKind.searchHint: String
         ContentKind.MOD -> "Найти мод: Sodium, JEI, Xaero's Minimap…"
         ContentKind.SHADER -> "Найти шейдер: Complementary, BSL, Photon…"
         ContentKind.RESOURCE_PACK -> "Найти ресурспак: Fresh Animations, Faithful…"
+        ContentKind.DATA_PACK -> "Найти датапак: Terralith, Incendium…"
     }
 
 internal class PacksModel(private val scope: CoroutineScope, source: CatalogSource) {
@@ -159,13 +165,14 @@ fun CatalogScreen(state: LauncherState) {
         if (query.isBlank()) return@LaunchedEffect
         when (tab) {
             CatalogTab.PACKS -> packs.search.query = query
-            CatalogTab.MODS, CatalogTab.SHADERS, CatalogTab.RESOURCE_PACKS ->
+            CatalogTab.MODS, CatalogTab.SHADERS, CatalogTab.RESOURCE_PACKS, CatalogTab.DATA_PACKS ->
                 tab.kind?.let { content?.searches?.get(it) }?.query = query
             CatalogTab.INSTALLED -> Unit
         }
         state.catalogQuery = ""
     }
     LaunchedEffect(content) { content?.ensureScanned() }
+    if (content != null && target != null) DataPackWorldDialog(content, state.gameDirOf(target))
 
     val opened = openedProject
     if (opened != null) {
@@ -174,10 +181,10 @@ fun CatalogScreen(state: LauncherState) {
         val allowed = isPack || (target != null && kind != null && when (kind) {
             ContentKind.MOD -> target.loader.isModded
             ContentKind.SHADER -> state.supportsShaders(target)
-            ContentKind.RESOURCE_PACK -> true
+            ContentKind.RESOURCE_PACK, ContentKind.DATA_PACK -> true
         })
         val installedPack = state.packs.firstOrNull { it.projectId == opened.projectId }
-        val installedContent = content?.installed?.values?.flatten()?.filter { it.projectId == opened.projectId }
+        val installedContent = content?.installed?.values?.flatten()?.filter { it.projectId == opened.projectId && kind != ContentKind.DATA_PACK }
             ?.let { items -> items.firstOrNull { it.enabled } ?: items.firstOrNull() }
         ProjectScreen(
             hit = opened,
@@ -378,7 +385,7 @@ private fun ContentHitRow(model: ContentModel, kind: ContentKind, hit: Modrinth.
         onClick = onProject,
     ) {
         when {
-            installed -> Tag("Установлен", AWColors.Success)
+            installed && kind != ContentKind.DATA_PACK -> Tag("Установлен", AWColors.Success)
             busy -> Text(if (model.waiting(hit.projectId)) "В очереди" else "Ставлю…", style = MaterialTheme.typography.labelLarge, color = AWColors.TextMuted)
             else -> AWButton(
                 "Установить",
@@ -392,7 +399,7 @@ private fun ContentHitRow(model: ContentModel, kind: ContentKind, hit: Modrinth.
 
 @Composable
 private fun InstalledList(state: LauncherState, target: VersionEntry, model: ContentModel, listState: LazyListState, onProject: (Modrinth.SearchHit) -> Unit) {
-    val kinds = listOfNotNull(ContentKind.MOD.takeIf { target.loader.isModded }, ContentKind.SHADER, ContentKind.RESOURCE_PACK)
+    val kinds = ContentKind.entries.filter { it != ContentKind.MOD || target.loader.isModded }
     val sections = kinds.map { it to model.installed[it].orEmpty() }.filter { it.second.isNotEmpty() }
     when {
         !model.scanned -> ListHint("Смотрю, что стоит в ${target.label}…")
@@ -422,7 +429,7 @@ private fun InstalledRow(model: ContentModel, item: InstalledItem, onProject: (M
     ContentRow(
         icon = item.iconUrl,
         title = item.title,
-        byline = listOfNotNull(item.versionNumber.takeIf { it.isNotBlank() }, item.fileName).joinToString(" · "),
+        byline = listOfNotNull(item.worldName, item.versionNumber.takeIf { it.isNotBlank() }, item.fileName).joinToString(" · "),
         details = update?.let { "Доступно обновление: ${it.versionNumber}" },
         detailsAccent = update != null,
         dimmed = !item.enabled,
@@ -447,6 +454,42 @@ private fun InstalledRow(model: ContentModel, item: InstalledItem, onProject: (M
                     tint = if (!busy) AWColors.Danger else AWColors.TextMuted.copy(alpha = 0.5f),
                     modifier = Modifier.size(20.dp),
                 )
+            }
+        }
+    }
+}
+
+@Composable
+internal fun DataPackWorldDialog(model: ContentModel, gameDir: Path) {
+    val request = model.dataPackRequest
+    val files = model.dataPackFiles
+    if (request == null && files == null) return
+    var failure by remember(request, files) { mutableStateOf<String?>(null) }
+    val worlds by androidx.compose.runtime.produceState<List<Path>?>(null, request, files, gameDir) {
+        try { value = withContext(Dispatchers.IO) { ModManager.dataPackWorlds(gameDir) } }
+        catch (e: CancellationException) { throw e }
+        catch (e: Exception) { failure = e.message ?: "Не удалось прочитать миры" }
+    }
+    AWDialog("Выбери мир для датапака", onDismiss = { model.dataPackRequest = null; model.dataPackFiles = null }, width = 560.dp) {
+        if (request != null) Text(request.first.title, modifier = Modifier.fillMaxWidth(), maxLines = 2,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, color = AWColors.Text, translate = false)
+        Spacer(Modifier.height(8.dp))
+        Text("Датапак устанавливается в выбранный мир. После установки открой мир заново",
+            modifier = Modifier.fillMaxWidth(), color = AWColors.TextSoft, style = MaterialTheme.typography.bodySmall)
+        Spacer(Modifier.height(12.dp))
+        when {
+            failure != null -> Text(failure.orEmpty(), color = AWColors.Danger, translate = false)
+            worlds == null -> Text("Читаю миры…", color = AWColors.TextMuted)
+            worlds!!.isEmpty() -> Text("Сначала создай мир в этой сборке или перенеси существующий", color = AWColors.TextMuted)
+            else -> LazyColumn(Modifier.fillMaxWidth().heightIn(max = 320.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(worlds!!, key = { it.toString() }) { world ->
+                    AWButton(world.fileName.toString(), translate = false, modifier = Modifier.fillMaxWidth(), onClick = {
+                        model.dataPackRequest = null
+                        model.dataPackFiles = null
+                        if (files != null) model.addFiles(files, ContentKind.DATA_PACK, world)
+                        else if (request != null) model.install(ContentKind.DATA_PACK, request.first, request.second, world)
+                    })
+                }
             }
         }
     }

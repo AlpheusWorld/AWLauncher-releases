@@ -5,7 +5,8 @@ import java.nio.file.Path
 enum class ContentKind(val projectType: String, val folder: String, val extension: String) {
     MOD("mod", "mods", ".jar"),
     SHADER("shader", "shaderpacks", ".zip"),
-    RESOURCE_PACK("resourcepack", "resourcepacks", ".zip");
+    RESOURCE_PACK("resourcepack", "resourcepacks", ".zip"),
+    DATA_PACK("datapack", "datapacks", ".zip");
 
     fun dir(gameDir: Path): Path = gameDir.resolve(folder)
 

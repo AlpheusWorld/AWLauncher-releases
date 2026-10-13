@@ -10,6 +10,7 @@ import ru.aw.launcher.packs.PackFile
 import ru.aw.launcher.packs.PackIndex
 import java.io.IOException
 import java.util.zip.ZipFile
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.io.path.exists
 import kotlin.io.path.readText
 
@@ -64,6 +65,7 @@ object CurseForge {
     @Serializable internal data class ManifestFile(val projectID: Int, val fileID: Int, val required: Boolean = true)
 
     @Volatile private var classes: List<Category>? = null
+    private val projects = ConcurrentHashMap<Int, Pair<Long, Mod>>()
     private fun classes(): List<Category> = classes ?: Json.decodeFromString<Response<List<Category>>>(
         get("categories", mapOf("gameId" to "$GAME", "classesOnly" to "true"))
     ).data.also { classes = it }
@@ -74,6 +76,7 @@ object CurseForge {
             "modpack" -> setOf("modpacks")
             "resourcepack" -> setOf("texture-packs", "resource-packs")
             "shader" -> setOf("shaders")
+            "datapack" -> setOf("data-packs", "datapacks")
             else -> throw IOException("Неизвестный тип контента: $type")
         }
         return classes().firstOrNull { it.slug in slugs }?.id ?: throw IOException("В CurseForge нет раздела $type")
@@ -84,6 +87,7 @@ object CurseForge {
         "modpacks" -> "modpack"
         "texture-packs", "resource-packs" -> "resourcepack"
         "shaders" -> "shader"
+        "data-packs", "datapacks" -> "datapack"
         else -> throw IOException("Этот проект CurseForge не поддерживается")
     }
 
@@ -95,8 +99,15 @@ object CurseForge {
         catch (e: IOException) { throw IOException("Не удалось загрузить данные CurseForge: ${e.message}", e) }
     }
 
-    internal fun projectInfo(id: String): Mod = Json.decodeFromString<Response<Mod>>(get("mods/${projectNumber(id)}")).data.also {
-        require(it.gameId == GAME && it.id == projectNumber(id)) { "Проект CurseForge относится к другой игре" }
+    internal fun projectInfo(id: String): Mod {
+        val number = projectNumber(id)
+        val now = System.currentTimeMillis()
+        projects[number]?.takeIf { now - it.first < 300_000 }?.let { return it.second }
+        return Json.decodeFromString<Response<Mod>>(get("mods/$number")).data.also {
+            require(it.gameId == GAME && it.id == number) { "Проект CurseForge относится к другой игре" }
+            if (projects.size >= 256) projects.entries.minByOrNull { entry -> entry.value.first }?.let { entry -> projects.remove(entry.key, entry.value) }
+            projects[number] = now to it
+        }
     }
 
     fun search(type: String, query: String, loaders: List<String>, gameVersion: String?, offset: Int): Modrinth.SearchPage {
@@ -168,6 +179,7 @@ object CurseForge {
     internal fun mapFile(file: File, type: String, distributed: Boolean = true): Modrinth.Version {
         val loaders = when (type) {
             "resourcepack" -> listOf("minecraft")
+            "datapack" -> listOf("datapack")
             "shader" -> listOf("iris", "optifine")
             else -> file.gameVersions.map { it.lowercase() }.filter { it in LOADERS }
         }
