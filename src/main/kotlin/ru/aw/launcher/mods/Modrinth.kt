@@ -157,7 +157,7 @@ object Modrinth {
     fun versionsByHash(sha1s: Collection<String>): Map<String, Version> {
         if (sha1s.isEmpty()) return emptyMap()
         val body = buildJsonObject {
-            put("hashes", JsonArray(sha1s.map { JsonPrimitive(it) }))
+            put("hashes", JsonArray(sha1s.distinct().sorted().map { JsonPrimitive(it) }))
             put("algorithm", "sha1")
         }
         return Json.decodeFromString<Map<String, Version>>(Http.postJson("$API/version_files", body.toString()))
@@ -166,7 +166,7 @@ object Modrinth {
     fun latestVersions(sha1s: Collection<String>, loaders: List<String>, gameVersion: String): Map<String, Version> {
         if (sha1s.isEmpty()) return emptyMap()
         val body = buildJsonObject {
-            put("hashes", JsonArray(sha1s.map { JsonPrimitive(it) }))
+            put("hashes", JsonArray(sha1s.distinct().sorted().map { JsonPrimitive(it) }))
             put("algorithm", "sha1")
             put("loaders", JsonArray(loaders.map { JsonPrimitive(it) }))
             put("game_versions", buildJsonArray { add(gameVersion) })
@@ -177,7 +177,7 @@ object Modrinth {
     fun projects(ids: Collection<String>): List<Project> {
         if (ids.isEmpty()) return emptyList()
         val url = "$API/projects".toHttpUrl().newBuilder()
-            .addQueryParameter("ids", ids.joinToString(",", "[", "]") { "\"$it\"" })
+            .addQueryParameter("ids", ids.distinct().sorted().joinToString(",", "[", "]") { "\"$it\"" })
             .build()
             .toString()
         return Json.decodeFromString<List<Project>>(Http.getString(url))

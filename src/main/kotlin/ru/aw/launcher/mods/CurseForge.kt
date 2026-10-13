@@ -3,6 +3,7 @@ package ru.aw.launcher.mods
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.HttpUrl
 import ru.aw.launcher.core.Json
 import ru.aw.launcher.core.Paths
 import ru.aw.launcher.net.Http
@@ -21,6 +22,13 @@ object CurseForge {
     private const val MAX_RESULTS = 10_000
     private val LOADERS = mapOf("forge" to 1, "fabric" to 4, "quilt" to 5, "neoforge" to 6)
     internal val DOWNLOAD_HOSTS = setOf("edge.forgecdn.net", "mediafilez.forgecdn.net", "media.forgecdn.net")
+    internal fun isMetadataUrl(url: HttpUrl): Boolean {
+        val service = SERVICE.toHttpUrl()
+        if (!url.isHttps || url.port != 443 || url.username.isNotEmpty() || url.password.isNotEmpty() ||
+            url.encodedPath.endsWith("/download")) return false
+        return (url.host == "api.curseforge.com" && url.encodedPath.startsWith("/v1/")) ||
+            (url.host == service.host && url.encodedPath.startsWith(service.encodedPath + "/"))
+    }
 
     val apiKey: String by lazy {
         sequenceOf(

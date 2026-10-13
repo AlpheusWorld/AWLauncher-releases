@@ -25,8 +25,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import org.jsoup.nodes.Element
 import ru.aw.launcher.core.Shell
@@ -73,25 +71,38 @@ internal fun ProjectScreen(
     var loader by remember(hit.projectId) { mutableStateOf("") }
     var imageIndex by remember(hit.projectId) { mutableStateOf<Int?>(null) }
     var release by remember(hit.projectId) { mutableStateOf<Modrinth.Version?>(null) }
+    var versions by remember(hit.projectId) { mutableStateOf(preview?.versions.orEmpty()) }
+    var versionsLoaded by remember(hit.projectId) { mutableStateOf(preview != null) }
+    var versionsLoading by remember(hit.projectId) { mutableStateOf(false) }
+    var versionsError by remember(hit.projectId) { mutableStateOf<String?>(null) }
 
     LaunchedEffect(hit.projectId, retry) {
         if (preview != null) return@LaunchedEffect
         error = null
         try {
-            data = withContext(Dispatchers.IO) {
-                coroutineScope {
-                    val project = async { ContentCatalog.project(hit.projectId) }
-                    val versions = async { ContentCatalog.versions(hit.projectId) }
-                    val info = project.await()
-                    ProjectPageData(info, versions.await(), ProjectDescription.parse(info.body.ifBlank { info.description },
-                        ContentCatalog.page(hit.projectId, info.projectType, info.slug)))
-                }
+            val info = withContext(Dispatchers.IO) { ContentCatalog.project(hit.projectId) }
+            val description = withContext(Dispatchers.IO) {
+                ProjectDescription.parse(info.body.ifBlank { info.description }, ContentCatalog.page(hit.projectId, info.projectType, info.slug))
             }
+            data = ProjectPageData(info, versions, description)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             error = e.message ?: "Не получилось"
         }
+    }
+
+    LaunchedEffect(hit.projectId, retry, tab) {
+        if (preview != null || tab != 1 || versionsLoaded) return@LaunchedEffect
+        versionsLoading = true
+        versionsError = null
+        try {
+            versions = withContext(Dispatchers.IO) { ContentCatalog.versions(hit.projectId) }
+            versionsLoaded = true
+            data = data?.copy(versions = versions)
+        } catch (e: CancellationException) { throw e }
+        catch (e: Exception) { versionsError = e.message ?: "Не получилось" }
+        finally { versionsLoading = false }
     }
 
     val page = data
@@ -175,7 +186,9 @@ internal fun ProjectScreen(
                                         (gameVersion.isBlank() || gameVersion in version.gameVersions) && (loader.isBlank() || loader in version.loaders)
                                 }
                             }
-                            if (filtered.isEmpty()) ListHint("Нет версий с такими фильтрами")
+                            if (versionsError != null) ListHint(versionsError.orEmpty(), "Повторить") { retry++ }
+                            else if (versionsLoading || !versionsLoaded) ListHint("Загружаю…")
+                            else if (filtered.isEmpty()) ListHint("Нет версий с такими фильтрами")
                             else LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                 items(filtered, key = { it.id }) { version ->
                                     Row(
