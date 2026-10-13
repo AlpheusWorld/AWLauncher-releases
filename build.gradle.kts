@@ -13,7 +13,7 @@ plugins {
 }
 
 group = "ru.aw"
-version = "1.0.18"
+version = "1.0.19"
 
 kotlin {
     jvmToolchain(21)

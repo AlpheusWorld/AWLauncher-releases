@@ -24,7 +24,7 @@ jobs:
       AW_SIGNER_THUMBPRINT: ${{ vars.AW_SIGNER_THUMBPRINT }}
       AW_UPDATE_URL: ${{ vars.AW_UPDATE_URL }}
       AW_DISCORD_APP_ID: ${{ vars.AW_DISCORD_APP_ID }}
-      # CurseForge is configured locally; never embed its key in public installers.
+      # The shared CurseForge key stays on the server, outside public installers.
       AW_CURSEFORGE_API_KEY: ''
       WINDOWS_SIGNING_CERTIFICATE_BASE64: ${{ secrets.WINDOWS_SIGNING_CERTIFICATE_BASE64 }}
       WINDOWS_SIGNING_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_SIGNING_CERTIFICATE_PASSWORD }}

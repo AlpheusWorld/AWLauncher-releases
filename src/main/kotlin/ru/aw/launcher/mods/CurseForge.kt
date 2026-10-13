@@ -15,6 +15,7 @@ import kotlin.io.path.readText
 
 object CurseForge {
     private const val API = "https://api.curseforge.com/v1"
+    private const val SERVICE = "https://awlauncher.zarplaykayt.chatgpt.site/api/curseforge"
     private const val GAME = 432
     private const val MAX_RESULTS = 10_000
     private val LOADERS = mapOf("forge" to 1, "fabric" to 4, "quilt" to 5, "neoforge" to 6)
@@ -87,9 +88,10 @@ object CurseForge {
     }
 
     private fun get(path: String, params: Map<String, String> = emptyMap()): String {
-        if (apiKey.isBlank()) throw IOException("Для CurseForge нужен API-ключ: укажи AW_CURSEFORGE_API_KEY или файл .aw/curseforge_api_key.txt и перезапусти лаунчер")
-        val url = "$API/$path".toHttpUrl().newBuilder().apply { params.forEach { (k, v) -> addQueryParameter(k, v) } }.build()
-        return try { Http.getString(url.toString(), mapOf("x-api-key" to apiKey)) }
+        val url = "${if (apiKey.isBlank()) SERVICE else API}/$path".toHttpUrl().newBuilder()
+            .apply { params.forEach { (k, v) -> addQueryParameter(k, v) } }.build()
+        val headers = if (apiKey.isBlank()) emptyMap() else mapOf("x-api-key" to apiKey)
+        return try { Http.getString(url.toString(), headers) }
         catch (e: IOException) { throw IOException("Не удалось загрузить данные CurseForge: ${e.message}", e) }
     }
 
@@ -155,7 +157,13 @@ object CurseForge {
         require(it.gameId == GAME && it.modId == project && it.id == file && !it.isServerPack) { "Файл CurseForge относится к другому проекту или серверной сборке" }
     }
 
-    internal fun allowedDownload(url: String): Boolean = runCatching { url.toHttpUrl().let { it.isHttps && it.host in DOWNLOAD_HOSTS } }.getOrDefault(false)
+    internal fun allowedDownload(url: String): Boolean = runCatching {
+        val parsed = url.toHttpUrl()
+        val service = SERVICE.toHttpUrl()
+        parsed.isHttps && parsed.username.isEmpty() && parsed.password.isEmpty() && parsed.port == 443 &&
+            (parsed.host in DOWNLOAD_HOSTS || (parsed.host == service.host && parsed.query == null &&
+                parsed.encodedPath.matches(Regex("${service.encodedPath}/mods/[1-9][0-9]*/files/[1-9][0-9]*/download"))))
+    }.getOrDefault(false)
     private fun isGameVersion(value: String) = value.firstOrNull()?.isDigit() == true || value.matches(Regex("\\d{2}w\\d{2}[a-z]"))
     internal fun mapFile(file: File, type: String, distributed: Boolean = true): Modrinth.Version {
         val loaders = when (type) {
@@ -163,7 +171,8 @@ object CurseForge {
             "shader" -> listOf("iris", "optifine")
             else -> file.gameVersions.map { it.lowercase() }.filter { it in LOADERS }
         }
-        val download = file.downloadUrl?.takeIf { file.isAvailable && distributed && allowedDownload(it) }
+        val download = file.downloadUrl?.takeIf { file.isAvailable && distributed && allowedDownload(it) && it.toHttpUrl().host in DOWNLOAD_HOSTS }
+            ?.let { if (apiKey.isBlank()) "$SERVICE/mods/${file.modId}/files/${file.id}/download" else it }
         return Modrinth.Version(id = "cf:${file.modId}:${file.id}", projectId = "cf:${file.modId}", name = file.displayName,
             versionNumber = file.displayName.ifBlank { file.fileName }, versionType = when (file.releaseType) { 1 -> "release"; 2 -> "beta"; else -> "alpha" },
             datePublished = file.fileDate, gameVersions = file.gameVersions.filter(::isGameVersion), loaders = loaders,

@@ -51,6 +51,13 @@ class CurseForgeTest {
         assertNull(CurseForge.mapFile(file.copy(isAvailable = false), "mod").primaryFile)
         assertNull(CurseForge.mapFile(file.copy(downloadUrl = "https://edge.forgecdn.net.evil.example/a.jar"), "mod").primaryFile)
         assertNull(CurseForge.mapFile(file.copy(downloadUrl = "http://edge.forgecdn.net/a.jar"), "mod").primaryFile)
+        val service = "https://awlauncher.zarplaykayt.chatgpt.site/api/curseforge/mods/51/files/102/download"
+        assertTrue(CurseForge.allowedDownload(service))
+        assertFalse(CurseForge.allowedDownload("$service?url=https://example.com"))
+        assertFalse(CurseForge.allowedDownload(service.replace(".site/", ".site.evil.example/")))
+        assertFalse(CurseForge.allowedDownload(service.replace("/download", "/description")))
+        assertFalse(CurseForge.allowedDownload(service.replace("https://", "http://")))
+        assertNull(CurseForge.mapFile(file.copy(downloadUrl = service), "mod").primaryFile)
         assertFalse(Modpacks.isAllowedUrl(file.downloadUrl!!)) // Modrinth archives retain their existing host policy.
     }
 
