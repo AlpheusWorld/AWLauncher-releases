@@ -9,6 +9,21 @@ import org.junit.jupiter.api.Test
 class LoadersTest {
 
     @Test
+    fun `Fabric and Quilt builds are sorted numerically rather than trusting cached API order`() {
+        val builds = LoaderRepository.fabricBuilds("""[
+            {"loader":{"version":"0.19.3","stable":true}},
+            {"loader":{"version":"0.19.5","stable":true}},
+            {"loader":{"version":"0.19.10","stable":true}},
+            {"loader":{"version":"0.20.0-beta.1","stable":false}},
+            {"loader":{"version":"0.19.5","stable":true}},
+            {"loader":{"version":""}}
+        ]""")
+        assertEquals(listOf("0.20.0-beta.1", "0.19.10", "0.19.5", "0.19.3"), builds.map { it.version })
+        assertFalse(builds.first().stable)
+        assertEquals("0.19.10", builds.first { it.stable }.version)
+    }
+
+    @Test
     fun `NeoForge builds map onto the game version, the year-numbered ones included`() {
         assertEquals("1.21.1", LoaderRepository.neoForgeGameVersion("21.1.73"))
         assertEquals("1.21", LoaderRepository.neoForgeGameVersion("21.0.167"))

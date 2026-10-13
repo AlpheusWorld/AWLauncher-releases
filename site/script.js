@@ -1,18 +1,45 @@
 /* ============================================================
    AWLauncher — сайт лаунчера: логика страницы
-   Никаких зависимостей. Всё на transform/opacity.
+   Без зависимостей. Анимации срабатывают при появлении и действиях пользователя.
    ============================================================ */
 (function () {
   'use strict';
 
-  var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var $ = function (sel, root) { return (root || document).querySelector(sel); };
   var $$ = function (sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); };
+
+  function bindChoiceKeys(selector) {
+    $$(selector).forEach(function (group) {
+      var choices = $$('[role="tab"], [role="radio"]', group);
+      choices.forEach(function (choice) {
+        choice.tabIndex = choice.getAttribute('aria-selected') === 'true' || choice.getAttribute('aria-checked') === 'true' ? 0 : -1;
+      });
+      group.addEventListener('keydown', function (event) {
+        var index = choices.indexOf(event.target);
+        if (index < 0) return;
+        var next;
+        if (event.key === 'ArrowRight' || event.key === 'ArrowDown') next = (index + 1) % choices.length;
+        else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') next = (index - 1 + choices.length) % choices.length;
+        else if (event.key === 'Home') next = 0;
+        else if (event.key === 'End') next = choices.length - 1;
+        else return;
+        event.preventDefault();
+        choices[next].click();
+        choices[next].focus();
+      });
+    });
+  }
 
   /* ══════════════════════════════════════════════════════════
      1. ЯЗЫК: русский снимком из разметки, английский словарём
      ══════════════════════════════════════════════════════════ */
   var EN = {
+    'hero.preview': 'Everything you need, in one window',
+    'mock.vanilla': 'no mods',
+    "stats.localesValue": "50 interface languages",
+    "mock.status": "Ready to play",
+    "mock.libraryHint": "Minecraft Java Edition",
+    "mock.library": "My instances",
     'a11y.skip': 'Skip to content',
     'a11y.menu': 'Menu',
     'nav.features': 'Features',
@@ -20,85 +47,75 @@
     'nav.profiles': 'Instances',
     'nav.accounts': 'Accounts',
     'nav.discord': 'Discord',
-    'nav.themes': 'Themes',
+    'nav.themes': "Appearance",
     'nav.install': 'Install',
     'nav.faq': 'Questions',
     'cta.download': 'Download for Windows',
     'cta.downloadShort': 'Download',
-    'cta.features': 'What is inside',
+    'cta.features': "What is inside",
     'menu.note': 'Windows 10 and 11 · 64-bit · free',
-    'hero.eyebrow': 'Windows 10 and 11 · 64-bit · free',
-    'hero.title1': 'Installs Minecraft, a loader and mods.',
-    'hero.title2': 'Keeps every instance in its own folder',
-    'hero.lead': 'AWLauncher downloads the game version you pick, chooses Java itself, installs the loader and sorts mods into instances. When the game crashes, it shows the reason from the log.',
-    'hero.meta1': 'MSI signed with Authenticode and SHA-256',
-    'hero.meta2': 'Auto-update over an HTTPS feed',
-    'hero.meta3': 'Microsoft sign-in in the browser',
-    'mock.sub': '148 mods · 6 GB of RAM · Java 21',
+    'hero.eyebrow': "Minecraft Java Edition",
+    'hero.title1': "Build your own",
+    'hero.title2': "Minecraft",
+    'hero.lead': "Your favorite version, mods and worlds — in one launcher. Pick an instance and play; AWLauncher installs Java and the loader for you.",
+    'hero.meta1': "Windows 10 / 11",
+    'hero.meta2': "64-bit",
+    'hero.meta3': "Free",
+    'mock.sub': "Fabric · Java 25",
     'mock.play': 'Play',
-    'mock.fps': 'frames per second in menus',
-    'float.verifyTitle': 'Files verified',
-    'float.verifyText': '12 480 files, 0 mismatches',
-    'float.versionTitle': 'Version pulled',
-    'float.versionText': 'snapshot 24w45a available',
-    'stats.loaders': 'Loaders',
-    'stats.catalogs': 'Content catalogs',
-    'stats.locales': 'Interface languages',
-    'stats.themes': 'Window themes',
-    'mq.1': 'Fabric', 'mq.2': 'Forge', 'mq.3': 'NeoForge', 'mq.4': 'Quilt',
-    'mq.5': 'Modrinth', 'mq.6': 'CurseForge', 'mq.7': 'Microsoft sign-in',
-    'mq.8': 'Discord Rich Presence', 'mq.9': 'Automatic Java', 'mq.10': 'Snapshots and alpha',
-    'mq.11': '.mrpack import', 'mq.12': 'Resource packs and shaders',
+    'stats.loaders': "Your favorite loader",
+    'stats.catalogs': "Mods inside the launcher",
+    'stats.locales': "In your language",
     'features.eyebrow': 'Features',
-    'features.title': 'Minecraft versions, loaders, mods and Java',
-    'features.lead': 'The launcher downloads version manifests, libraries and Java by itself. Modrinth and CurseForge catalogs open inside, and every profile lives in its own folder.',
-    'f1.title': 'Versions and loaders in one list',
-    'f1.text': 'Releases, snapshots, alpha and beta sit next to Fabric, Forge, NeoForge and Quilt. Pick a version and a loader — the launcher assembles the manifest, libraries, assets and launch arguments itself.',
-    'f1.tagNew': 'latest', 'f1.tagMods': 'for mods', 'f1.tagStable': 'battle-tested', 'f1.tagLegacy': 'for old packs', 'f1.tagSnap': 'snapshot',
-    'f1.m1v': '1,200+', 'f1.m1': 'versions across the manifests', 'f1.m2v': 'automatic', 'f1.m2': 'libraries and assets', 'f1.m3v': 'cached', 'f1.m3': 'relaunch without re-downloading',
-    'f2.title': 'Modrinth and CurseForge catalogs',
-    'f2.text': 'Search mods, modpacks, resource packs and shaders inside the launcher. Required dependencies install with the project, updates come from the instance card.',
+    'features.title': "Everything your game needs",
+    'features.lead': "Versions, mods and Java in one place. Choose what to play — the launcher takes care of installation and file checks.",
+    'f1.title': "Versions and mod loaders",
+    'f1.text': "From the first alphas to recent releases and snapshots. Pick Minecraft and a loader — libraries and game files install automatically.",
+    'f1.tagNew': "current release", 'f1.tagMods': 'for mods', 'f1.tagStable': 'battle-tested', 'f1.tagLegacy': 'for old packs', 'f1.tagSnap': 'snapshot',
+    'f1.m1v': "918", 'f1.m1': "versions in the Mojang catalog", 'f1.m2v': 'automatic', 'f1.m2': 'libraries and assets', 'f1.m3v': 'cached', 'f1.m3': 'relaunch without re-downloading',
+    'f2.title': "Find mods without leaving the app",
+    'f2.text': "Modrinth and CurseForge inside the launcher. Find mods, packs, resources and shaders; required dependencies install with them.",
     'f2.t1': 'Import .mrpack packs and .zip files with manifest.json',
     'f2.t2': 'Choose the exact release and Minecraft version',
     'f2.t3': 'If a required file is unavailable, the pack is never installed half-broken',
-    'f3.title': 'No hunting for Java by hand',
-    'f3.text': 'The launcher picks a matching runtime for the game version and installs it. Bring your own Java too: point at an executable or a JDK folder, even per instance.',
-    'f3.demo': 'matches 1.20.1',
-    'f4.title': 'File checks and readable crashes',
-    'f4.text': 'It compares downloads against manifests and reads the game log. Instead of "Error 1" you get a line about what is missing: libraries, memory or a mod for a different version.',
-    'f5.title': 'Memory, JVM flags and the window',
-    'f5.text': 'A memory slider with a recommendation for your machine, custom JVM arguments, window size and fullscreen — global or per instance.',
+    'f3.title': "The right Java, sorted",
+    'f3.text': "The right Java installs with the game. Prefer your own? Set its path in the settings, separately for each instance.",
+    'f3.demo': "matches 26.3",
+    'f4.title': "When something goes wrong",
+    'f4.text': "The launcher checks files and reads the crash log: missing memory, a library or a mod for the wrong version.",
+    'f5.title': "Make it fit your PC",
+    'f5.text': "Memory, window size and launch options — globally or per instance. The launcher suggests how much memory to allocate.",
     'f5.rec': 'we suggest 6 GB',
     'f5.min': '2 GB', 'f5.max': '16 GB',
-    'f6.title': 'Move in from another launcher',
-    'f6.text': 'Point at a profile folder, .minecraft or a shared instances directory — AWLauncher recognises Prism, MultiMC, Modrinth, CurseForge and ATLauncher, copies worlds, mods and settings, and rebuilds the activity calendar from logs. Source files stay untouched, credentials stay in the old launcher.',
+    'f6.title': "Your worlds come with you",
+    'f6.text': "Choose your old launcher folder. AWLauncher imports instances, worlds, mods and settings from Prism, MultiMC, Modrinth, CurseForge or ATLauncher. The original files stay in place.",
     'loaders.eyebrow': 'Loaders',
-    'loaders.title': 'Fabric, Forge, NeoForge and Quilt',
-    'loaders.lead': 'The loader is chosen when you create an instance. The launcher runs its installer, spreads files inside the profile folder and records the loader version on the instance card.',
+    'loaders.title': "Support for your favorite mods",
+    'loaders.lead': "Fabric for a light setup, Forge for your favorite mods — or NeoForge and Quilt. Choose a loader when creating an instance.",
     'profiles.eyebrow': 'Instances',
-    'profiles.title': 'Every instance has its own folder, worlds and settings',
-    'profiles.lead': 'Mods from one instance never get in the way of another. Rename profiles, duplicate them together with their worlds, group them. Icons come from built-in badges and backgrounds, or from your own PNG, JPEG and WebP up to 8 MB.',
+    'profiles.title': "Your instances stay separate",
+    'profiles.lead': "Vanilla today, a big modpack tomorrow. Each instance has its own mods, saves and settings. Group, favorite and duplicate them, worlds included.",
     'profiles.t1': 'Favorites, groups and a multi-select mode',
     'profiles.t2': 'Per-profile memory and Java',
     'profiles.t3': 'Playtime statistics and an activity calendar',
     'profiles.t4': 'Drag a folder or an archive straight into the library',
-    'profiles.cardMeta': 'Vanilla · no mods',
-    'profiles.note': '.aw/profiles/skyforge → mods, worlds, config, shaderpacks',
+    'profiles.cardMeta': "Vanilla · no mods",
+    'profiles.note': ".aw/instances/skyforge → mods, saves, config, shaderpacks",
     'accounts.eyebrow': 'Accounts and skin',
-    'accounts.title': 'Microsoft accounts, offline profiles and skins',
+    'accounts.title': "Sign in with your account",
     'acc1.title': 'Microsoft sign-in',
-    'acc1.text': 'Confirm the sign-in in your browser — the password is only ever typed on the Microsoft page. Tokens are protected with Windows DPAPI and the session renews itself. Offline accounts work on servers with online-mode=false.',
+    'acc1.text': "Sign in with Microsoft in your browser or create an offline profile. Your password stays on the Microsoft page and Windows DPAPI protects your tokens.",
     'acc1.code': 'Sign-in code',
     'acc1.t1': 'Tokens stay protected by Windows DPAPI',
     'acc1.t2': 'The session renews itself and you can cancel the sign-in from the accounts screen',
     'acc1.t3': 'The password never reaches the launcher — only the Microsoft page',
     'acc2.title': 'Skin with a 3D preview',
-    'acc2.text': 'Upload a 64×64 or 64×32 PNG up to 1 MB, pick Classic or Slim and look at the character before sending. Drag with the mouse to rotate it.',
+    'acc2.text': "Upload your PNG skin, pick Classic or Slim and see how it looks in the game. Drag the model below to rotate it.",
     'acc2.drag': 'Drag to rotate',
-    'acc2.foot': 'The “Apply to account” button sends the skin to Minecraft Services with that account token. The launcher checks the profile UUID before writing.',
+    'acc2.foot': "In the launcher, apply the skin to your chosen account after previewing it",
     'discord.eyebrow': 'Discord Rich Presence',
-    'discord.title': 'Discord activity',
-    'discord.lead': 'The launcher talks to your installed Discord over local Windows IPC. No sign-in, no bot, no tokens. The mode is read from the game launch and its log, without any mod.',
+    'discord.title': "Show friends what you are playing",
+    'discord.lead': "Discord shows your instance and time in the game. It connects automatically through the desktop app — no extra mods needed.",
     'discord.t1': 'The server address stays hidden until you allow it',
     'discord.t2': 'Show the game only, or hide the instance name',
     'discord.t3': 'Local instance images are never uploaded anywhere',
@@ -107,62 +124,56 @@
     'rpc.mode': 'Singleplayer', 'rpc.elapsed': 'in session',
     'rpc.btnProject': 'Project page', 'rpc.btnLauncher': 'Get AWLauncher',
     'themes.eyebrow': 'Appearance',
-    'themes.title': 'Four themes: light, dark, system, OLED',
-    'themes.lead': 'The choice is remembered in the launcher. Below you can switch this page and see how they differ.',
-    'themes.light': 'Light', 'themes.lightHint': 'soft green on white',
-    'themes.dark': 'Dark', 'themes.darkHint': 'graphite and emerald',
+    'themes.title': "Choose your appearance",
+    'themes.lead': "Light, dark, system or OLED. Try them on this page — your choice stays saved in this browser.",
+    'themes.light': 'Light', 'themes.lightHint': "light surfaces, gentle contrast",
+    'themes.dark': 'Dark', 'themes.darkHint': "graphite and emerald",
     'themes.system': 'System', 'themes.systemHint': 'whatever Windows uses',
     'themes.oled': 'OLED', 'themes.oledHint': 'true black, no bloom',
-    'locales.title': '50 interface locales',
-    'locales.text': 'Russian, US and UK English, Spain and Latin American Spanish, Brazilian and European Portuguese, two Chinese variants, plus Arabic and Hebrew with right-to-left layout. Fonts and translations ship inside the app — no network needed.',
+    'locales.title': "We speak your language",
+    'locales.text': "50 languages, including English. Translations and fonts ship with the launcher and work offline.",
     'install.eyebrow': 'Install',
-    'install.title': 'Pick your system',
-    'install.lead': 'A signed installer ships for Windows. On Linux and macOS the launcher builds from source with one Gradle command — there are no ready-made packages yet.',
-    'os.win.tag': 'installer',
-    'os.src.tag': 'from source',
+    'install.title': "Install and start playing",
+    'install.lead': "Ready-made installers are available for Windows 10 and 11, 64-bit. Choose your system to see the available options.",
+    'os.win.tag': "installer",
+    'os.src.tag': "no packages",
     'os.copy': 'Copy',
     'os.copied': 'Copied',
     'reqs.title': 'What you will need',
-    'reqs.r1': 'Windows 10 or 11, 64-bit — for the ready-made installer',
-    'reqs.r2': 'JDK 21 — to build the launcher from source on Linux and macOS',
-    'reqs.r3': 'Java for the game is installed by the launcher, no manual hunting needed',
-    'reqs.r4': 'Access to the AlpheusWorld organization: the repository is private',
+    'reqs.r1': "Windows 10 or 11, 64-bit",
+    'reqs.r2': "Microsoft sign-in requires an account that owns Minecraft Java Edition",
+    'reqs.r3': "Internet access for the first download of the game, Java and selected mods",
+    'reqs.r4': "The launcher Java runtime is included in the installer",
     'reqs.title2': 'How a release is verified',
-    'reqs.v1': 'The MSI and EXE are Authenticode-signed and the signature is checked before publishing',
-    'reqs.v2': 'update.json carries the SHA-256 of the build',
-    'reqs.v3': 'Updates come from an HTTPS feed; releases of the private repository are available to AlpheusWorld organization members',
+    'reqs.v1': "The update manifest is signed with Ed25519; the launcher verifies it before installation",
+    'reqs.v2': "The installer size and SHA-256 are checked before updating",
+    'reqs.v3': "Releases are available to everyone in the public repository; the initial installer does not currently have a trusted Authenticode certificate",
     'faq.eyebrow': 'Questions',
-    'faq.title': 'Common questions',
+    'faq.title': "Any questions?",
     'faq.q1': 'Do I need a Minecraft license?',
-    'faq.a1': 'For official servers, yes — sign in with Microsoft. An offline account is enough for servers with online-mode=false and for singleplayer.',
+    'faq.a1': "Microsoft sign-in requires an account that owns Minecraft Java Edition. Offline profiles work on servers configured to accept them: online-mode=false.",
     'faq.q2': 'Where does the launcher keep its files?',
-    'faq.a2': 'In the .aw folder: accounts, settings, game folders and instances. Each profile keeps its own mods, worlds, resource packs, shaders and configs, so instances never overlap.',
+    'faq.a2': "In the .aw folder inside your home directory. Instances live in .aw/instances, each with its own mods, saves, resourcepacks, shaderpacks and config. Shared libraries, game files and Java runtimes are stored separately.",
     'faq.q3': 'How do I move instances from another launcher?',
     'faq.a3': 'New instance → import from folder. Point at a profile, .minecraft or a shared instances directory — AWLauncher detects Prism, MultiMC, Modrinth, CurseForge or ATLauncher and copies the contents. Playtime and logs come along, and hours are never counted twice.',
     'faq.q4': 'What about the CurseForge catalog?',
-    'faq.a4': 'It needs the official AlpheusWorld API key: set it in the environment as AW_CURSEFORGE_API_KEY or drop it into a file in your user profile. It travels in a header, not in the URL. Without a key the CurseForge catalog stays quiet while Modrinth works as usual.',
+    'faq.a4': "The CurseForge catalog uses an official AlpheusWorld API key. In a custom build, set it through AW_CURSEFORGE_API_KEY or .aw/curseforge_api_key.txt. If the key is missing or an author has disabled third-party downloads, the launcher does not bypass that restriction; Modrinth keeps working.",
     'faq.q5': 'The game crashes — where do I look?',
     'faq.a5': 'At the instance log: the launcher parses the game output and points at the cause. Check the profile files and the memory limit first — those are the two most common reasons.',
     'faq.q6': 'How much memory should I allocate?',
     'faq.a6': 'The launcher suggests a value for your machine. Big modded profiles with a hundred mods usually do fine with 4–8 GB; handing over all of your RAM is a bad idea.',
-    'dl.eyebrow': 'Windows release',
-    'dl.title': 'Download AWLauncher',
-    'dl.lead': 'A .msi installer for Windows 10 and 11 (64-bit), signed with Authenticode. On Linux and macOS the launcher builds from source — commands are in the Install section.',
-    'dl.btn': 'Download .msi',
-    'dl.fact1b': '~45 MB',
-    'dl.repo': 'Repository on GitHub',
-    'dl.fact2': 'installer with no extra downloads',
-    'dl.fact3': 'Data in the .aw folder',
-    'foot.tagline': 'A Minecraft Java Edition launcher for Windows: versions, loaders, content catalogs and a separate folder for every instance.',
+    'faq.q7': 'What is AWAssistant?',
+    'faq.a7': 'A client mod for searching server rules inside Minecraft, opened with F8. AWLauncher 1.0.11 automatically installs it for Fabric 26.1.2 and 26.3 with Java 25 and Fabric Loader 0.19.3 or newer. Disable automatic installation in Settings → Game → AWAssistant client mod.',
+    'foot.tagline': "Minecraft Java Edition. Your versions, mods and worlds — in one launcher.",
     'foot.note': 'This project is not affiliated with Mojang Studios or Microsoft. Minecraft is a trademark of Mojang Studios.',
     'foot.colProduct': 'Product',
     'foot.colMore': 'Details',
     'foot.colLinks': 'Links',
     'foot.releases': 'Releases',
-    'foot.repo': 'Repository',
+    'foot.repo': "Source code",
     'foot.readme': 'Documentation',
     'foot.auth': 'MinecraftAuth',
-    'foot.rights': '© 2026 AlpheusWorld. Onest and Noto fonts are SIL OFL, licenses ship with the build.',
+    'foot.rights': "© 2026 AlpheusWorld. Launcher code is MIT-licensed; font and third-party notices ship with the distribution.",
     'foot.up': 'Back to top'
   };
 
@@ -176,47 +187,33 @@
   };
 
   var LOADERS = {
-    fabric: {
-      name: 'Fabric',
-      tag: { ru: 'под моды и оптимизацию', en: 'for mods and performance' },
-      text: {
-        ru: 'Максимум модов на новую версию игры: Fabric успевает за снапшотами и почти не добавляет нагрузки. Оптимизационные моды и шейдеры встают без конфликтов.',
-        en: 'The most mods on the newest game version: Fabric keeps up with snapshots and adds almost no overhead. Performance mods and shaders drop in without conflicts.'
-      },
-      loader: 'fabric-loader-0.16.5', java: '21', mods: '148'
-    },
-    forge: {
-      name: 'Forge',
-      tag: { ru: 'для крупных сборок', en: 'for large packs' },
-      text: {
-        ru: 'Самый большой выбор старых и новых модов. Ставь, когда сборка собрана под Forge: индустрия, магия и техно-моды чаще всего живут именно здесь.',
-        en: 'The largest pool of old and new mods. Use it when a pack is built for Forge: industry, magic and tech mods mostly live here.'
-      },
-      loader: 'forge-47.2.20', java: '17', mods: '212'
-    },
-    neoforge: {
-      name: 'NeoForge',
-      tag: { ru: 'современная ветка Forge', en: 'the modern Forge branch' },
-      text: {
-        ru: 'Наследник Forge для 1.20.2 и новее: те же моды, обновлённое ядро и загрузка быстрее. Хороший выбор, если нужна свежая версия игры без потери совместимости с модами.',
-        en: 'The Forge successor for 1.20.2 and newer: same kind of mods, a refreshed core and faster loading. A good pick when you want a recent game version without losing mod support.'
-      },
-      loader: 'neoforge-21.1.72', java: '21', mods: '96'
-    },
-    quilt: {
-      name: 'Quilt',
-      tag: { ru: 'легковесная альтернатива', en: 'a lightweight alternative' },
-      text: {
-        ru: 'Форк Fabric с более гибким API. Ставится поверх большинства Fabric-модов и пригодится, если хочется попробовать другой набор библиотек без переезда.',
-        en: 'A Fabric fork with a more flexible API. Most Fabric mods still work, which makes it handy when you want a different set of libraries without moving anywhere.'
-      },
-      loader: 'quilt-loader-0.23.1', java: '21', mods: '64'
-    }
+    fabric: { name: 'Fabric', tag: pair('для сборок на Fabric', 'for Fabric instances'),
+      text: pair('Выбирай для модов на Fabric. В примере — Minecraft 26.3 с Java 25; перед установкой мода проверь, что он выпущен для этой версии игры.', 'Choose it for Fabric mods. This example uses Minecraft 26.3 and Java 25; check that each mod supports this game version.'),
+      loader: 'fabric-loader-0.19.5', minecraft: '26.3', java: '25' },
+    forge: { name: 'Forge', tag: pair('для сборок на Forge', 'for Forge instances'),
+      text: pair('Подходит для сборок, которые требуют Forge. В примере — Minecraft 1.20.1 и рекомендованный для него Forge 47.4.10. Моды на другом загрузчике могут не подойти.', 'Use it for instances that require Forge. The example uses Minecraft 1.20.1 and its recommended Forge 47.4.10 build. Mods for other loaders may be incompatible.'),
+      loader: 'forge-47.4.10', minecraft: '1.20.1', java: '17' },
+    neoforge: { name: 'NeoForge', tag: pair('для сборок на NeoForge', 'for NeoForge instances'),
+      text: pair('Выбирай, если моды выпущены для NeoForge. В примере — Minecraft 1.21.1 и Java 21. Совместимость с Forge проверяй по требованиям конкретного мода.', 'Choose it for mods built for NeoForge. This example uses Minecraft 1.21.1 and Java 21. Check each mod for Forge compatibility.'),
+      loader: 'neoforge-21.1.259', minecraft: '1.21.1', java: '21' },
+    quilt: { name: 'Quilt', tag: pair('для сборок на Quilt', 'for Quilt instances'),
+      text: pair('Подходит для модов и сборок, которые требуют Quilt. В примере — Minecraft 1.20.1 и Java 17. Для Fabric-модов проверяй заявленную совместимость с Quilt.', 'Use it for mods and instances that require Quilt. The example uses Minecraft 1.20.1 and Java 17. Check Fabric mods for declared Quilt compatibility.'),
+      loader: 'quilt-loader-0.30.1', minecraft: '1.20.1', java: '17' }
   };
 
   var ruSnapshot = {};
   var ruAttrSnapshot = {};
   var currentLang = 'ru';
+  // Verified fallback values, 2026-10-11. Live metadata refreshes them once per page load.
+  var minecraftInfo = { release: '26.3', snapshot: '26.4-snapshot-3', count: 918 };
+
+  function renderMinecraftInfo() {
+    $$('[data-minecraft-release]').forEach(function (element) { element.textContent = minecraftInfo.release; });
+    $$('[data-minecraft-snapshot]').forEach(function (element) { element.textContent = minecraftInfo.snapshot; });
+    $$('[data-minecraft-count]').forEach(function (element) {
+      element.textContent = minecraftInfo.count.toLocaleString(currentLang === 'ru' ? 'ru-RU' : 'en-US');
+    });
+  }
 
   function collectRu() {
     $$('[data-i18n]').forEach(function (el) {
@@ -259,6 +256,7 @@
     applyLoader(activeLoader);
     applyOs(activeOs);
     renderLog();
+    renderMinecraftInfo();
     try { localStorage.setItem('aw-lang', lang); } catch (e) {}
   }
 
@@ -272,16 +270,20 @@
   /* ══════════════════════════════════════════════════════════
      2. ТЕМЫ
      ══════════════════════════════════════════════════════════ */
-  var THEME_COLORS = { light: '#F2F6F3', dark: '#111114', oled: '#000000', system: '#111114' };
+  var THEME_COLORS = { light: '#f5f5f1', dark: '#101213', oled: '#000000', system: '#101213' };
   var themeButtons = $$('#themePicker .theme-btn');
 
   function setTheme(theme) {
+    if (!Object.prototype.hasOwnProperty.call(THEME_COLORS, theme)) theme = 'dark';
     document.documentElement.dataset.theme = theme;
     themeButtons.forEach(function (btn) {
-      btn.setAttribute('aria-checked', String(btn.getAttribute('data-theme-value') === theme));
+      var selected = btn.getAttribute('data-theme-value') === theme;
+      btn.setAttribute('aria-checked', String(selected));
+      btn.tabIndex = selected ? 0 : -1;
     });
     var meta = $('meta[name="theme-color"]');
-    if (meta) meta.setAttribute('content', THEME_COLORS[theme] || THEME_COLORS.dark);
+    var resolvedTheme = theme === 'system' ? (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark') : theme;
+    if (meta) meta.setAttribute('content', THEME_COLORS[resolvedTheme] || THEME_COLORS.dark);
     try { localStorage.setItem('aw-theme', theme); } catch (e) {}
   }
 
@@ -289,22 +291,23 @@
     btn.addEventListener('click', function () { setTheme(btn.getAttribute('data-theme-value')); });
   });
 
+  window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function () {
+    if (document.documentElement.dataset.theme === 'system') setTheme('system');
+  });
+
   /* ══════════════════════════════════════════════════════════
      3. МЕНЮ
      ══════════════════════════════════════════════════════════ */
   var burger = $('#burger');
   var menu = $('#menu');
-  var menuTimer = null;
 
   function openMenu() {
     if (!menu) return;
-    clearTimeout(menuTimer);
     menu.hidden = false;
-    /* принудительный пересчёт, чтобы отработал переход */
-    void menu.offsetHeight;
     menu.classList.add('is-open');
     if (burger) burger.setAttribute('aria-expanded', 'true');
     document.body.classList.add('is-locked');
+    setMenuBackground(true);
     var first = $('.menu__list a', menu);
     if (first) first.focus({ preventScroll: true });
   }
@@ -314,9 +317,15 @@
     menu.classList.remove('is-open');
     if (burger) burger.setAttribute('aria-expanded', 'false');
     document.body.classList.remove('is-locked');
-    clearTimeout(menuTimer);
-    menuTimer = setTimeout(function () { menu.hidden = true; }, reduced ? 0 : 520);
+    setMenuBackground(false);
+    menu.hidden = true;
     if (returnFocus && burger) burger.focus({ preventScroll: true });
+  }
+
+  function setMenuBackground(locked) {
+    $$('#main, .foot, .nav__brand, .nav__links, .nav__side > :not(#burger)').forEach(function (element) {
+      element.inert = locked;
+    });
   }
 
   if (burger && menu) {
@@ -327,7 +336,16 @@
       link.addEventListener('click', function () { closeMenu(false); });
     });
     document.addEventListener('keydown', function (event) {
-      if (event.key === 'Escape' && !menu.hidden) closeMenu(true);
+      if (menu.hidden) return;
+      if (event.key === 'Escape') closeMenu(true);
+      if (event.key === 'Tab') {
+        var focusable = $$('a, button', menu).filter(function (element) { return element.getClientRects().length > 0; });
+        focusable.push(burger);
+        var current = focusable.indexOf(document.activeElement);
+        var next = event.shiftKey ? current - 1 : current + 1;
+        event.preventDefault();
+        focusable[(next + focusable.length) % focusable.length].focus();
+      }
     });
     window.addEventListener('resize', function () {
       if (!menu.hidden && window.innerWidth > 1120) closeMenu(false);
@@ -335,40 +353,56 @@
   }
 
   /* ══════════════════════════════════════════════════════════
-     4. REVEAL ПРИ ПРОКРУТКЕ
+     4. ПОЯВЛЕНИЕ БЛОКОВ БЕЗ ПОСТОЯННОГО ЦИКЛА
      ══════════════════════════════════════════════════════════ */
-  var revealables = $$('.reveal');
-  var revealed = 0;
+  function initReveals() {
+    var preference = window.matchMedia('(prefers-reduced-motion: reduce)');
+    var elements = $$('.reveal');
+    if (preference.matches || !('IntersectionObserver' in window)) return;
 
-  function revealAll() {
-    revealables.forEach(function (el) { el.classList.add('is-in'); });
-  }
+    var observer = null;
+    function show(element, animate) {
+      element.classList.remove('is-pending');
+      if (animate) element.classList.add('is-entering');
+      if (observer) observer.unobserve(element);
+    }
 
-  if ('IntersectionObserver' in window && !reduced) {
-    var revealObserver = new IntersectionObserver(function (entries) {
-      entries.forEach(function (entry) {
-        if (entry.isIntersecting) {
-          entry.target.classList.add('is-in');
-          revealed += 1;
-          revealObserver.unobserve(entry.target);
-        }
+    try {
+      observer = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (entry.isIntersecting) show(entry.target, !preference.matches);
+        });
+      }, { threshold: 0.08, rootMargin: '0px 0px -24px 0px' });
+      elements.forEach(function (element) {
+        element.classList.add('is-pending');
+        observer.observe(element);
       });
-    }, { threshold: 0.12, rootMargin: '0px 0px -6% 0px' });
-    revealables.forEach(function (el) { revealObserver.observe(el); });
+    } catch (error) {
+      if (observer) observer.disconnect();
+      elements.forEach(function (element) { show(element, false); });
+      return;
+    }
 
-    /* Страховка: если наблюдатель почему-то не сработал, показываем всё.
-       Скрытый текст хуже отсутствующей анимации. */
-    window.setTimeout(function () {
-      if (revealed === 0) revealAll();
-    }, 1400);
-  } else {
-    revealAll();
+    document.addEventListener('animationend', function (event) {
+      if (event.animationName === 'aw-enter') event.target.classList.remove('is-entering');
+    });
+    document.addEventListener('focusin', function (event) {
+      var pending = event.target.closest('.reveal.is-pending');
+      if (pending) show(pending, false);
+    });
+    preference.addEventListener('change', function () {
+      if (!preference.matches) return;
+      observer.disconnect();
+      elements.forEach(function (element) {
+        show(element, false);
+        element.classList.remove('is-entering');
+      });
+    });
   }
 
   /* ══════════════════════════════════════════════════════════
-     5. НАВИГАЦИЯ: прогресс, «залипание», активный раздел
+     5. НАВИГАЦИЯ: прогресс и активный раздел
      ══════════════════════════════════════════════════════════ */
-  var nav = $('#nav');
   var progress = $('#navProgress');
   var navLinks = $$('.nav__links a');
   var sections = $$('main section[id]');
@@ -379,7 +413,6 @@
     var scrolled = window.scrollY || document.documentElement.scrollTop;
     var max = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
     if (progress) progress.style.transform = 'scaleX(' + Math.min(1, scrolled / max).toFixed(4) + ')';
-    if (nav) nav.classList.toggle('is-stuck', scrolled > 30);
 
     var bestId = '';
     var bestTop = -Infinity;
@@ -403,69 +436,27 @@
   requestFrame();
 
   /* ══════════════════════════════════════════════════════════
-     6. МОКАП ЛАУНЧЕРА: журнал и полоса загрузки
+     6. МОКАП ЛАУНЧЕРА: статичный журнал
      ══════════════════════════════════════════════════════════ */
   var LOG_STEPS = [
-    { ru: 'Проверка файлов: 12 480 файлов', en: 'Checking files: 12 480 entries', warn: false },
-    { ru: 'Fabric 0.16.5 → Minecraft 1.20.1', en: 'Fabric 0.16.5 → Minecraft 1.20.1', warn: false },
-    { ru: 'Java 21 найдена: jdk-21.0.4+7', en: 'Java 21 found: jdk-21.0.4+7', warn: false },
-    { ru: 'mods/jei-1.20.1-forge.jar', en: 'mods/jei-1.20.1-forge.jar', warn: false },
-    { ru: 'Шейдеры: Complementary 4.7', en: 'Shaders: Complementary 4.7', warn: false },
-    { ru: 'gson-2.10.1 не совпала — перекачана', en: 'gson-2.10.1 mismatched — re-downloaded', warn: true },
-    { ru: 'Проверка целостности: OK', en: 'Integrity check: OK', warn: false },
-    { ru: 'Запуск Minecraft 1.20.1', en: 'Launching Minecraft 1.20.1', warn: false }
+    { ru: 'Minecraft 26.3 · Fabric 0.19.5', en: 'Minecraft 26.3 · Fabric 0.19.5' },
+    { ru: 'Java 25 · установлена', en: 'Java 25 · installed' },
+    { ru: 'Файлы сборки проверены', en: 'Instance files verified' },
+    { ru: 'Всё готово к запуску', en: 'Ready to launch' }
   ];
 
-  var logHost = $('#mockLog');
-  var mockBar = $('#mockBar');
-  var logIndex = 0;
-  var logTimer = null;
-
   function renderLog() {
-    if (!logHost) return;
-    var visible = reduced ? LOG_STEPS.slice(0, 4) : LOG_STEPS.slice(Math.max(0, logIndex - 4), logIndex);
-    logHost.innerHTML = '';
-    visible.forEach(function (step) {
-      var li = document.createElement('li');
-      li.textContent = step[currentLang] || step.ru;
-      if (step.warn) li.className = 'is-warn';
-      logHost.appendChild(li);
-      if (reduced) {
-        li.classList.add('is-in');
-      } else {
-        window.requestAnimationFrame(function () { li.classList.add('is-in'); });
-      }
+    var host = $('#mockLog');
+    if (!host) return;
+    host.textContent = '';
+    LOG_STEPS.forEach(function (step) {
+      var line = document.createElement('li');
+      line.textContent = step[currentLang] || step.ru;
+      host.appendChild(line);
     });
   }
-
-  function tickLog() {
-    logIndex += 1;
-    if (logIndex > LOG_STEPS.length) logIndex = 1;
-    renderLog();
-    if (mockBar) mockBar.style.transform = 'scaleX(' + (logIndex / LOG_STEPS.length).toFixed(3) + ')';
-  }
-
-  if (logHost) {
-    logIndex = 4;
-    renderLog();
-    if (mockBar) mockBar.style.transform = 'scaleX(' + (logIndex / LOG_STEPS.length).toFixed(3) + ')';
-    if (!reduced) logTimer = window.setInterval(tickLog, 1900);
-  }
-
-  /* ══════════════════════════════════════════════════════════
-     7. ТАЙМЕР СЕССИИ В КАРТОЧКЕ DISCORD
-     ══════════════════════════════════════════════════════════ */
-  var rpcTimer = $('#rpcTimer');
-  if (rpcTimer && !reduced) {
-    var seconds = 1 * 3600 + 24 * 60 + 7;
-    window.setInterval(function () {
-      seconds += 1;
-      var h = String(Math.floor(seconds / 3600)).padStart(2, '0');
-      var m = String(Math.floor((seconds % 3600) / 60)).padStart(2, '0');
-      var s = String(seconds % 60).padStart(2, '0');
-      rpcTimer.textContent = h + ':' + m + ':' + s;
-    }, 1000);
-  }
+  var mockBar = $('#mockBar');
+  if (mockBar) mockBar.style.transform = 'scaleX(1)';
 
   /* ══════════════════════════════════════════════════════════
      8. ВЫБОР ЗАГРУЗЧИКА
@@ -487,15 +478,14 @@
     var rowLoader = $('#rowLoader');
     var rowMc = $('#rowMc');
     var rowJava = $('#rowJava');
-    var rowMods = $('#rowMods');
     if (rowLoader) rowLoader.textContent = data.loader;
-    if (rowMc) rowMc.textContent = key === 'forge' ? '1.19.2' : '1.20.1';
+    if (rowMc) rowMc.textContent = data.minecraft;
     if (rowJava) rowJava.textContent = data.java;
-    if (rowMods) rowMods.textContent = data.mods;
     $$('#loaderPicker .loader-tab').forEach(function (tab) {
       var on = tab.getAttribute('data-loader') === key;
       tab.classList.toggle('is-active', on);
       tab.setAttribute('aria-selected', String(on));
+      tab.tabIndex = on ? 0 : -1;
     });
   }
 
@@ -511,107 +501,96 @@
   /* ══════════════════════════════════════════════════════════
      9. УСТАНОВЩИК: ВЫБОР СИСТЕМЫ
      ══════════════════════════════════════════════════════════ */
-  var RELEASES_URL = 'https://github.com/AlpheusWorld/AWLauncher/releases/latest';
-  var REPO_URL = 'https://github.com/AlpheusWorld/AWLauncher';
-  var SOURCE_CMD = 'git clone https://github.com/AlpheusWorld/AWLauncher.git\n' +
-    './gradlew packageDistributionForCurrentOS -PnoDeploy';
+  var RELEASES_URL = 'https://github.com/AlpheusWorld/AWLauncher-releases/releases/latest';
+  var INSTALLER_URL = RELEASES_URL + '/download/AWLauncher-Setup.exe';
 
   function pair(ru, en) { return { ru: ru, en: en }; }
 
+  function unavailableSystem(name, icon) {
+    return {
+      icon: icon, badge: pair(name + ' · пакетов нет', name + ' · no packages'),
+      file: pair('Установщика для ' + name + ' пока нет', 'No installer for ' + name + ' yet'),
+      rows: [
+        [pair('пакеты', 'packages'), pair('не опубликованы', 'not published')],
+        [pair('готовая версия', 'available build'), 'Windows x64'],
+        [pair('исходный код', 'source code'), pair('открыт, MIT', 'open, MIT')]
+      ],
+      cmd: null, btn: pair('Посмотреть релизы', 'View releases'), btnIcon: '#i-external', href: RELEASES_URL,
+      note: pair('Официальные установщики сейчас выпускаются только для Windows. Работа на ' + name + ' не подтверждена; готовые пакеты для этой системы не публикуются.', 'Official installers are currently released for Windows only. Operation on ' + name + ' is unverified; no packages are published for this system.'),
+      steps: [
+        [pair('Проверь доступные системы', 'Check available platforms'), pair('Текущий выпуск поддерживает Windows 10 и 11, 64-бит.', 'The current release supports Windows 10 and 11, 64-bit.')],
+        [pair('Не ищи готовый пакет для ' + name, 'No ready-made ' + name + ' package'), pair('В официальном релизе есть EXE и MSI для Windows. Пакетов для выбранной системы пока нет.', 'Official releases include EXE and MSI installers for Windows. Packages for the selected system are not available yet.')],
+        [pair('Проверяй страницу релизов', 'Check the releases page'), pair('Новые установщики и заметки об обновлениях публикуются в открытом репозитории AWLauncher-releases.', 'New installers and release notes are published in the public AWLauncher-releases repository.')]
+      ]
+    };
+  }
+
   var SYSTEMS = {
     windows: {
-      icon: '#i-windows',
-      badge: pair('Windows 10 и 11 · 64-бит', 'Windows 10 and 11 · 64-bit'),
-      file: 'AWLauncher-x.x.x.msi',
+      icon: '#i-windows', badge: pair('Windows 10 и 11 · 64-бит', 'Windows 10 and 11 · 64-bit'),
+      file: 'AWLauncher-Setup.exe',
       rows: [
-        [pair('формат', 'format'), 'MSI (Windows Installer)'],
-        [pair('размер', 'size'), pair('~45 МБ', '~45 MB')],
-        [pair('подпись', 'signature'), 'Authenticode + SHA-256'],
-        [pair('Java', 'Java'), pair('ставится лаунчером', 'installed by the launcher')]
+        [pair('версия', 'version'), '1.0.11'],
+        [pair('формат', 'format'), 'EXE · MSI'],
+        [pair('размер EXE', 'EXE size'), pair('≈98,6 МБ', '≈98.6 MB')],
+        [pair('обновления', 'updates'), 'Ed25519 · SHA-256'],
+        [pair('Java для игры', 'game Java'), pair('подбирается автоматически', 'selected automatically')]
       ],
-      cmd: null,
-      btn: pair('Скачать .msi', 'Download .msi'),
-      btnIcon: '#i-download',
-      href: RELEASES_URL,
-      note: pair(
-        'Обновление приходит из лаунчера: update.json содержит SHA-256 сборки. Релизы приватного репозитория доступны участникам организации AlpheusWorld.',
-        'Updates arrive from inside the launcher: update.json carries the SHA-256 of the build. Releases of the private repository are available to AlpheusWorld organization members.'
-      ),
+      cmd: null, btn: pair('Скачать .exe', 'Download .exe'), btnIcon: '#i-download', href: INSTALLER_URL,
+      note: pair('Установщик содержит Java для лаунчера. Файлы Minecraft загружаются отдельно. У первого установщика пока нет доверенного Authenticode-сертификата Windows; подпись обновлений Ed25519 проверяется отдельно.', 'The installer includes Java for the launcher. Minecraft files download separately. The initial installer does not yet have a trusted Windows Authenticode certificate; Ed25519 update signatures are verified separately.'),
       steps: [
-        [pair('Скачай установщик и запусти', 'Download the installer and run it'),
-         pair('Компактное тёмное окно спросит папку и ярлык. Установку ведёт Windows Installer: прогресс, отмена и откат работают штатно, докачивать ничего не нужно.',
-              'A compact dark window asks for a folder and a shortcut. Windows Installer does the work: progress, cancel and rollback behave, and nothing extra is downloaded.')],
-        [pair('Войди в аккаунт', 'Sign in'),
-         pair('«Аккаунты» → «Войти через Microsoft» и подтверждение в браузере. Для серверов с online-mode=false хватит офлайн-профиля.',
-              'Accounts → Sign in with Microsoft, then confirm in the browser. For servers with online-mode=false an offline profile is enough.')],
-        [pair('Создай сборку', 'Create an instance'),
-         pair('Выбери версию и загрузчик, поставь моды из каталога — и жми «Играть». Данные лаунчера живут в папке .aw.',
-              'Pick a version and a loader, add mods from the catalog, then hit Play. Launcher data lives in the .aw folder.')]
+        [pair('Скачай EXE и запусти установщик', 'Download the EXE and run the installer'), pair('Открой AWLauncher-Setup.exe из официального релиза и выбери папку. MSI включён в EXE; отдельно устанавливать Java для лаунчера не нужно.', 'Open AWLauncher-Setup.exe from the official release and choose a folder. The EXE contains the MSI; no separate Java installation is needed for the launcher.')],
+        [pair('Войди в аккаунт', 'Sign in'), pair('Открой «Аккаунты» → «Войти через Microsoft» и подтверди вход в браузере. Нужен аккаунт с Minecraft Java Edition. Офлайн-профиль подходит для совместимых серверов.', 'Open Accounts → Sign in with Microsoft and confirm in your browser. An account that owns Minecraft Java Edition is required. Offline profiles work on compatible servers.')],
+        [pair('Создай сборку', 'Create an instance'), pair('Выбери версию игры и подходящий загрузчик, добавь моды и нажми «Играть». Java подбирается по выбранной версии Minecraft, а сборки хранятся в .aw/instances.', 'Pick a game version and compatible loader, add mods and press Play. Java is selected for that Minecraft version, and instances live in .aw/instances.')]
       ]
     },
-    linux: {
-      icon: '#i-terminal',
-      badge: pair('Linux · сборка из исходников', 'Linux · built from source'),
-      file: 'packageDistributionForCurrentOS',
-      rows: [
-        [pair('формат', 'format'), pair('deb или rpm', 'deb or rpm')],
-        [pair('сборка', 'build'), 'jpackage'],
-        [pair('нужен', 'required'), 'JDK 21'],
-        [pair('готовых пакетов', 'prebuilt packages'), pair('нет', 'none yet')]
-      ],
-      cmd: SOURCE_CMD,
-      btn: pair('Открыть репозиторий', 'Open the repository'),
-      btnIcon: '#i-external',
-      href: REPO_URL,
-      note: pair(
-        'Официальных сборок для Linux пока нет: лаунчер запускается из исходников. Gradle идёт в комплекте, отдельно ставить не нужно.',
-        'There are no official Linux builds yet: the launcher runs from source. Gradle ships with the project, no separate install needed.'
-      ),
-      steps: [
-        [pair('Поставь JDK 21 и склонируй репозиторий', 'Install JDK 21 and clone the repository'),
-         pair('Репозиторий приватный, поэтому нужен доступ к организации AlpheusWorld. Команды для клонирования — в блоке справа.',
-              'The repository is private, so you need access to the AlpheusWorld organization. The clone commands are in the block on the right.')],
-        [pair('Собери пакет под свой дистрибутив', 'Build a package for your distribution'),
-         pair('<code>./gradlew packageDistributionForCurrentOS -PnoDeploy</code> соберёт deb или rpm через jpackage. Параметр <code>-PnoDeploy</code> оставляет уже установленную копию лаунчера нетронутой.',
-              '<code>./gradlew packageDistributionForCurrentOS -PnoDeploy</code> builds a deb or rpm through jpackage. The <code>-PnoDeploy</code> flag leaves an already installed copy of the launcher untouched.')],
-        [pair('Запусти лаунчер', 'Run the launcher'),
-         pair('Быстрая проверка без установки — <code>./gradlew run -PnoDeploy</code>. Для каталога CurseForge задай ключ <code>AW_CURSEFORGE_API_KEY</code>.',
-              'A quick check without installing: <code>./gradlew run -PnoDeploy</code>. For the CurseForge catalog set <code>AW_CURSEFORGE_API_KEY</code>.')]
-      ]
-    },
-    macos: {
-      icon: '#i-apple',
-      badge: pair('macOS · сборка из исходников', 'macOS · built from source'),
-      file: 'packageDistributionForCurrentOS',
-      rows: [
-        [pair('формат', 'format'), pair('dmg', 'dmg')],
-        [pair('сборка', 'build'), 'jpackage'],
-        [pair('нужен', 'required'), 'JDK 21'],
-        [pair('подпись Apple', 'Apple signature'), pair('нет', 'none')]
-      ],
-      cmd: SOURCE_CMD,
-      btn: pair('Открыть репозиторий', 'Open the repository'),
-      btnIcon: '#i-external',
-      href: REPO_URL,
-      note: pair(
-        'Сборка не подписана Apple, поэтому при первом запуске Gatekeeper попросит подтвердить открытие приложения в «Настройки → Конфиденциальность и безопасность».',
-        'The build is not signed by Apple, so on first launch Gatekeeper will ask you to confirm opening the app in System Settings → Privacy & Security.'
-      ),
-      steps: [
-        [pair('Поставь JDK 21 и склонируй репозиторий', 'Install JDK 21 and clone the repository'),
-         pair('Репозиторий приватный: нужен доступ к организации AlpheusWorld. Команды для клонирования — в блоке справа.',
-              'The repository is private: you need access to the AlpheusWorld organization. The clone commands are in the block on the right.')],
-        [pair('Собери dmg', 'Build the dmg'),
-         pair('<code>./gradlew packageDistributionForCurrentOS -PnoDeploy</code> соберёт образ в <code>build/compose/binaries/main/dmg</code>.',
-              '<code>./gradlew packageDistributionForCurrentOS -PnoDeploy</code> builds the image into <code>build/compose/binaries/main/dmg</code>.')],
-        [pair('Открой приложение', 'Open the app'),
-         pair('Первый запуск потребует подтверждения Gatekeeper. Быстрая проверка без упаковки — <code>./gradlew run -PnoDeploy</code>.',
-              'The first launch needs a Gatekeeper confirmation. A quick check without packaging: <code>./gradlew run -PnoDeploy</code>.')]
-      ]
-    }
+    linux: unavailableSystem('Linux', '#i-terminal'),
+    macos: unavailableSystem('macOS', '#i-apple')
   };
 
   var activeOs = 'windows';
+
+  function fetchMetadata(url) {
+    var controller = new AbortController();
+    var timeout = window.setTimeout(function () { controller.abort(); }, 10000);
+    return window.fetch(url, { signal: controller.signal, credentials: 'omit', referrerPolicy: 'no-referrer' })
+      .then(function (response) {
+        if (!response.ok) throw new Error('Metadata response ' + response.status);
+        return response.json();
+      }).finally(function () { window.clearTimeout(timeout); });
+  }
+
+  function refreshPublicData() {
+    if (!window.fetch || !window.AbortController) return;
+    fetchMetadata('https://piston-meta.mojang.com/mc/game/version_manifest_v2.json')
+      .then(function (data) {
+        if (!data || !data.latest || !Array.isArray(data.versions) || !data.versions.length) return;
+        var release = data.versions.find(function (entry) { return entry.id === data.latest.release && entry.type === 'release'; });
+        var snapshot = data.versions.find(function (entry) { return entry.id === data.latest.snapshot; });
+        var safeId = /^[a-zA-Z0-9_.+-]{1,64}$/;
+        if (!release || !snapshot || !safeId.test(release.id) || !safeId.test(snapshot.id)) return;
+        minecraftInfo = { release: release.id, snapshot: snapshot.id, count: data.versions.length };
+        renderMinecraftInfo();
+      }).catch(function () {});
+
+    fetchMetadata('https://api.github.com/repos/AlpheusWorld/AWLauncher-releases/releases/latest')
+      .then(function (data) {
+        if (!data || data.draft || data.prerelease || !Array.isArray(data.assets)) return;
+        var version = String(data.tag_name || '').replace(/^v/, '');
+        var installer = data.assets.find(function (asset) { return asset.name === 'AWLauncher-Setup.exe'; });
+        if (!/^\d+\.\d+\.\d+$/.test(version) || !installer || !Number.isSafeInteger(installer.size) || installer.size <= 0 || installer.size > 2147483648) return;
+        SYSTEMS.windows.rows[0][1] = version;
+        var megabytes = installer.size / 1000000;
+        SYSTEMS.windows.rows[2][1] = pair('≈' + megabytes.toFixed(1).replace('.', ',') + ' МБ', '≈' + megabytes.toFixed(1) + ' MB');
+        applyOs(activeOs);
+        var metadata = $('#softwareMetadata');
+        if (metadata) {
+          var application = JSON.parse(metadata.textContent);
+          application.softwareVersion = version;
+          metadata.textContent = JSON.stringify(application);
+        }
+      }).catch(function () {});
+  }
 
   function pick(value) {
     if (value && typeof value === 'object') return value[currentLang] || value.ru;
@@ -636,7 +615,7 @@
     var btnIcon = $('#osBtnIcon');
 
     if (badge) badge.textContent = pick(sys.badge);
-    if (file) file.textContent = sys.file;
+    if (file) file.textContent = pick(sys.file);
 
     if (rows) {
       rows.innerHTML = '';
@@ -685,6 +664,7 @@
       var on = tab.getAttribute('data-os') === key;
       tab.classList.toggle('is-active', on);
       tab.setAttribute('aria-selected', String(on));
+      tab.tabIndex = on ? 0 : -1;
     });
   }
 
@@ -778,46 +758,15 @@
     var voxDrag = false;
     var voxPointerX = 0;
     var voxStartAngle = 0;
-    var voxRaf = null;
-    var voxActive = false;
-    var stageVisible = true;
-    var pageVisible = true;
 
     function voxApply(angle) {
       voxHost.style.transform = 'rotateX(5deg) rotateY(' + angle.toFixed(2) + 'deg)';
     }
 
-    function voxPaint(time) {
-      if (!voxActive) { voxRaf = null; return; }
-      voxRaf = window.requestAnimationFrame(voxPaint);
-      if (voxDrag || reduced) return;
-      voxApply(voxAngle + Math.sin(time / 2800) * 22);
-    }
-
-    function voxSync() {
-      var wanted = stageVisible && pageVisible && !reduced;
-      if (wanted === voxActive) return;
-      voxActive = wanted;
-      if (wanted && voxRaf === null) voxRaf = window.requestAnimationFrame(voxPaint);
-    }
-
     voxApply(voxAngle);
 
-    if ('IntersectionObserver' in window) {
-      stageVisible = false;
-      new IntersectionObserver(function (entries) {
-        entries.forEach(function (entry) { stageVisible = entry.isIntersecting; });
-        voxSync();
-      }, { threshold: 0.12 }).observe(skinStage);
-    }
-    voxSync();
-
-    document.addEventListener('visibilitychange', function () {
-      pageVisible = document.visibilityState === 'visible';
-      voxSync();
-    });
-
     skinStage.addEventListener('pointerdown', function (event) {
+      if (event.button !== 0 || !event.isPrimary) return;
       if (event.target.closest && event.target.closest('.seg')) return;
       voxDrag = true;
       voxPointerX = event.clientX;
@@ -840,7 +789,6 @@
         if (skinStage.hasPointerCapture && skinStage.hasPointerCapture(event.pointerId)) {
           skinStage.releasePointerCapture(event.pointerId);
         }
-        if (voxActive && voxRaf === null) voxRaf = window.requestAnimationFrame(voxPaint);
       });
     });
 
@@ -851,6 +799,7 @@
           var on = other === btn;
           other.classList.toggle('is-active', on);
           other.setAttribute('aria-checked', String(on));
+          other.tabIndex = on ? 0 : -1;
         });
       });
     });
@@ -860,6 +809,8 @@
      11. FAQ
      ══════════════════════════════════════════════════════════ */
   $$('.faq__q').forEach(function (button) {
+    var answer = $('.faq__a', button.closest('.faq__item'));
+    if (answer) answer.setAttribute('aria-hidden', 'true');
     button.addEventListener('click', function () {
       var item = button.closest('.faq__item');
       var isOpen = item.classList.contains('is-open');
@@ -867,66 +818,19 @@
         other.classList.remove('is-open');
         var q = $('.faq__q', other);
         if (q) q.setAttribute('aria-expanded', 'false');
+        var otherAnswer = $('.faq__a', other);
+        if (otherAnswer) otherAnswer.setAttribute('aria-hidden', 'true');
       });
       if (!isOpen) {
         item.classList.add('is-open');
         button.setAttribute('aria-expanded', 'true');
+        if (answer) answer.setAttribute('aria-hidden', 'false');
       }
     });
   });
 
   /* ══════════════════════════════════════════════════════════
-     12. КУРСОРНЫЙ БЛИК ПО КАРТОЧКАМ
-     ══════════════════════════════════════════════════════════ */
-  if (window.matchMedia('(hover: hover)').matches) {
-    $$('.spotlight').forEach(function (card) {
-      card.addEventListener('pointermove', function (event) {
-        var rect = card.getBoundingClientRect();
-        card.style.setProperty('--mx', (event.clientX - rect.left) + 'px');
-        card.style.setProperty('--my', (event.clientY - rect.top) + 'px');
-      });
-    });
-  }
-
-  /* ══════════════════════════════════════════════════════════
-     13. МАГНИТНЫЕ КНОПКИ
-     ══════════════════════════════════════════════════════════ */
-  if (!reduced && window.matchMedia('(hover: hover) and (min-width: 900px)').matches) {
-    $$('.magnetic').forEach(function (btn) {
-      var raf = null;
-      var target = { x: 0, y: 0 };
-
-      function paint() {
-        raf = null;
-        btn.style.transform = 'translate3d(' + target.x.toFixed(2) + 'px,' + target.y.toFixed(2) + 'px,0)';
-      }
-
-      btn.addEventListener('pointermove', function (event) {
-        var rect = btn.getBoundingClientRect();
-        target.x = (event.clientX - (rect.left + rect.width / 2)) * 0.16;
-        target.y = (event.clientY - (rect.top + rect.height / 2)) * 0.24;
-        if (!raf) raf = window.requestAnimationFrame(paint);
-      });
-
-      btn.addEventListener('pointerleave', function () {
-        target.x = 0;
-        target.y = 0;
-        if (!raf) raf = window.requestAnimationFrame(paint);
-      });
-    });
-  }
-
-  /* ══════════════════════════════════════════════════════════
-     14. БЕСШОВНЫЕ БЕГУЩИЕ СТРОКИ
-     ══════════════════════════════════════════════════════════ */
-  $$('.marquee__track, .locale-band__track').forEach(function (track) {
-    var clone = track.cloneNode(true);
-    clone.setAttribute('aria-hidden', 'true');
-    while (clone.firstChild) track.appendChild(clone.firstChild);
-  });
-
-  /* ══════════════════════════════════════════════════════════
-     15. СТАРТ
+     12. СТАРТ
      ══════════════════════════════════════════════════════════ */
   var savedLang = null;
   try { savedLang = localStorage.getItem('aw-lang'); } catch (e) {}
@@ -936,4 +840,7 @@
 
   var savedTheme = document.documentElement.dataset.theme || 'dark';
   setTheme(savedTheme);
+  bindChoiceKeys('#themePicker, #loaderPicker, #osTabs, .seg');
+  initReveals();
+  refreshPublicData();
 })();

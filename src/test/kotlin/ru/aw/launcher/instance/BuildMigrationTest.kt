@@ -85,6 +85,30 @@ class BuildMigrationTest {
     @TempDir lateinit var root: Path
     private val bytes = byteArrayOf(1, 2, 3, 4)
 
+    @Test
+    fun `Minecraft migration clears explicit Loader choice for the new game version`() = runBlocking {
+        val item = mod()
+        InstanceStore.update(root) { it.copy(loaderVersion = "0.19.5", memoryMb = 3072) }
+        val ready = plan(item)
+        BuildMigration.apply(ready, setOf(item.fileName), {}, {},
+            prepareGame = { stage -> assertNull(InstanceStore.get(stage).loaderVersion) }, commitVersion = {})
+        assertNull(InstanceStore.get(root).loaderVersion)
+        assertEquals(3072, InstanceStore.get(root).memoryMb)
+    }
+
+    @Test
+    fun `failed Minecraft migration preserves the previous Loader choice`() = runBlocking {
+        val item = mod()
+        InstanceStore.update(root) { it.copy(loaderVersion = "0.19.5") }
+        val ready = plan(item)
+        assertThrows<IOException> {
+            BuildMigration.apply(ready, setOf(item.fileName), {}, {}, prepareGame = {},
+                commitVersion = { throw IOException("Could not commit Minecraft version") })
+        }
+        assertEquals("0.19.5", InstanceStore.get(root).loaderVersion)
+        assertArrayEquals(bytes, Files.readAllBytes(item.file))
+    }
+
     private fun mod(name: String = "old.jar", enabled: Boolean = true): InstalledItem {
         Files.createDirectories(root.resolve("mods"))
         val file = root.resolve("mods/$name")

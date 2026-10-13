@@ -46,7 +46,11 @@ data class InstanceOptions(
     val iconBackground: String? = null,
     val iconImage: String? = null,
     val iconUrl: String? = null,
+    // An explicit per-instance choice overrides an imported build or modpack pin.
+    val loaderVersion: String? = null,
 ) {
+    fun launchLoaderVersion(profileVersion: String?): String? = loaderVersion ?: profileVersion
+
     fun launchSettings(defaults: LauncherSettings): LauncherSettings = defaults.copy(
         memoryMb = memoryMb ?: defaults.memoryMb,
         jvmArgs = jvmArgs ?: defaults.jvmArgs,

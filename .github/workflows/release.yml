@@ -3,7 +3,14 @@ name: Verified Windows release
 on:
   push:
     tags: ['v*']
+    branches: [main]
+    paths: ['releases/*.md']
   workflow_dispatch:
+
+# A committed release note on main publishes the signed feed used by the Update button.
+concurrency:
+  group: awlauncher-windows-release
+  cancel-in-progress: false
 
 permissions:
   contents: write
@@ -17,7 +24,8 @@ jobs:
       AW_SIGNER_THUMBPRINT: ${{ vars.AW_SIGNER_THUMBPRINT }}
       AW_UPDATE_URL: ${{ vars.AW_UPDATE_URL }}
       AW_DISCORD_APP_ID: ${{ vars.AW_DISCORD_APP_ID }}
-      AW_CURSEFORGE_API_KEY: ${{ secrets.AW_CURSEFORGE_API_KEY }}
+      # CurseForge is configured locally; never embed its key in public installers.
+      AW_CURSEFORGE_API_KEY: ''
       WINDOWS_SIGNING_CERTIFICATE_BASE64: ${{ secrets.WINDOWS_SIGNING_CERTIFICATE_BASE64 }}
       WINDOWS_SIGNING_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_SIGNING_CERTIFICATE_PASSWORD }}
       AW_UPDATE_SIGNING_PRIVATE_KEY: ${{ secrets.AW_UPDATE_SIGNING_PRIVATE_KEY }}

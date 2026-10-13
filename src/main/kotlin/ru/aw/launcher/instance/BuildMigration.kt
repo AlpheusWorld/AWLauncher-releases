@@ -90,7 +90,7 @@ object BuildMigration {
             onStage("Подготавливаю обновление сборки")
             if (originalExisted) copyTree(originalMods, stagedMods)
             val compatible = plan.mods.mapNotNull { it.replacement?.projectId }.toSet()
-            InstanceStore.update(stage) { InstanceStore.get(root).copy(javaPath = null, blockedUpdates = emptyList(),
+            InstanceStore.update(stage) { InstanceStore.get(root).copy(javaPath = null, loaderVersion = null, blockedUpdates = emptyList(),
                 catalogMods = InstanceStore.get(root).catalogMods.filterNot { it.fileName.startsWith("mods/") && it.projectId in compatible }) }
             prepareGame(stage)
             for (mod in plan.mods) {

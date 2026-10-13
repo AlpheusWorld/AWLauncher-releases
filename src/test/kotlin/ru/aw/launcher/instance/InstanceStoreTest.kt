@@ -14,6 +14,25 @@ class InstanceStoreTest {
     @TempDir lateinit var root: Path
 
     @Test
+    fun `explicit Loader choice overrides imported pins and survives restart only for its own instance`() {
+        val first = root.resolve("fabric")
+        val second = root.resolve("other")
+        assertEquals("0.19.3", InstanceStore.get(first).launchLoaderVersion("0.19.3"))
+        assertNull(InstanceStore.get(first).launchLoaderVersion(null))
+        InstanceStore.update(first) { it.copy(loaderVersion = "0.19.5", memoryMb = 3072) }
+        InstanceStore.forget(first)
+        val reloaded = InstanceStore.get(first)
+        assertEquals("0.19.5", reloaded.launchLoaderVersion("0.19.3"))
+        assertEquals("0.19.5", reloaded.launchLoaderVersion(null))
+        assertEquals(3072, reloaded.memoryMb)
+        assertEquals("0.19.3", InstanceStore.get(second).launchLoaderVersion("0.19.3"))
+        InstanceStore.update(first) { it.copy(loaderVersion = null) }
+        InstanceStore.forget(first)
+        assertEquals("0.19.3", InstanceStore.get(first).launchLoaderVersion("0.19.3"))
+        assertEquals(3072, InstanceStore.get(first).memoryMb)
+    }
+
+    @Test
     fun `old profiles inherit launch settings and retain managed mods`() {
         val old = Json.decodeFromString<InstanceOptions>("""{"fpsBoost":true,"blockedUpdates":["blocked-version"]}""")
         val defaults = LauncherSettings(memoryMb = 4096, jvmArgs = "-XX:+UseG1GC")

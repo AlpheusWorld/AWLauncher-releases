@@ -1348,6 +1348,27 @@ class LauncherState(
         }
     }
 
+    fun saveLoaderVersion(entry: VersionEntry, version: String?) {
+        if (savingInstanceSettings || busy || buildsBusy) return
+        if (entry.loader != LoaderKind.FABRIC && entry.loader != LoaderKind.QUILT) return
+        if (version != null && !Regex("^[0-9A-Za-z][0-9A-Za-z.+_-]{0,79}$").matches(version)) {
+            fail("Некорректная версия Loader", entry)
+            return
+        }
+        savingInstanceSettings = true
+        scope.launch {
+            try {
+                // Save only the loader choice; keep memory, mods and other instance settings intact.
+                withContext(Dispatchers.IO) { InstanceStore.update(gameDirOf(entry)) { it.copy(loaderVersion = version) } }
+                instanceChanged(entry)
+                inform(if (version == null) "Выбор Loader сброшен к настройкам профиля"
+                    else "${entry.loader.label} Loader $version выбран. Он установится при следующем запуске", entry)
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { fail(e.message, entry, "Не удалось сохранить версию Loader") }
+            finally { savingInstanceSettings = false }
+        }
+    }
+
     fun saveInstanceSettings(entry: VersionEntry, draft: InstanceOptions) {
         if (savingInstanceSettings || busy || buildsBusy) return
         savingInstanceSettings = true

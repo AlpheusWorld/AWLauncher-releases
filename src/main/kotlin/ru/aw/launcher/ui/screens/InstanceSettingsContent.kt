@@ -12,6 +12,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import ru.aw.launcher.core.Settings
 import ru.aw.launcher.core.SettingsDefaults
+import ru.aw.launcher.meta.LoaderKind
+import ru.aw.launcher.meta.LoaderRepository
+import ru.aw.launcher.meta.LoaderVersion
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import ru.aw.launcher.ui.*
 import ru.aw.launcher.ui.components.*
 import ru.aw.launcher.ui.components.LocalizedText as Text
@@ -67,6 +72,9 @@ internal fun InstanceSettingsContent(state: LauncherState, entry: VersionEntry, 
                     }
                 }
                 Text("${entry.loader.label} ${entry.id}", color = AWColors.TextSoft, translate = false)
+                if (entry.loader == LoaderKind.FABRIC || entry.loader == LoaderKind.QUILT) {
+                    InstanceLoaderSettings(state, entry, options.loaderVersion, enabled)
+                }
                 AWButton("Открыть папку", icon = AWIcons.Folder, onClick = { state.openFolder(state.gameDirOf(entry)) })
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     AWButton("Изменить иконку", enabled = enabled && !state.libraryBusy, onClick = { state.editInstanceIcon(entry) })
@@ -162,6 +170,58 @@ internal fun InstanceSettingsContent(state: LauncherState, entry: VersionEntry, 
                 if (options != inherited) state.saveInstanceSettings(entry, inherited)
             })
             AWButton("Настройки лаунчера", enabled = enabled, onClick = { state.openSettings(section = 2) })
+        }
+    }
+}
+
+@Composable
+@OptIn(ExperimentalLayoutApi::class)
+private fun InstanceLoaderSettings(state: LauncherState, entry: VersionEntry, savedVersion: String?, enabled: Boolean) {
+    var chosen by remember(entry.key, savedVersion) { mutableStateOf(savedVersion) }
+    var versions by remember(entry.key) { mutableStateOf(emptyList<LoaderVersion>()) }
+    var revision by remember(entry.key) { mutableStateOf(0) }
+    var loading by remember(entry.key) { mutableStateOf(true) }
+    var menu by remember(entry.key) { mutableStateOf(false) }
+    LaunchedEffect(entry.key, entry.id, entry.loader, revision) {
+        loading = true
+        try {
+            versions = withContext(Dispatchers.IO) { LoaderRepository.versionsFor(entry.loader, entry.id, refresh = true) }
+        } finally { loading = false }
+    }
+    val profileVersion = entry.pack?.loaderVersion ?: entry.build?.loaderVersion
+    val effective = chosen ?: profileVersion
+    Panel(Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("Версия Loader", color = AWColors.Text, fontWeight = FontWeight.Bold)
+            Text(if (effective == null) "Профиль использует последнюю стабильную версию"
+                else "${entry.loader.label} Loader $effective", color = AWColors.TextSoft)
+            Text("Выбор сохраняется для этой сборки и применяется при следующем запуске", color = AWColors.TextMuted,
+                style = MaterialTheme.typography.bodySmall)
+            if (entry.pack != null) Text("Другая версия Loader может повлиять на совместимость модов сборки",
+                color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Box {
+                    AWButton(chosen ?: "Из настроек профиля", enabled = enabled && !loading, onClick = { menu = true })
+                    AWDropdownMenu(menu, onDismissRequest = { menu = false }) {
+                        Column(Modifier.width(300.dp).heightIn(max = 260.dp).verticalScroll(rememberScrollState())) {
+                            AWMenuItem("Из настроек профиля", onClick = { chosen = null; menu = false })
+                            versions.forEach { version ->
+                                AWMenuItem(version.label, onClick = { chosen = version.version; menu = false })
+                            }
+                        }
+                    }
+                }
+                AWButton(if (loading) "Загружаю…" else "Обновить список", enabled = enabled && !loading,
+                    onClick = { revision++ })
+                versions.firstOrNull { it.stable }?.let { latest ->
+                    AWButton("Последняя: ${latest.version}", enabled = enabled && !loading,
+                        onClick = { chosen = latest.version })
+                }
+                AWButton("Применить Loader", style = ButtonStyle.PRIMARY,
+                    enabled = enabled && chosen != savedVersion, onClick = { state.saveLoaderVersion(entry, chosen) })
+            }
+            if (!loading && versions.isEmpty()) Text("Не удалось получить список версий. Проверь соединение и обнови список",
+                color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall)
         }
     }
 }

@@ -145,7 +145,7 @@ object GameLauncher {
                         baseFiles?.await()
                         awaitJava()
                     },
-                    pinned = loaderVersion,
+                    pinned = options.launchLoaderVersion(loaderVersion),
                     onStage = onStage,
                     onProgress = progress.sink("loader"),
                 )

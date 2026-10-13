@@ -6,6 +6,7 @@ import kotlinx.serialization.decodeFromString
 import ru.aw.launcher.core.Json
 import ru.aw.launcher.core.Log
 import ru.aw.launcher.net.Http
+import java.util.concurrent.ConcurrentHashMap
 
 enum class LoaderKind(val label: String) {
     VANILLA("Vanilla"),
@@ -71,12 +72,15 @@ object LoaderRepository {
         "https://files.minecraftforge.net/net/minecraftforge/forge/promotions_slim.json"
     private const val NEOFORGE_MAVEN = "https://maven.neoforged.net/releases/net/neoforged/neoforge"
 
-    private val cache = HashMap<String, List<LoaderVersion>>()
+    private data class CachedVersions(val versions: List<LoaderVersion>, val fetchedAt: Long)
+    private val cache = ConcurrentHashMap<String, CachedVersions>()
+    private const val CACHE_NANOS = 5L * 60 * 1_000_000_000
 
-    fun versionsFor(kind: LoaderKind, gameVersion: String): List<LoaderVersion> {
+    fun versionsFor(kind: LoaderKind, gameVersion: String, refresh: Boolean = false): List<LoaderVersion> {
         if (kind == LoaderKind.VANILLA || gameVersion.isBlank()) return emptyList()
         val key = "${kind.name}:$gameVersion"
-        cache[key]?.let { return it }
+        cache[key]?.takeIf { !refresh && System.nanoTime() - it.fetchedAt < CACHE_NANOS }
+            ?.let { return it.versions }
 
         val result = runCatching {
             when (kind) {
@@ -88,7 +92,7 @@ object LoaderRepository {
             }
         }.onFailure { Log.warn("loader list failed for $key: ${it.message}") }.getOrDefault(emptyList())
 
-        if (result.isNotEmpty()) cache[key] = result
+        if (result.isNotEmpty()) cache[key] = CachedVersions(result, System.nanoTime())
         return result
     }
 
@@ -158,7 +162,11 @@ object LoaderRepository {
     )
 
     private fun fabricLike(url: String): List<LoaderVersion> =
-        Json.decodeFromString<List<FabricLoaderEntry>>(Http.getString(url))
+        // The HTTP disk cache must also revalidate after an explicit refresh or TTL expiry.
+        fabricBuilds(Http.getString(url, mapOf("Cache-Control" to "no-cache")))
+
+    internal fun fabricBuilds(document: String): List<LoaderVersion> =
+        Json.decodeFromString<List<FabricLoaderEntry>>(document)
             .filter { it.loader.version.isNotBlank() }
             .map { entry ->
                 val version = entry.loader.version
@@ -166,6 +174,8 @@ object LoaderRepository {
                     version.contains("rc", true)
                 LoaderVersion(version = version, stable = entry.loader.stable || !looksPre)
             }
+            .distinctBy { it.version }
+            .sortedWith { a, b -> NEWEST_FIRST.compare(a.version, b.version) }
 
     @Serializable
     private data class ForgePromotions(@SerialName("promos") val promos: Map<String, String> = emptyMap())
