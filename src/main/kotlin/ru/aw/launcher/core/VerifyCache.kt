@@ -74,6 +74,13 @@ object VerifyCache {
     private fun key(path: Path): String =
         runCatching { Paths.root.relativize(path).toString() }.getOrElse { path.toString() }
 
+    fun cachedSha1(path: Path): String? {
+        val attrs = runCatching { Files.readAttributes(path, BasicFileAttributes::class.java) }.getOrNull() ?: return null
+        if (!attrs.isRegularFile) return null
+        val cached = entries[key(path)] ?: return null
+        return cached.sha1.toHex().takeIf { cached.size == attrs.size() && cached.mtime == attrs.lastModifiedTime().toMillis() }
+    }
+
     fun isValid(path: Path, expectedSha1: String?, expectedSize: Long?): Boolean {
         val attrs = runCatching {
             Files.readAttributes(path, BasicFileAttributes::class.java)

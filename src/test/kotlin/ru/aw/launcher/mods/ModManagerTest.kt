@@ -12,6 +12,42 @@ import kotlin.io.path.exists
 import kotlin.io.path.writeText
 
 class ModManagerTest {
+    @Test fun `preview lists local files without hashing or catalog requests`(@TempDir game: Path) = kotlinx.coroutines.runBlocking {
+        val jar = ModManager.modsDir(game).createDirectories().resolve("local.jar.disabled").apply { writeText("local mod") }
+        val item = ModManager.scan(game, LoaderKind.FABRIC, "26.3", withUpdates = true, previewOnly = true).single()
+        assertEquals(jar, item.file)
+        assertFalse(item.enabled)
+        assertEquals("", item.sha1)
+        assertEquals(null, item.projectId)
+        assertEquals(null, ru.aw.launcher.core.VerifyCache.cachedSha1(jar))
+    }
+
+    @Test fun `preview reuses verified metadata but rejects changed files`(@TempDir game: Path) = kotlinx.coroutines.runBlocking {
+        val jar = ModManager.modsDir(game).createDirectories().resolve("known.jar").apply { writeText("original") }
+        val sum = ModManager.scan(game, LoaderKind.FABRIC, "26.3", identifyRemote = false).single().sha1
+        assertEquals(ru.aw.launcher.core.sha1Of(jar), sum)
+        assertEquals(sum, ru.aw.launcher.core.VerifyCache.cachedSha1(jar))
+        ru.aw.launcher.instance.InstanceStore.update(game) { it.copy(catalogMods = listOf(
+            ru.aw.launcher.instance.ManagedMod("project", "release", "mods/known.jar", sum, "Known mod", "2.0")
+        )) }
+        val cached = ModManager.scan(game, LoaderKind.FABRIC, "26.3", previewOnly = true).single()
+        assertEquals("Known mod", cached.title)
+        assertEquals("project", cached.projectId)
+        assertEquals("release", cached.versionId)
+        assertEquals(sum, cached.sha1)
+
+        val modified = java.nio.file.Files.getLastModifiedTime(jar).toMillis()
+        jar.writeText("modified")
+        java.nio.file.Files.setLastModifiedTime(jar, java.nio.file.attribute.FileTime.fromMillis(modified + 2_000))
+        val changed = ModManager.scan(game, LoaderKind.FABRIC, "26.3", previewOnly = true).single()
+        assertEquals("", changed.sha1)
+        assertEquals(null, changed.projectId)
+        assertEquals(null, ru.aw.launcher.core.VerifyCache.cachedSha1(jar))
+        val rescanned = ModManager.scan(game, LoaderKind.FABRIC, "26.3", identifyRemote = false).single()
+        assertEquals(ru.aw.launcher.core.sha1Of(jar), rescanned.sha1)
+        assertFalse(sum == rescanned.sha1)
+    }
+
     private fun datapack(path: Path, prefix: String = ""): Path {
         java.util.zip.ZipOutputStream(java.nio.file.Files.newOutputStream(path)).use { zip ->
             for ((name, text) in mapOf("pack.mcmeta" to "{\"pack\":{\"pack_format\":61,\"description\":\"Test\"}}",

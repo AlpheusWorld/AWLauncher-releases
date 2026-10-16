@@ -17,6 +17,14 @@ class DiscordPresenceTest {
     private fun card(p: Presence, s: LauncherSettings = russian) = DiscordPresence.activity(p,s)
     private fun playing() = Presence.Playing("1.21.11","Fabric",null,21,1_790_000_000_123,pack="Fabulously Optimized")
 
+    @Test fun `launcher and game website links use the project domain`() {
+        for (presence in listOf(Presence.Launcher, Presence.Starting("Test", "26.3", "Fabric"), playing())) {
+            val activity = card(presence)
+            assertEquals("https://alpheusworld.ru/", activity.getValue("buttons").jsonArray.last().jsonObject.text("url"))
+            assertEquals("https://alpheusworld.ru/", activity.getValue("assets").jsonObject.text("large_url"))
+        }
+    }
+
     @Test
     fun `launcher and game use AW artwork and a stable session timestamp`() {
         val launcher = card(Presence.Launcher)

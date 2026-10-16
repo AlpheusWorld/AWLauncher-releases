@@ -8,6 +8,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonObject
 import ru.aw.launcher.core.Log
 import ru.aw.launcher.core.Storage
+import ru.aw.launcher.core.VerifyCache
 import ru.aw.launcher.core.sha1Of
 import ru.aw.launcher.instance.InstanceStore
 import ru.aw.launcher.instance.ManagedMod
@@ -69,7 +70,16 @@ object ModManager {
         val size = file.fileSize()
         val modified = file.getLastModifiedTime().toMillis()
         hashes[file]?.takeIf { it.size == size && it.modified == modified }?.let { return it.sha1 }
-        return sha1Of(file).also { hashes[file] = Hashed(size, modified, it) }
+        VerifyCache.cachedSha1(file)?.let { cached ->
+            hashes[file] = Hashed(size, modified, cached)
+            return cached
+        }
+        return sha1Of(file).also {
+            if (file.fileSize() == size && file.getLastModifiedTime().toMillis() == modified) {
+                hashes[file] = Hashed(size, modified, it)
+                VerifyCache.record(file, it)
+            }
+        }
     }
 
     fun loadersFor(kind: LoaderKind): List<String> = when (kind) {
@@ -102,6 +112,7 @@ object ModManager {
         content: ContentKind = ContentKind.MOD,
         withUpdates: Boolean = false,
         identifyRemote: Boolean = true,
+        previewOnly: Boolean = false,
     ): List<InstalledItem> =
         withContext(Dispatchers.IO) {
             val directories = if (content == ContentKind.DATA_PACK) dataPackWorlds(gameDir).flatMap {
@@ -113,7 +124,11 @@ object ModManager {
             }
             if (files.isEmpty()) return@withContext emptyList()
 
-            val sums = files.associateWith { file -> if (file.isDirectory()) "" else runCatching { hashOf(file) }.getOrDefault("") }
+            val sums = files.associateWith { file ->
+                if (file.isDirectory()) "" else runCatching {
+                    if (previewOnly) VerifyCache.cachedSha1(file).orEmpty() else hashOf(file)
+                }.getOrDefault("")
+            }
             val known = sums.values.filter { it.isNotEmpty() }
             val options = InstanceStore.get(gameDir)
             val records = options.catalogMods.associateBy { it.fileName }
@@ -121,13 +136,13 @@ object ModManager {
                 records[gameDir.toAbsolutePath().normalize().relativize(file.toAbsolutePath().normalize()).toString()
                     .replace('\\', '/').replace("/aw-disabled-datapacks/", "/datapacks/").removeSuffix(DISABLED)]?.takeIf { it.sha1 == sums[file] }
             }.associateBy { it.sha1 }
-            val versions = (if (identifyRemote) remote("identify mods") { Modrinth.versionsByHash(known.filter { it !in tracked }) }.orEmpty() else emptyMap()) +
+            val versions = (if (identifyRemote && !previewOnly) remote("identify mods") { Modrinth.versionsByHash(known.filter { it !in tracked }) }.orEmpty() else emptyMap()) +
                 tracked.mapValues { (_, record) -> Modrinth.Version(id = record.versionId, projectId = record.projectId,
                     name = record.title, versionNumber = record.versionNumber, datePublished = record.datePublished) }
-            val projects = (if (identifyRemote) remote("mod titles") { Modrinth.projects(versions.filterKeys { it !in tracked }.values.map { it.projectId }.filterNot(CurseForge::owns).distinct()) }
+            val projects = (if (identifyRemote && !previewOnly) remote("mod titles") { Modrinth.projects(versions.filterKeys { it !in tracked }.values.map { it.projectId }.filterNot(CurseForge::owns).distinct()) }
                 .orEmpty() else emptyList()).associateBy { it.id }
             val loaders = catalogLoaders(content, kind)
-            val updates = if (withUpdates && versions.isNotEmpty()) {
+            val updates = if (withUpdates && !previewOnly && versions.isNotEmpty()) {
                 val latest = ContentCatalog.updates(versions, loaders, gameVersion).versions
                 stableUpdates(versions, latest, loaders, gameVersion)
             } else {

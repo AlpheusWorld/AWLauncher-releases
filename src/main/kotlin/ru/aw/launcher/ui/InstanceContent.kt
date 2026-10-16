@@ -71,12 +71,19 @@ internal class ContentModel(
         scanJob = scope.launch {
             try {
                 if (!scanned) {
-                    val local = scanAll(remote = false)
+                    val local = scanAll(remote = false, previewOnly = true) { kind, rows ->
+                        if (generation == scanGeneration) {
+                            installed = retainRows(installed + (kind to rows))
+                            if (rows.isNotEmpty()) scanned = true
+                        }
+                    }
                     if (generation != scanGeneration) return@launch
                     installed = retainRows(local)
                     scanned = true
                 }
-                val remote = scanAll()
+                val remote = scanAll { kind, rows ->
+                    if (generation == scanGeneration) installed = retainRows(installed + (kind to rows))
+                }
                 if (generation != scanGeneration) return@launch
                 installed = retainRows(remote)
                 scannedAt = System.currentTimeMillis()
@@ -108,9 +115,13 @@ internal class ContentModel(
         }
     }
 
-    private suspend fun scanAll(remote: Boolean = true): Map<ContentKind, List<InstalledItem>> = coroutineScope {
+    private suspend fun scanAll(remote: Boolean = true, previewOnly: Boolean = false,
+                                onResult: (ContentKind, List<InstalledItem>) -> Unit = { _, _ -> }): Map<ContentKind, List<InstalledItem>> = coroutineScope {
         ContentKind.entries.associateWith { kind -> async {
-            ModManager.scan(dir, loader, gameVersion, kind, withUpdates = remote && (kind != ContentKind.MOD || loader.isModded), identifyRemote = remote)
+            val rows = ModManager.scan(dir, loader, gameVersion, kind,
+                withUpdates = remote && (kind != ContentKind.MOD || loader.isModded), identifyRemote = remote, previewOnly = previewOnly)
+            onResult(kind, rows)
+            rows
         } }.mapValues { it.value.await() }
     }
 

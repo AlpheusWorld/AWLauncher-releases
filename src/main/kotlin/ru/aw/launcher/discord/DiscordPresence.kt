@@ -39,7 +39,7 @@ object DiscordPresence {
             javaClass.getResourceAsStream("/discord-app-id.txt")?.bufferedReader()?.use { it.readText().trim() },
         ).firstOrNull { it != null && idPattern.matches(it) } ?: "0"
     }
-    const val SITE_URL = "https://awlauncher.zarplaykayt.chatgpt.site/"
+    const val SITE_URL = "https://alpheusworld.ru/"
     private val openedAt = System.currentTimeMillis()
     private val desired = MutableStateFlow<Presence>(Presence.Launcher)
     private val connectionStatus = MutableStateFlow(DiscordStatus.WAITING)
