@@ -94,7 +94,39 @@ public final class AssistantClientSmoke implements ClientModInitializer {
                     screen.keyPressed(new KeyEvent(InputConstants.KEY_F8,0,0));stage=5;since=ticks;
                 } else if(stage==5 &&screen instanceof TitleScreen &&ticks-since>15) {
                     verifyNativeFocus(client,false);client.keyboardHandler.setClipboard(originalClipboard);
-                    Files.writeString(client.gameDirectory.toPath().resolve("awassistant-smoke.ok"),"Hotkey, Russian input, search, arrow/Enter/Escape, separate scrolling, copy, servers, categories, dragging, saved position, official rules, GUI scaling and native rendering verified; FPS title="+baselineFps+", assistant="+expandedFps+", no blur="+clearFps+"; first-open tick gap ms="+firstOpenGap/1_000_000.0);client.stop();stage=6;
+                    ClientBridge.screen(client,new RulesScreen(screen));stage=50;since=ticks;
+                } else if(stage==50 &&screen instanceof RulesScreen &&ticks-since>20) {
+                    if((Boolean)field(screen,"indexing")||(Boolean)field(screen,"loading"))return;
+                    ((ru.aw.assistant.ui.SearchInput)field(screen,"input")).value("1.1");
+                    var update=RulesScreen.class.getDeclaredMethod("updateSearch");update.setAccessible(true);update.invoke(screen);stage=51;since=ticks;
+                } else if(stage==51 &&screen instanceof RulesScreen &&ticks-since>10) {
+                    float scale=((Number)field(screen,"scale")).floatValue();int x=((Number)field(screen,"panelX")).intValue(),y=((Number)field(screen,"panelY")).intValue(),w=((Number)field(screen,"panelW")).intValue(),top=((Number)field(screen,"resultTop")).intValue();
+                    String id=(String)field(screen,"serverId");if(AWAssistant.RULES.favorite(id,"1.1"))AWAssistant.RULES.toggleFavorite(id,"1.1");
+                    click(screen,(x+w-90)*scale,(top+10)*scale);
+                    if(!AWAssistant.RULES.favorite(id,"1.1"))throw new IllegalStateException("Favorite button did not save the rule");
+                    click(screen,(x+w-250)*scale,(y+20)*scale);stage=52;since=ticks;
+                } else if(stage==52 &&screen instanceof ru.aw.assistant.ui.RuleLibraryScreen &&ticks-since>10) {
+                    if(((List<?>)field(screen,"rows")).isEmpty())throw new IllegalStateException("Favorites library is empty");capture(client,"favorites.png");stage=53;since=ticks;
+                } else if(stage==53 &&screen instanceof ru.aw.assistant.ui.RuleLibraryScreen &&ticks-since>10&&captured) {
+                    float scale=((Number)field(screen,"scale")).floatValue();int x=((Number)field(screen,"x")).intValue(),y=((Number)field(screen,"y")).intValue();
+                    click(screen,(x+170)*scale,(y+65)*scale);if(((List<?>)field(screen,"rows")).isEmpty())throw new IllegalStateException("Search history is empty");
+                    click(screen,(x+290)*scale,(y+65)*scale);capture(client,"changes.png");stage=54;since=ticks;
+                } else if(stage==54 &&screen instanceof ru.aw.assistant.ui.RuleLibraryScreen &&ticks-since>10&&captured) {
+                    screen.onClose();ClientBridge.screen(client,AWAssistant.HUD.editor(ClientBridge.screen(client)));stage=55;since=ticks;
+                } else if(stage==55 &&screen.getClass().getName().contains("AssistantHud$Editor")&&ticks-since>15) {
+                    int panel=((Number)field(screen,"panel")).intValue();click(screen,panel+50,34+2*22+9);
+                    if(!AWAssistant.RULES.hud().get("coordinates").enabled())click(screen,panel+50,157);
+                    double old=AWAssistant.RULES.hud().get("coordinates").scale();screen.mouseScrolled(20,20,0,1);
+                    if(AWAssistant.RULES.hud().get("coordinates").scale()<=old)throw new IllegalStateException("HUD scale did not change");
+                    var bounds=(java.util.Map<?,?>)field(AWAssistant.HUD,"bounds");var box=bounds.get("coordinates");
+                    var bx=box.getClass().getDeclaredMethod("x");bx.setAccessible(true);var by=box.getClass().getDeclaredMethod("y");by.setAccessible(true);
+                    int hx=(int)bx.invoke(box),hy=(int)by.invoke(box);click(screen,hx+5,hy+5);
+                    var button=new net.minecraft.client.input.MouseButtonInfo(InputConstants.MOUSE_BUTTON_LEFT,0);
+                    screen.mouseDragged(new net.minecraft.client.input.MouseButtonEvent(180,110,button),170,90);screen.mouseReleased(new net.minecraft.client.input.MouseButtonEvent(180,110,button));
+                    if(AWAssistant.RULES.hud().get("coordinates").x()<=.02)throw new IllegalStateException("HUD drag did not change stored position");
+                    capture(client,"hud-editor.png");stage=56;since=ticks;
+                } else if(stage==56&&ticks-since>10&&captured) {
+                    Files.writeString(client.gameDirectory.toPath().resolve("awassistant-smoke.ok"),"Hotkey, Russian input, search, navigation, scrolling, copy, servers, dragging, GUI scaling, favorites, query history, rule changes tab and HUD editor rendering/enable/scale/drag verified; FPS title="+baselineFps+", assistant="+expandedFps+", no blur="+clearFps+"; first-open tick gap ms="+firstOpenGap/1_000_000.0);client.stop();stage=6;
                 }
                 if(ticks>1600 &&stage!=6)throw new IllegalStateException("Client UI verification timed out at stage "+stage);
             } catch(Exception failure) {

@@ -65,7 +65,7 @@ public final class RuleSearch {
     private static Set<String> queryTopics(String text){
         var result=new HashSet<String>();
         String s=normalize(text).replace("-","");
-        if(has(s,"фанп","фунп","funpay","коммерц","реальные деньги","реальную валюту"))result.add("commerce");
+        if(has(s,"фанп","фунп","funpay","коммерц","реальные деньги","реальную валюту")||has(s,"продат","продаж","продав","купит","покуп","обмен")&&has(s,"рубл","рубли","реал","деньг","донат","вне игр"))result.add("commerce");
         if(has(s,"читы","читов","читер","cheat","килаур","киллаур","killaura","xray","иксрей","софт")||terms(s).stream().anyMatch(t->t.equals("чит")))result.add("cheats");
         if(has(s,"дюп","dupe","дублирован"))result.add("dupes");
         if(has(s,"флуд","спам","caps","капс"))result.add("spam");
@@ -83,5 +83,6 @@ public final class RuleSearch {
         return Set.copyOf(result);
     }
     private static boolean has(String text,String... fragments){for(String fragment:fragments)if(text.contains(fragment))return true;return false;}
+    public static boolean matchesIntent(String query,RuleBook.Rule rule){var intent=queryTopics(query);return intent.isEmpty()||topics(normalize(rule.title()+" "+rule.description()+" "+String.join(" ",rule.keywords()))).containsAll(intent);}
     public static String normalize(String text) { return Normalizer.normalize(text == null ? "" : text, Normalizer.Form.NFKC).toLowerCase(Locale.ROOT).replace('ё', 'е').strip(); }
 }

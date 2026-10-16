@@ -4,7 +4,7 @@ import java.util.zip.ZipFile
 
 plugins { id 'java' }
 group = 'ru.aw'
-version = '0.1.3'
+version = '0.2.0'
 def gameVersion = providers.gradleProperty('gameVersion').getOrElse('26.1.2')
 def releases = [
     '26.1.2': ['4e618f09a0c649dde3fdf829df443ce0b8831e65', '0.155.3+26.1.2'],
@@ -31,7 +31,7 @@ dependencies {
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.10.2'
 }
 def modules = layout.buildDirectory.dir("fabric-modules/${gameVersion}")
-def selectedModules = ['fabric-api-base-', 'fabric-key-mapping-api-v1-', 'fabric-lifecycle-events-v1-', 'fabric-resource-loader-v1-']
+def selectedModules = ['fabric-api-base-', 'fabric-key-mapping-api-v1-', 'fabric-lifecycle-events-v1-', 'fabric-resource-loader-v1-', 'fabric-rendering-v1-']
 def prepareGame = tasks.register('prepareGame') {
     inputs.property('gameVersion', gameVersion)
     outputs.file(gameJar)
