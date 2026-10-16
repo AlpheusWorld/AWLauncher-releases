@@ -94,7 +94,11 @@ public final class AssistantClientSmoke implements ClientModInitializer {
                     screen.keyPressed(new KeyEvent(InputConstants.KEY_F8,0,0));stage=5;since=ticks;
                 } else if(stage==5 &&screen instanceof TitleScreen &&ticks-since>15) {
                     verifyNativeFocus(client,false);client.keyboardHandler.setClipboard(originalClipboard);
-                    ClientBridge.screen(client,new RulesScreen(screen));stage=50;since=ticks;
+                    ClientBridge.screen(client,new RulesScreen(screen));
+                    AWAssistant.RULES.saveHud(ru.aw.assistant.rules.RuleRepository.defaultHud());
+                    ClientBridge.screen(client,AWAssistant.HUD.editor(ClientBridge.screen(client)));stage=49;since=ticks;
+                } else if(stage==49&&ticks-since>20) {
+                    screen.onClose();stage=50;since=ticks;
                 } else if(stage==50 &&screen instanceof RulesScreen &&ticks-since>20) {
                     if((Boolean)field(screen,"indexing")||(Boolean)field(screen,"loading"))return;
                     ((ru.aw.assistant.ui.SearchInput)field(screen,"input")).value("1.1");

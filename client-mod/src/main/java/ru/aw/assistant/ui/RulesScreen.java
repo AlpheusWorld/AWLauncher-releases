@@ -57,7 +57,7 @@ public final class RulesScreen extends Screen {
     private void reload(){
         if(loading)return;loading=true;message="";
         AWAssistant.RULES.reload().whenComplete((snapshot,failure)->minecraft.execute(()->{
-            if(ClientBridge.screen(minecraft)!=this)return;loading=false;
+            loading=false;if(ClientBridge.screen(minecraft)!=this)return;
             if(failure!=null){message="Не удалось загрузить правила";return;}
             data=snapshot;
             AWAssistant.SEMANTIC.enabled(AWAssistant.RULES.neural());
@@ -74,7 +74,7 @@ public final class RulesScreen extends Screen {
     private void refreshSources(){
         if(refreshing)return;refreshing=true;message="Обновляю правила с сайтов серверов…";
         AWAssistant.RULES.refresh().whenComplete((snapshot,failure)->minecraft.execute(()->{
-            if(ClientBridge.screen(minecraft)!=this)return;refreshing=false;
+            refreshing=false;if(ClientBridge.screen(minecraft)!=this){index=null;return;}
             if(failure!=null){message="Не удалось обновить правила; сохранены прежние";return;}
             String selectedNumber=selectedRule()==null?"":selectedRule().number(),selectedCategory=category;
             var previous=currentBook();data=snapshot;
@@ -94,8 +94,8 @@ public final class RulesScreen extends Screen {
         var cached=indexes.get(id);
         if(cached!=null&&cached.book.equals(book)){index=cached.search;indexing=false;updateSearch();return;}
         java.util.concurrent.CompletableFuture.supplyAsync(()->new RuleSearch(book)).whenComplete((ready,failure)->minecraft.execute(()->{
-            if(ClientBridge.screen(minecraft)!=this||request!=indexRequest)return;
-            indexing=false;if(failure!=null){message="Не удалось подготовить поиск";return;}
+            if(request!=indexRequest)return;indexing=false;if(ClientBridge.screen(minecraft)!=this)return;
+            if(failure!=null){message="Не удалось подготовить поиск";return;}
             index=ready;indexes.put(id,new IndexedBook(book,ready));if(indexes.size()>8)indexes.remove(indexes.keySet().iterator().next());updateSearch();
             for(int i=0;i<matches.size();i++)if(matches.get(i).rule().number().equals(desiredNumber)){select(i);break;}
         }));
@@ -109,7 +109,7 @@ public final class RulesScreen extends Screen {
         String query=input.value();
         if(book!=null&&index!=null&&AWAssistant.SEMANTIC.enabled()&&query.strip().length()>=2){
             AWAssistant.SEMANTIC.search(book,query,category,matches).whenComplete((found,failure)->minecraft.execute(()->{
-                if(ClientBridge.screen(minecraft)!=this||request!=queryGeneration||failure!=null)return;
+                if(request!=queryGeneration||failure!=null)return;
                 String number=selected>0&&selectedRule()!=null?selectedRule().number():"";
                 matches=found;selected=0;for(int i=0;i<matches.size();i++)if(matches.get(i).rule().number().equals(number))selected=i;
                 wrapResults();
