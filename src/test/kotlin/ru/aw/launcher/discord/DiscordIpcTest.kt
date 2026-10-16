@@ -7,8 +7,70 @@ import ru.aw.launcher.core.Json
 import java.io.IOException
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.nio.channels.ServerSocketChannel
+import java.net.StandardProtocolFamily
+import java.net.UnixDomainSocketAddress
+import java.nio.file.Path
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import org.junit.jupiter.api.condition.EnabledOnOs
+import org.junit.jupiter.api.condition.OS
+import org.junit.jupiter.api.io.TempDir
 
 class DiscordIpcTest {
+    @TempDir lateinit var socketDirectory: Path
+
+    @Test
+    @EnabledOnOs(OS.LINUX)
+    fun `Unix transport handles fragmented frames and closes resources`() {
+        val path = socketDirectory.resolve("ipc")
+        val expected = ByteArray(32768) { it.toByte() }
+        val worker = Executors.newSingleThreadExecutor()
+        try {
+            ServerSocketChannel.open(StandardProtocolFamily.UNIX).use { server ->
+                server.bind(UnixDomainSocketAddress.of(path))
+                val response = worker.submit {
+                    server.accept().use { peer ->
+                        val request = ByteBuffer.allocate(3)
+                        while (request.hasRemaining()) check(peer.read(request) > 0)
+                        assertArrayEquals(byteArrayOf(1, 2, 3), request.array())
+                        var offset = 0
+                        while (offset < expected.size) {
+                            val buffer = ByteBuffer.wrap(expected, offset, minOf(17, expected.size - offset))
+                            while (buffer.hasRemaining()) peer.write(buffer)
+                            offset += minOf(17, expected.size - offset)
+                        }
+                    }
+                }
+                DiscordIpc.UnixSocket(path).use { transport ->
+                    transport.write(byteArrayOf(1, 2, 3))
+                    val received = ByteArray(expected.size)
+                    transport.readFully(received, System.nanoTime() + TimeUnit.SECONDS.toNanos(5))
+                    assertArrayEquals(expected, received)
+                }
+                response.get(5, TimeUnit.SECONDS)
+            }
+        } finally { worker.shutdownNow() }
+    }
+
+    @Test
+    @EnabledOnOs(OS.LINUX)
+    fun `Unix transport enforces the read deadline and detects disconnected peers`() {
+        val path = socketDirectory.resolve("ipc-timeout")
+        ServerSocketChannel.open(StandardProtocolFamily.UNIX).use { server ->
+            server.bind(UnixDomainSocketAddress.of(path))
+            DiscordIpc.UnixSocket(path).use { transport ->
+                server.accept().use {
+                    val timeout = assertThrows(IOException::class.java) {
+                        transport.readFully(ByteArray(1), System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(40))
+                    }
+                    assertTrue(timeout.message.orEmpty().contains("timed out"))
+                }
+                assertThrows(IOException::class.java) { transport.readFully(ByteArray(1), System.nanoTime() + TimeUnit.SECONDS.toNanos(1)) }
+            }
+        }
+    }
+
     private class Pipe : DiscordIpc.Transport {
         val writes = mutableListOf<Pair<Int,JsonObject>>()
         var incoming = byteArrayOf()

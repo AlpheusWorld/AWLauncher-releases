@@ -65,9 +65,23 @@ sealed interface UpdateState {
 object UpdateConfig {
 
     val feedUrl: String? by lazy {
-        sequenceOf(System.getenv("AW_UPDATE_URL"), readFromFile(), readBundled())
+        sequenceOf(System.getenv("AW_UPDATE_URL"), readFromFile())
             .mapNotNull { it?.trim() }
             .firstOrNull { it.startsWith("https://") }
+            ?: readBundled()?.let { bundled ->
+                if (Shell.isLinux) linuxFeed(bundled, linuxPackageType(), System.getProperty("os.arch")) else bundled
+            }
+    }
+
+    internal fun linuxPackageType(): String? = when {
+        Files.isExecutable(Path.of("/usr/bin/dpkg")) -> "deb"
+        Files.isExecutable(Path.of("/usr/bin/rpm")) -> "rpm"
+        else -> null
+    }
+
+    internal fun linuxFeed(url: String, type: String?, architecture: String): String? {
+        if (type !in setOf("deb", "rpm") || architecture.lowercase() !in setOf("amd64", "x86_64")) return null
+        return if (url.endsWith("/update.json")) url.removeSuffix("update.json") + "update-linux-$type-x64.json" else url
     }
 
     private fun readFromFile(): String? = runCatching {
@@ -109,6 +123,13 @@ object Updater {
         if (_state.value is UpdateState.Downloading || _state.value is UpdateState.Installing || _state.value is UpdateState.Checking) return
         _state.value = UpdateState.Checking
         _state.value = try {
+            if (Shell.isLinux) withContext(Dispatchers.IO) {
+                val failed = Paths.cache.resolve("update/linux-failed")
+                if (failed.exists()) {
+                    failed.deleteIfExists()
+                    throw IOException("Не удалось установить предыдущее обновление. Журнал: ${Paths.cache.resolve("update/install.log")}")
+                }
+            }
             val manifest = withContext(Dispatchers.IO) {
                 val document = metadata(url, 64 * 1024)
                 val parsed = Json.decodeFromString<UpdateManifest>(document)
@@ -123,6 +144,7 @@ object Updater {
                 } else parsed
             }
             validate(manifest)
+            validatePlatform(manifest, Shell.isLinux)
             verifyProof(manifest)
             if (isNewer(manifest.version, currentVersion)) UpdateState.Available(manifest) else UpdateState.UpToDate
         } catch (e: CancellationException) {
@@ -139,12 +161,13 @@ object Updater {
         try {
             if (!isNewer(update.version, currentVersion)) throw IOException("Эта версия лаунчера уже установлена или устарела")
             validate(update)
+            validatePlatform(update, Shell.isLinux)
             verifyProof(update)
             val app = Shell.appExecutable
                 ?: throw IOException("Обновление ставится только в установленный лаунчер, не при запуске из IDE")
             _state.value = UpdateState.Downloading(update, 0f)
             val file = download(update) { fraction, speed -> _state.value = UpdateState.Downloading(update, fraction, speed) }
-            if (signerThumbprint.isNotBlank()) withContext(Dispatchers.IO) { verifyInstallerSignature(file) }
+            if (Shell.isWindows && signerThumbprint.isNotBlank()) withContext(Dispatchers.IO) { verifyInstallerSignature(file) }
             currentCoroutineContext().ensureActive()
             _state.value = UpdateState.Installing(update)
             startInstaller(file, app, update.version)
@@ -181,7 +204,7 @@ object Updater {
     private fun verifyProof(update: UpdateManifest) {
         val key = publicKey
         if (key != null) verifySignedManifest(update, key)
-        else if (!Regex("^[0-9A-F]{40}$").matches(signerThumbprint)) throw IOException("Проверка подписи обновлений не настроена")
+        else if (!Shell.isWindows || !Regex("^[0-9A-F]{40}$").matches(signerThumbprint)) throw IOException("Проверка подписи обновлений не настроена")
     }
 
     internal fun verifySignedManifest(update: UpdateManifest, encodedKey: String) {
@@ -252,7 +275,7 @@ object Updater {
         pieceBytes: Long = Pieces.PIECE_BYTES,
         onProgress: (fraction: Float, bytesPerSecond: Long) -> Unit = { _, _ -> },
     ): Path = withContext(Dispatchers.IO) {
-        val extension = if (update.url.substringBefore('?').endsWith(".exe", ignoreCase = true)) "exe" else "msi"
+        val extension = installerExtension(update.url)
         val dir = Paths.cache.resolve("updates").also { it.createDirectories() }
         val target = dir.resolve("AWLauncher-${update.version}.$extension")
         val part = dir.resolve("${target.fileName}.part")
@@ -344,6 +367,10 @@ object Updater {
     }
 
     private suspend fun startInstaller(installer: Path, app: Path, version: String) {
+        if (Shell.isLinux) {
+            startLinuxInstaller(installer, app)
+            return
+        }
         val dir = Paths.cache.resolve("update")
         val ready = dir.resolve("ready")
         val script = withContext(Dispatchers.IO) {
@@ -366,6 +393,59 @@ object Updater {
         withTimeoutOrNull(READY_MILLIS) { while (!ready.exists()) delay(50) }
             ?: Log.warn("update splash did not show up in $READY_MILLIS ms")
     }
+
+    internal fun installerExtension(url: String): String {
+        val path = url.substringBefore('?').lowercase()
+        return listOf("exe", "deb", "rpm").firstOrNull { path.endsWith(".$it") } ?: "msi"
+    }
+
+    internal fun validatePlatform(update: UpdateManifest, linux: Boolean) {
+        val extension = installerExtension(update.url)
+        if (linux && extension !in setOf("deb", "rpm")) throw IOException("Обновление предназначено для другой операционной системы")
+        if (!linux && extension in setOf("deb", "rpm")) throw IOException("Обновление предназначено для другой операционной системы")
+    }
+
+    private suspend fun startLinuxInstaller(installer: Path, app: Path) {
+        val dir = Paths.cache.resolve("update")
+        val ready = dir.resolve("linux-ready")
+        val failed = dir.resolve("linux-failed")
+        val extension = installerExtension(installer.toUri().toString())
+        val manager = Path.of(if (extension == "deb") "/usr/bin/dpkg" else "/usr/bin/rpm")
+        val privilege = Path.of("/usr/bin/pkexec")
+        if (!Files.isExecutable(manager) || !Files.isExecutable(privilege)) throw IOException("Для установки обновления нужны ${manager.fileName} и pkexec")
+        withContext(Dispatchers.IO) {
+            dir.createDirectories()
+            ready.deleteIfExists()
+            failed.deleteIfExists()
+            ProcessBuilder(listOf("/bin/sh", "-c", linuxInstallerScript(), "awlauncher-update",
+                ProcessHandle.current().pid().toString(), privilege.toString(), manager.toString(),
+                if (extension == "deb") "--install" else "--upgrade", installer.toAbsolutePath().toString(),
+                dir.resolve("install.log").toString(), app.toAbsolutePath().toString(), failed.toString(), ready.toString()))
+                .redirectOutput(ProcessBuilder.Redirect.DISCARD).redirectError(ProcessBuilder.Redirect.DISCARD).start()
+        }
+        withTimeoutOrNull(READY_MILLIS) { while (!ready.exists()) delay(50) }
+            ?: throw IOException("Не удалось запустить установщик обновления Linux")
+    }
+
+    internal fun linuxInstallerScript(): String = """
+        umask 077
+        : > "${'$'}9" || exit 1
+        attempts=0
+        while kill -0 "${'$'}1" 2>/dev/null; do
+            attempts=${'$'}((attempts + 1))
+            if [ "${'$'}attempts" -ge 120 ]; then
+                printf '%s\n' 'launcher did not exit' > "${'$'}8"
+                exit 1
+            fi
+            sleep 0.5
+        done
+        "${'$'}2" "${'$'}3" "${'$'}4" "${'$'}5" > "${'$'}6" 2>&1
+        result=${'$'}?
+        if [ "${'$'}result" -ne 0 ]; then printf '%s\n' "${'$'}result" > "${'$'}8"; fi
+        if [ -x "${'$'}7" ]; then exec "${'$'}7"; fi
+        printf '%s\n' 'launcher executable is missing' > "${'$'}8"
+        exit 1
+    """.trimIndent()
 
     private const val READY_MILLIS = 10_000L
     private const val SAMPLE_NANOS = 250_000_000L

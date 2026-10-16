@@ -316,6 +316,7 @@ class LauncherState(
 
     val accounts = AccountManager.accounts
     val selectedAccount = AccountManager.selected
+    private val accountChanges = Mutex()
     val servers = Servers.all
     val updates = Updater.state
 
@@ -1443,7 +1444,7 @@ class LauncherState(
                     )
                 }
             }
-                .onSuccess { inform("Ярлык «${it.fileName.toString().removeSuffix(".lnk")}» на рабочем столе", entry) }
+                .onSuccess { inform("Ярлык «${it.fileName.toString().removeSuffix(".lnk").removeSuffix(".desktop")}» на рабочем столе", entry) }
                 .onFailure { fail(it.message, entry) }
         }
     }
@@ -1560,9 +1561,17 @@ class LauncherState(
         }
     }
 
-    fun removeAccount(uuid: String) { if (skinWorkingUuid != uuid) AccountManager.remove(uuid) }
+    fun removeAccount(uuid: String) {
+        scope.launch {
+            accountChanges.withLock {
+                if (skinWorkingUuid != uuid) withContext(Dispatchers.IO) { AccountManager.remove(uuid) }
+            }
+        }
+    }
 
-    fun selectAccount(uuid: String) = AccountManager.select(uuid)
+    fun selectAccount(uuid: String) {
+        scope.launch { accountChanges.withLock { withContext(Dispatchers.IO) { AccountManager.select(uuid) } } }
+    }
 
     private fun visibleEntries(): List<VersionEntry> = buildChoices()
 

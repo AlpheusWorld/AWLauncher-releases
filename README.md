@@ -5,13 +5,15 @@
   <p>Сборки, моды и аккаунты — в одном месте</p>
   <p>
     <a href="https://github.com/AlpheusWorld/AWLauncher-releases/releases/latest"><strong>Скачать для Windows</strong></a>
+    · <a href="https://github.com/AlpheusWorld/AWLauncher-releases/releases/latest/download/AWLauncher-linux-x64.deb">Linux DEB</a>
+    · <a href="https://github.com/AlpheusWorld/AWLauncher-releases/releases/latest/download/AWLauncher-linux-x64.rpm">Linux RPM</a>
     · <a href="https://awlauncher.ru">Сайт</a>
     · <a href="https://github.com/AlpheusWorld/AWLauncher-releases/issues">Сообщить об ошибке</a>
   </p>
   <p>
     <a href="https://github.com/AlpheusWorld/AWLauncher-releases/releases/latest"><img src="https://img.shields.io/github/v/release/AlpheusWorld/AWLauncher-releases?style=flat&color=2bc778&label=release" alt="Последний релиз"></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-2bc778?style=flat" alt="Лицензия MIT"></a>
-    <img src="https://img.shields.io/badge/platform-Windows%20x64-555?style=flat" alt="Windows x64">
+    <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20x64-555?style=flat" alt="Windows и Linux x64">
   </p>
 </div>
 
@@ -39,6 +41,26 @@ CurseForge доступен без ручной настройки API-ключ�
 4. Нажми **Играть**
 
 Нужна **Windows 10 или 11, 64-бит**. Java для самого лаунчера входит в установщик, а игровую Java он подбирает и скачивает автоматически. Для официального входа нужен аккаунт с Minecraft Java Edition. Офлайн-профили доступны для игры без авторизации на серверах, которые её не требуют.
+
+## Linux
+
+Для Linux x64 доступны пакеты **DEB** и **RPM** на [странице последнего релиза](https://github.com/AlpheusWorld/AWLauncher-releases/releases/latest). Java для лаунчера включена в пакет.
+
+Ubuntu / Debian:
+
+```sh
+sudo apt install ./AWLauncher-linux-x64.deb
+```
+
+Fedora / совместимые RPM-дистрибутивы:
+
+```sh
+sudo dnf install ./AWLauncher-linux-x64.rpm
+```
+
+Нужна графическая сессия X11 или XWayland. Для сохранения Microsoft-входа используется системная связка ключей Secret Service. Установщик добавляет необходимые зависимости. Лаунчер появится в меню приложений; данные и сборки хранятся в `~/.aw`.
+
+Автообновления DEB и RPM используют отдельные подписанные файлы. Установка обновления запрашивает системное подтверждение через Polkit.
 
 ## Обновления
 

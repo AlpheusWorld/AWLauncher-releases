@@ -13,7 +13,7 @@ plugins {
 }
 
 group = "ru.aw"
-version = "1.0.21"
+version = "1.0.22"
 
 kotlin {
     jvmToolchain(21)
@@ -119,7 +119,8 @@ compose.desktop {
         )
 
         nativeDistributions {
-            targetFormats(TargetFormat.Msi, TargetFormat.Exe)
+            if (System.getProperty("os.name").lowercase().contains("linux")) targetFormats(TargetFormat.Deb, TargetFormat.Rpm)
+            else targetFormats(TargetFormat.Msi, TargetFormat.Exe)
             packageName = "AWLauncher"
             packageVersion = project.version.toString()
             vendor = "AlpheusWorld"
@@ -151,6 +152,15 @@ compose.desktop {
                 upgradeUuid = "9F1D3B2A-7C4E-4E8B-9A21-5D6E8C0F3B71"
                 console = false
                 iconFile.set(project.file("branding/AWLauncher.ico"))
+            }
+            linux {
+                packageName = "awlauncher"
+                menuGroup = "Games"
+                appCategory = "Game"
+                shortcut = true
+                debMaintainer = "contact@awlauncher.ru"
+                rpmLicenseType = "MIT"
+                iconFile.set(project.file("branding/AWLauncher-mark.png"))
             }
         }
 
@@ -252,7 +262,8 @@ tasks.matching { it.name == "createDistributable" || it.name == "createReleaseDi
     dependsOn(generateDistributionLegal)
     doLast {
         val image = (this as AbstractJPackageTask).destinationDir.get().asFile.resolve("AWLauncher")
-        check(image.resolve("AWLauncher.exe").exists()) { "Application image is missing" }
+        val launcher = if (System.getProperty("os.name").lowercase().contains("win")) image.resolve("AWLauncher.exe") else image.resolve("bin/AWLauncher")
+        check(launcher.exists()) { "Application image is missing" }
         copy { from(distributionLegal); into(image.resolve("legal")) }
     }
 }
@@ -273,6 +284,35 @@ val prepareInstallerResources = tasks.register<Copy>("prepareInstallerResources"
 // Compose 1.7 clears --resource-dir inside its packaging action. Use the same
 // jpackage/WiX engine with our resources, keeping its task names and app images.
 tasks.withType<AbstractJPackageTask>().configureEach {
+    if (targetFormat == TargetFormat.Deb || targetFormat == TargetFormat.Rpm) {
+        val imageTask = tasks.named<AbstractJPackageTask>(
+            if (name.startsWith("packageRelease")) "createReleaseDistributable" else "createDistributable"
+        )
+        dependsOn(imageTask)
+        appImage.set(imageTask.flatMap { it.destinationDir }.map { it.dir(packageName.get()) })
+        actions.clear()
+        doLast {
+            val destination = destinationDir.get().asFile
+            check(destination.toPath().toAbsolutePath().normalize().startsWith(
+                layout.buildDirectory.get().asFile.toPath().toAbsolutePath().normalize()
+            )) { "Installer output must stay inside the build directory" }
+            project.delete(destination)
+            destination.mkdirs()
+            val deb = targetFormat == TargetFormat.Deb
+            val options = mutableListOf(
+                "--type", if (deb) "deb" else "rpm",
+                "--app-image", appImage.get().asFile.absolutePath,
+                "--dest", destination.absolutePath, "--name", packageName.get(),
+                "--app-version", packageVersion.get(), "--vendor", packageVendor.get(),
+                "--linux-package-name", "awlauncher", "--linux-menu-group", "Games",
+                "--linux-app-category", "Game", "--linux-shortcut",
+                "--linux-package-deps", if (deb) "libsecret-tools, gnome-keyring, pkexec, xdg-utils" else "libsecret, gnome-keyring, polkit, xdg-utils",
+            )
+            if (deb) options.addAll(listOf("--linux-deb-maintainer", "contact@awlauncher.ru"))
+            else options.addAll(listOf("--linux-rpm-license-type", "MIT"))
+            project.exec { executable = File(javaHome.get(), "bin/jpackage").absolutePath; args(options) }.assertNormalExitValue()
+        }
+    }
     if (targetFormat == TargetFormat.Msi || targetFormat == TargetFormat.Exe) {
         val imageTask = tasks.named<AbstractJPackageTask>(
             if (name.startsWith("packageRelease")) "createReleaseDistributable" else "createDistributable"
@@ -436,8 +476,12 @@ afterEvaluate {
     tasks.named("createRuntimeImage") {
         doLast {
             val image = layout.buildDirectory.dir("compose/tmp/main/runtime").get().asFile
-            val borrowed = image.resolve("bin/java.exe")
-            File(compose.desktop.application.javaHome, "bin/java.exe").copyTo(borrowed, overwrite = true)
+            val windows = System.getProperty("os.name").lowercase().contains("win")
+            val javaName = if (windows) "java.exe" else "java"
+            val borrowed = image.resolve("bin/$javaName")
+            borrowed.parentFile.mkdirs()
+            File(compose.desktop.application.javaHome, "bin/$javaName").copyTo(borrowed, overwrite = true)
+            if (!windows) check(borrowed.setExecutable(true, false)) { "Runtime launcher is not executable" }
             try {
                 val dump = ProcessBuilder(borrowed.absolutePath, "-Xshare:dump")
                     .redirectErrorStream(true)
@@ -447,7 +491,7 @@ afterEvaluate {
             } finally {
                 borrowed.delete()
             }
-            check(image.resolve("bin/server/classes.jsa").exists()) { "CDS dump produced no archive" }
+            check(image.resolve(if (windows) "bin/server/classes.jsa" else "lib/server/classes.jsa").exists()) { "CDS dump produced no archive" }
         }
     }
 
@@ -459,9 +503,12 @@ afterEvaluate {
     }
 
     tasks.withType<AbstractJPackageTask>().configureEach {
-        launcherJvmArgs.addAll(classArchiveKey.map { key ->
-            listOf("-XX:SharedArchiveFile=\$APPDIR\\\\aw-$key.jsa", "-XX:+AutoCreateSharedArchive")
-        })
+        // Linux packages install into a read-only system directory; use the bundled static CDS archive there.
+        if (System.getProperty("os.name").lowercase().contains("win")) {
+            launcherJvmArgs.addAll(classArchiveKey.map { key ->
+                listOf("-XX:SharedArchiveFile=\$APPDIR\\\\aw-$key.jsa", "-XX:+AutoCreateSharedArchive")
+            })
+        }
     }
 
     tasks.named("createDistributable") { finalizedBy(deployDesktop) }

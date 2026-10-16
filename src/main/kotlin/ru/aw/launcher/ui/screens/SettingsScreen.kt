@@ -226,7 +226,7 @@ private fun AppearancePanel(settings: LauncherSettings) {
         Column {
             SectionTitle("Внешний вид")
             Text(
-                "Подстроить цвета AWLauncher под себя или под тему Windows",
+                "Подстроить цвета AWLauncher под себя или под тему системы",
                 style = MaterialTheme.typography.bodySmall,
                 color = AWColors.TextMuted,
             )

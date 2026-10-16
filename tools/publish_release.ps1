@@ -1,6 +1,7 @@
 param(
     [string]$Version,
     [string]$Artifacts = '',
+    [string]$LinuxArtifacts = '',
     [string]$Repository = 'AlpheusWorld/AWLauncher-releases',
     [string]$Notes,
     [string]$JavaHome = $env:JAVA_HOME,
@@ -26,6 +27,24 @@ $base = "https://github.com/$Repository/releases/download/$tag"
 $manifest = [ordered]@{ version=$Version; url="$base/AWLauncher.msi"; sha256=(Get-FileHash -LiteralPath $msi -Algorithm SHA256).Hash.ToLowerInvariant();
     size=(Get-Item -LiteralPath $msi).Length; signatureUrl="$base/update.json.sig" } | ConvertTo-Json
 [IO.File]::WriteAllText($manifestPath, $manifest + "`n", [Text.UTF8Encoding]::new($false))
+$manifestPaths = @($manifestPath)
+$linuxAssets = @()
+if ($LinuxArtifacts) {
+    foreach ($format in @('deb', 'rpm')) {
+        $packages = @(Get-ChildItem -LiteralPath $LinuxArtifacts -Filter "*.$format" -Recurse -File | Where-Object { $_.Name.Contains($Version) })
+        if ($packages.Count -ne 1) { throw "Expected exactly one Linux $format package for $Version" }
+        $package = $packages[0]
+        $name = "AWLauncher-linux-x64.$format"
+        Copy-Item -LiteralPath $package.FullName -Destination (Join-Path $output $name) -Force
+        $linuxManifestName = "update-linux-$format-x64.json"
+        $linuxManifestPath = Join-Path $output $linuxManifestName
+        $linuxManifest = [ordered]@{ version=$Version; url="$base/$name"; sha256=(Get-FileHash -LiteralPath $package.FullName -Algorithm SHA256).Hash.ToLowerInvariant();
+            size=$package.Length; signatureUrl="$base/$linuxManifestName.sig" } | ConvertTo-Json
+        [IO.File]::WriteAllText($linuxManifestPath, $linuxManifest + "`n", [Text.UTF8Encoding]::new($false))
+        $manifestPaths += $linuxManifestPath
+        $linuxAssets += @($name, $linuxManifestName, "$linuxManifestName.sig")
+    }
+}
 $previousKey = $env:AW_UPDATE_SIGNING_PRIVATE_KEY
 $protectedBytes = $null
 try {
@@ -36,15 +55,19 @@ try {
         $protectedBytes = [Security.Cryptography.ProtectedData]::Unprotect([Convert]::FromBase64String($record.protectedKey), $null, [Security.Cryptography.DataProtectionScope]::CurrentUser)
         $env:AW_UPDATE_SIGNING_PRIVATE_KEY = [Convert]::ToBase64String($protectedBytes)
     }
-    & (Join-Path $JavaHome 'bin/java.exe') (Join-Path $PSScriptRoot 'SignUpdate.java') sign $manifestPath "$manifestPath.sig"
-    if ($LASTEXITCODE -ne 0) { throw 'Manifest signing failed' }
+    foreach ($signedManifestPath in $manifestPaths) {
+        & (Join-Path $JavaHome 'bin/java.exe') (Join-Path $PSScriptRoot 'SignUpdate.java') sign $signedManifestPath "$signedManifestPath.sig"
+        if ($LASTEXITCODE -ne 0) { throw 'Manifest signing failed' }
+    }
 } finally {
     $env:AW_UPDATE_SIGNING_PRIVATE_KEY = $previousKey
     if ($protectedBytes) { [Array]::Clear($protectedBytes,0,$protectedBytes.Length) }
 }
-& (Join-Path $JavaHome 'bin/java.exe') (Join-Path $PSScriptRoot 'SignUpdate.java') verify $manifestPath (Join-Path $projectRoot 'src/main/resources/update/public-key.txt')
-if ($LASTEXITCODE -ne 0) { throw 'Manifest does not match the pinned public key' }
-$hashes = @('AWLauncher-Setup.exe','AWLauncher.msi','update.json','update.json.sig') | ForEach-Object {
+foreach ($signedManifestPath in $manifestPaths) {
+    & (Join-Path $JavaHome 'bin/java.exe') (Join-Path $PSScriptRoot 'SignUpdate.java') verify $signedManifestPath (Join-Path $projectRoot 'src/main/resources/update/public-key.txt')
+    if ($LASTEXITCODE -ne 0) { throw 'Manifest does not match the pinned public key' }
+}
+$hashes = (@('AWLauncher-Setup.exe','AWLauncher.msi','update.json','update.json.sig') + $linuxAssets) | ForEach-Object {
     (Get-FileHash -LiteralPath (Join-Path $output $_) -Algorithm SHA256).Hash.ToLowerInvariant() + '  ' + $_
 }
 [IO.File]::WriteAllText((Join-Path $output 'SHA256SUMS.txt'), ($hashes -join "`n") + "`n", [Text.UTF8Encoding]::new($false))
@@ -65,7 +88,7 @@ foreach ($name in $companionAssets) {
 }
 [IO.File]::WriteAllText((Join-Path $output 'SHA256SUMS.txt'), ($hashes -join "`n") + "`n", [Text.UTF8Encoding]::new($false))
 if ($PrepareOnly) { Write-Output "Prepared and verified $tag at $output"; return }
-$files=@('AWLauncher-Setup.exe','AWLauncher.msi','update.json','update.json.sig','SHA256SUMS.txt','AWLauncher-third-party-sources.zip','OpenJDK-sources.part01','OpenJDK-sources.part02','OpenJDK-SOURCES.md') + $companionAssets
+$files=@('AWLauncher-Setup.exe','AWLauncher.msi','update.json','update.json.sig','SHA256SUMS.txt','AWLauncher-third-party-sources.zip','OpenJDK-sources.part01','OpenJDK-sources.part02','OpenJDK-SOURCES.md') + $companionAssets + $linuxAssets
 foreach ($name in $files) { if (-not (Test-Path -LiteralPath (Join-Path $output $name) -PathType Leaf)) { throw "A required public release asset is missing: $name" } }
 
 # Credentials stay in memory and are only sent to GitHub's API/upload hosts.

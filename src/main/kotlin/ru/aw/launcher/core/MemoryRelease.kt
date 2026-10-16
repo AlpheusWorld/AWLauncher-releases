@@ -25,7 +25,7 @@ object MemoryRelease {
         delay(1_000)
         System.gc()
         delay(500)
-        val trimmed = runCatching { psapi?.EmptyWorkingSet(Kernel32.INSTANCE.GetCurrentProcess()) == true }
+        val trimmed = Shell.isWindows && runCatching { psapi?.EmptyWorkingSet(Kernel32.INSTANCE.GetCurrentProcess()) == true }
             .getOrDefault(false)
         Log.info("memory handed back for the game (working set trimmed: $trimmed)")
     }

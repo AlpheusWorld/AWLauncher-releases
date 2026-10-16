@@ -163,9 +163,11 @@ object JavaManager {
     fun customExecutable(raw: String, requiredMajor: Int? = null): Path {
         val path = try { Path.of(raw.trim().removeSurrounding("\"")).toAbsolutePath().normalize() }
         catch (e: Exception) { throw IOException("Некорректный путь к Java", e) }
-        val executable = if (path.isDirectory()) executableIn(path) else path
-        if (!executable.isRegularFile() || executable.fileName.toString().lowercase() !in setOf("java", "java.exe", "javaw.exe"))
-            throw IOException("Выбери java.exe, javaw.exe или папку установленной Java")
+        val candidate = if (path.isDirectory()) executableIn(path) else path
+        if (!candidate.isRegularFile() || candidate.fileName.toString().lowercase() !in setOf("java", "java.exe", "javaw.exe"))
+            throw IOException("Выбери исполняемый файл Java или папку установленной Java")
+        val executable = candidate.toRealPath()
+        if (RuleEnvironment.current.osName == "linux" && !Files.isExecutable(executable)) throw IOException("Для выбранного файла Java не разрешён запуск")
         val major = executable.parent?.parent?.let(::majorOf)
             ?: throw IOException("Не удалось определить версию Java: рядом с папкой bin должен быть файл release")
         if (requiredMajor != null && major < requiredMajor) throw IOException("Для этой сборки нужна Java $requiredMajor или новее, выбрана Java $major")

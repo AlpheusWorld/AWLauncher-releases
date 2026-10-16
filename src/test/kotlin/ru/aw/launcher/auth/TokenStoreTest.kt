@@ -11,8 +11,40 @@ import ru.aw.launcher.core.Paths
 import java.util.Base64
 import java.util.UUID
 import kotlin.io.path.readText
+import javax.crypto.spec.SecretKeySpec
+import org.junit.jupiter.api.assertThrows
 
 class TokenStoreTest {
+
+    @Test
+    fun `Linux token envelopes use fresh nonces and reject tampering`() {
+        val key = SecretKeySpec(ByteArray(32) { it.toByte() }, "AES")
+        val first = TokenStore.encrypt("minecraft-token", key)
+        val second = TokenStore.encrypt("minecraft-token", key)
+        assertNotEquals(first, second)
+        assertEquals("minecraft-token", TokenStore.decrypt(first, key))
+        val changed = Base64.getDecoder().decode(first).also { it[it.lastIndex] = (it.last().toInt() xor 1).toByte() }
+        assertThrows<Exception> { TokenStore.decrypt(Base64.getEncoder().encodeToString(changed), key) }
+        assertThrows<Exception> { TokenStore.decrypt(first, SecretKeySpec(ByteArray(32) { 7 }, "AES")) }
+        assertThrows<IllegalArgumentException> { TokenStore.decrypt("AA==", key) }
+    }
+
+    @Test
+    fun `temporarily unreadable protected tokens are not erased during account saves`() {
+        val stored = "secret-service:encrypted-value"
+        assertEquals(stored, TokenStore.protectPreserving("", stored))
+        assertEquals("", TokenStore.protectPreserving("", "plain:old-token"))
+    }
+
+    @Test
+    @EnabledOnOs(OS.LINUX)
+    fun `Linux tokens survive through the desktop Secret Service`() {
+        val token = "linux-test-token-" + UUID.randomUUID()
+        val protected = TokenStore.protect(token)
+        assertTrue(protected.startsWith("secret-service:"))
+        assertFalse(token in protected)
+        assertEquals(token, TokenStore.reveal(protected))
+    }
 
     @Test
     fun `legacy base64 tokens remain readable for migration`() {

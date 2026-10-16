@@ -19,7 +19,7 @@ $explanation=@'
 
 MinecraftAuth 5.0.2 is included as a separate, replaceable JAR under LGPL-3.0. Its unmodified source archive, including build scripts, is included here. Upstream: https://github.com/RaphiMC/MinecraftAuth/tree/v5.0.2
 
-AWLauncher loads shared dependencies from its app directory. To use a modified LGPL component, rebuild the library using its upstream build instructions and replace its JAR while the launcher is closed. Preserve the filename referenced in app/AWLauncher.cfg. You may disable class-data sharing by adding -Xshare:off to that configuration when testing modified libraries. AWLauncher does not require third-party JARs to retain the original signature or hash at startup.
+AWLauncher loads shared dependencies from `app` on Windows and `lib/app` on Linux. To use a modified LGPL component, rebuild the library using its upstream build instructions and replace its JAR while the launcher is closed. Preserve the filename referenced in `app/AWLauncher.cfg` (Windows) or `lib/app/AWLauncher.cfg` (Linux). You may disable class-data sharing by adding -Xshare:off to that configuration when testing modified libraries. AWLauncher does not require third-party JARs to retain the original signature or hash at startup.
 
 Full Eclipse Temurin/OpenJDK sources are provided as a separate asset in the same release. Notices and licenses for all runtime components are retained in the application image under legal and runtime/legal, and in the original JARs.
 '@

@@ -27,6 +27,7 @@ object AccountManager {
     val accounts: StateFlow<List<Account>> = _accounts.asStateFlow()
 
     private val _selected = MutableStateFlow<Account?>(null)
+    private var protectedAccounts = emptyMap<String, Account>()
     val selected: StateFlow<Account?> = _selected.asStateFlow()
 
     fun load() {
@@ -34,6 +35,7 @@ object AccountManager {
         if (!file.exists()) return
         runCatching {
             val store = Json.decodeFromString<AccountStore>(file.readText())
+            protectedAccounts = store.accounts.associateBy { it.uuid }
             val loaded = store.accounts.map { account ->
                 if (account.isOffline) account else account.copy(
                     accessToken = TokenStore.reveal(account.accessToken),
@@ -52,12 +54,13 @@ object AccountManager {
         runCatching {
             val saved = _accounts.value.map { account ->
                 if (account.isOffline) account else account.copy(
-                    accessToken = TokenStore.protect(account.accessToken),
-                    refreshToken = TokenStore.protect(account.refreshToken),
+                    accessToken = TokenStore.protectPreserving(account.accessToken, protectedAccounts[account.uuid]?.accessToken),
+                    refreshToken = TokenStore.protectPreserving(account.refreshToken, protectedAccounts[account.uuid]?.refreshToken),
                 )
             }
             val store = AccountStore(saved, _selected.value?.uuid)
             Paths.accountsFile.writeAtomically(PrettyJson.encodeToString(store))
+            protectedAccounts = saved.associateBy { it.uuid }
         }.onFailure { Log.error("could not save accounts", it) }
     }
 
@@ -87,7 +90,7 @@ object AccountManager {
         onStage: (String) -> Unit = {},
     ): Account {
         val account = MicrosoftAuth().signIn(onStage = onStage, onCode = onCode)
-        upsert(account)
+        withContext(Dispatchers.IO) { upsert(account) }
         return account
     }
 

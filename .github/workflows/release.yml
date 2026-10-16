@@ -1,4 +1,4 @@
-name: Verified Windows release
+name: Verified desktop release
 
 on:
   push:
@@ -16,7 +16,59 @@ permissions:
   contents: write
 
 jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      AW_MS_CLIENT_ID: ${{ vars.AW_MS_CLIENT_ID }}
+      AW_DISCORD_APP_ID: ${{ vars.AW_DISCORD_APP_ID }}
+      AW_CURSEFORGE_API_KEY: ''
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Set up Java 21
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libsecret-tools gnome-keyring dbus-x11 xvfb libgl1 libegl1 libgtk-3-0 libxrender1 libxtst6 libxi6 rpm fakeroot desktop-file-utils pkexec
+      - name: Verify and package Linux
+        run: |
+          chmod +x gradlew
+          dbus-run-session -- bash -euc '
+            printf "awlauncher-ci-keyring" | gnome-keyring-daemon --unlock --components=secrets >/dev/null
+            xvfb-run -a ./gradlew test packageDistributionForCurrentOS -PnoDeploy --no-daemon --max-workers=2 "-Dorg.gradle.jvmargs=-Xmx2g -Dfile.encoding=UTF-8"
+          '
+      - name: Verify the installed Linux application starts
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+        run: |
+          sudo mkdir -p /usr/share/desktop-directories
+          sudo dpkg --install build/compose/binaries/main/deb/*.deb
+          app_binary=$(dpkg -L awlauncher | awk '/\/bin\/AWLauncher$/ { print; exit }')
+          test -n "$app_binary"
+          set +e
+          timeout -k 5s 30s xvfb-run -a "$app_binary"
+          status=$?
+          set -e
+          test "$status" -eq 124 -o "$status" -eq 0
+          grep -R -F 'startup: launcher ready' "$HOME/.aw/logs"
+
+      - name: Retain Linux installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-installers
+          path: |
+            build/compose/binaries/main/deb/*.deb
+            build/compose/binaries/main/rpm/*.rpm
+          if-no-files-found: error
+
   release:
+    needs: linux
     runs-on: windows-latest
     timeout-minutes: 40
     env:
@@ -166,13 +218,19 @@ jobs:
             }
           }
 
+      - name: Retrieve Linux installers
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-installers
+          path: build/linux-artifacts
+
       - name: Prepare signed public release bundle
         shell: pwsh
         run: |
           $version = [regex]::Match((Get-Content 'build.gradle.kts' -Raw), '(?m)^version = "([^"]+)"').Groups[1].Value
           $notes = Join-Path $PWD "releases/$version.md"
           .\tools\prepare_release_sources.ps1 -Version $version
-          .\tools\publish_release.ps1 -Version $version -Artifacts 'build/compose/binaries/main' -Notes $notes -PrepareOnly
+          .\tools\publish_release.ps1 -Version $version -Artifacts 'build/compose/binaries/main' -LinuxArtifacts 'build/linux-artifacts' -Notes $notes -PrepareOnly
 
       - name: Retain verified release assets
         uses: actions/upload-artifact@v4
@@ -181,6 +239,8 @@ jobs:
           path: |
             build/publication/v*/*.exe
             build/publication/v*/*.msi
+            build/publication/v*/*.deb
+            build/publication/v*/*.rpm
             build/publication/v*/*.jar
             build/publication/v*/*.json
             build/publication/v*/*.sig
@@ -197,4 +257,4 @@ jobs:
         shell: pwsh
         run: |
           $version = [regex]::Match((Get-Content 'build.gradle.kts' -Raw), '(?m)^version = "([^"]+)"').Groups[1].Value
-          .\tools\publish_release.ps1 -Version $version -Artifacts 'build/compose/binaries/main' -Notes "releases/$version.md"
+          .\tools\publish_release.ps1 -Version $version -Artifacts 'build/compose/binaries/main' -LinuxArtifacts 'build/linux-artifacts' -Notes "releases/$version.md"

@@ -14,6 +14,7 @@ import kotlin.io.path.exists
 object Shell {
 
     val isWindows: Boolean = System.getProperty("os.name").orEmpty().lowercase().contains("win")
+    val isLinux: Boolean = System.getProperty("os.name").orEmpty().lowercase().contains("linux")
 
     val appExecutable: Path? by lazy {
         System.getProperty("jpackage.app-path")
@@ -45,7 +46,7 @@ object Shell {
             true
         }.onFailure { Log.warn("Desktop.open failed: ${it.message}") }.getOrDefault(false)
 
-        if (!viaDesktop) onError("Не удалось открыть проводник. Папка: $dir")
+        if (!viaDesktop && !openWithSystem(dir.toUri().toASCIIString())) onError("Не удалось открыть файловый менеджер. Папка: $dir")
     }
 
     fun browse(url: String): Boolean {
@@ -55,7 +56,21 @@ object Shell {
                 return true
             }
         }.onFailure { Log.debug("Desktop.browse failed: ${it.message}") }
-        return runCatching { ProcessBuilder("rundll32", "url.dll,FileProtocolHandler", url).start() }.isSuccess
+        return openWithSystem(url)
+    }
+
+    private fun openWithSystem(value: String): Boolean {
+        val commands = when {
+            isWindows -> listOf(listOf("rundll32", "url.dll,FileProtocolHandler", value))
+            isLinux -> listOf(listOf("xdg-open", value), listOf("gio", "open", value))
+            else -> emptyList()
+        }
+        return commands.any { command ->
+            runCatching {
+                ProcessBuilder(command).redirectOutput(ProcessBuilder.Redirect.DISCARD)
+                    .redirectError(ProcessBuilder.Redirect.DISCARD).start()
+            }.onFailure { Log.debug("system opener unavailable: ${command.first()}") }.isSuccess
+        }
     }
 
     private const val CREATE_NO_WINDOW = 0x08000000

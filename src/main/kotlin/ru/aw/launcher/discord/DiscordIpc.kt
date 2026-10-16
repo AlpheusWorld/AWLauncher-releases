@@ -8,10 +8,18 @@ import kotlinx.serialization.json.*
 import ru.aw.launcher.core.Json
 import java.io.Closeable
 import java.io.IOException
+import java.net.StandardProtocolFamily
+import java.net.UnixDomainSocketAddress
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.nio.channels.SocketChannel
+import java.nio.channels.Selector
+import java.nio.channels.SelectionKey
+import java.nio.file.Path
+import java.nio.file.Files
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
+import ru.aw.launcher.core.Shell
 
 internal interface PresenceIpc : Closeable {
     fun setActivity(activity: JsonObject?)
@@ -106,7 +114,17 @@ internal class DiscordIpc internal constructor(private val transport: Transport)
         private fun JsonObject.text(key: String) = (this[key] as? JsonPrimitive)?.contentOrNull
 
         fun connect(appId: String): DiscordIpc {
-            if (!System.getProperty("os.name").startsWith("Windows")) throw IOException("Discord IPC requires Windows")
+            if (Shell.isLinux) {
+                for (root in unixRoots()) for (index in 0..9) {
+                    val socket = root.resolve("discord-ipc-$index")
+                    if (!Files.exists(socket)) continue
+                    val ipc = runCatching { DiscordIpc(UnixSocket(socket)) }.getOrNull() ?: continue
+                    try { ipc.handshake(appId); return ipc }
+                    catch (_: IOException) { ipc.close() }
+                }
+                throw IOException("Discord is not available")
+            }
+            if (!Shell.isWindows) throw IOException("Discord IPC is not supported on this platform")
             for (index in 0..9) {
                 val handle = Kernel32.INSTANCE.CreateFile("\\\\.\\pipe\\discord-ipc-$index",
                     WinNT.GENERIC_READ or WinNT.GENERIC_WRITE, 0, null, WinNT.OPEN_EXISTING, 0, null)
@@ -116,6 +134,74 @@ internal class DiscordIpc internal constructor(private val transport: Transport)
                 catch (_: IOException) { ipc.close() }
             }
             throw IOException("Discord is not available")
+        }
+
+        private fun unixRoots(): List<Path> = buildList {
+            for (name in listOf("XDG_RUNTIME_DIR", "TMPDIR", "TMP", "TEMP")) {
+                System.getenv(name)?.takeIf { it.isNotBlank() }?.let { value ->
+                    runCatching { Path.of(value) }.getOrNull()?.takeIf { it.isAbsolute }?.let(::add)
+                }
+            }
+            add(Path.of("/tmp"))
+            System.getenv("XDG_RUNTIME_DIR")?.takeIf { it.isNotBlank() }?.let { value ->
+                runCatching { Path.of(value) }.getOrNull()?.takeIf { it.isAbsolute }?.let {
+                    add(it.resolve("app/com.discordapp.Discord"))
+                    add(it.resolve("snap.discord"))
+                }
+            }
+        }.distinct()
+    }
+
+    internal class UnixSocket(path: Path) : Transport {
+        private val channel = SocketChannel.open(StandardProtocolFamily.UNIX)
+        private val selector = try { Selector.open() } catch (error: IOException) { channel.close(); throw error }
+        init {
+            try {
+                channel.configureBlocking(false)
+                channel.register(selector, SelectionKey.OP_CONNECT)
+                if (!channel.connect(UnixDomainSocketAddress.of(path))) {
+                    val limit = deadline()
+                    while (!channel.finishConnect()) await(SelectionKey.OP_CONNECT, limit)
+                }
+            } catch (error: Exception) {
+                close()
+                throw error
+            }
+        }
+
+        private fun await(operation: Int, limit: Long) {
+            if (Thread.currentThread().isInterrupted) throw IOException("Discord request interrupted")
+            val remaining = limit - System.nanoTime()
+            if (remaining <= 0) throw IOException("Discord response timed out")
+            val key = channel.keyFor(selector) ?: throw IOException("Discord connection closed")
+            if (!key.isValid) throw IOException("Discord connection closed")
+            key.interestOps(operation)
+            selector.select((remaining / 1_000_000).coerceAtLeast(1))
+            selector.selectedKeys().clear()
+        }
+
+        override fun readFully(bytes: ByteArray, deadline: Long) {
+            val buffer = ByteBuffer.wrap(bytes)
+            while (buffer.hasRemaining()) {
+                when (channel.read(buffer)) {
+                    -1 -> throw IOException("Discord disconnected")
+                    0 -> await(SelectionKey.OP_READ, deadline)
+                }
+                if (System.nanoTime() >= deadline && buffer.hasRemaining()) throw IOException("Discord response timed out")
+            }
+        }
+
+        override fun write(bytes: ByteArray) {
+            val buffer = ByteBuffer.wrap(bytes)
+            val limit = deadline()
+            while (buffer.hasRemaining()) {
+                if (channel.write(buffer) == 0) await(SelectionKey.OP_WRITE, limit)
+                if (System.nanoTime() >= limit && buffer.hasRemaining()) throw IOException("Discord write timed out")
+            }
+        }
+
+        override fun close() {
+            try { channel.close() } finally { selector.close() }
         }
     }
 

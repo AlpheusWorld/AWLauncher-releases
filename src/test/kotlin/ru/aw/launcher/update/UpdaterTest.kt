@@ -24,6 +24,26 @@ class UpdaterTest {
     private val sha = "a".repeat(64)
 
     @Test
+    fun `Linux update feeds select the package family without changing custom URLs`() {
+        val base = "https://example.com/releases/latest/download/update.json"
+        assertEquals("https://example.com/releases/latest/download/update-linux-deb-x64.json", UpdateConfig.linuxFeed(base, "deb", "amd64"))
+        assertEquals("https://example.com/releases/latest/download/update-linux-rpm-x64.json", UpdateConfig.linuxFeed(base, "rpm", "x86_64"))
+        assertEquals(null, UpdateConfig.linuxFeed(base, "deb", "aarch64"))
+        assertEquals(null, UpdateConfig.linuxFeed(base, null, "amd64"))
+        assertEquals("https://example.com/custom.json", UpdateConfig.linuxFeed("https://example.com/custom.json", "deb", "amd64"))
+    }
+
+    @Test
+    fun `Linux installation cannot receive a Windows installer or vice versa`() {
+        val linux = UpdateManifest("1.0.12", "https://example.com/AWLauncher.deb", sha)
+        Updater.validatePlatform(linux, linux = true)
+        assertEquals("deb", Updater.installerExtension(linux.url))
+        assertEquals("rpm", Updater.installerExtension("https://example.com/a.rpm?download=1"))
+        assertThrows<IOException> { Updater.validatePlatform(linux, linux = false) }
+        assertThrows<IOException> { Updater.validatePlatform(linux.copy(url = "https://example.com/a.msi"), linux = true) }
+    }
+
+    @Test
     fun `versions compare by number, not by text`() {
         assertTrue(Updater.isNewer("1.10.0", "1.9.9"))
         assertTrue(Updater.isNewer("1.0.1", "1.0"))
