@@ -51,10 +51,17 @@ class AssistantFeaturesTest {
         assertArrayEquals(new long[]{2,1,3},SemanticSearch.tokenize("продать",vocab,128));
         assertEquals(4,SemanticSearch.tokenize("меч меч меч меч",vocab,4).length);
     }
-    @Test void semanticRankingRetainsExactEvidenceButDoesNotReturnUnrelatedLowScores(){
-        var commerce=rule("1.1","Продажа за реальные деньги запрещена","");var cheats=rule("2.2","Запрещены читы","");var unrelated=rule("3.3","Не спамить","");
-        var ranked=SemanticSearch.rank(Map.of(commerce,.82f,cheats,.33f,unrelated,.1f),List.of(new RuleSearch.Match(cheats,80)));
-        assertEquals(commerce,ranked.getFirst().rule());assertTrue(ranked.stream().anyMatch(m->m.rule().equals(cheats)));assertTrue(ranked.stream().noneMatch(m->m.rule().equals(unrelated)));
+    @Test void semanticRankingRejectsUnrelatedCandidatesInsteadOfRetainingLexicalNoise(){
+        var commerce=new RuleBook.Rule("1.1","Торговля за реальные деньги","Игра","Запрещены продажи игровых предметов за реальные деньги","",List.of("фанпей","funpay"));
+        var cheats=rule("2.2","Запрещено использовать читы","");var unrelated=rule("3.3","Не спамить","");var index=new RuleSearch(book(commerce,cheats,unrelated));
+        var ranked=SemanticSearch.rank("фанпей",index,Map.of(commerce,.75f,cheats,.30f,unrelated,.10f));
+        assertEquals(List.of(commerce),ranked.stream().map(RuleSearch.Match::rule).toList());
+        assertTrue(SemanticSearch.rank("какая завтра погода",index,Map.of(commerce,.05f,cheats,.02f,unrelated,.01f)).isEmpty());
+    }
+    @Test void retrievalPassagesIncludeTheTitleAndTheEndOfLongRules(){
+        var rule=rule("1.1","Начало "+"длинный текст ".repeat(250)+"Уникальное условие в самом конце","Бан 7 дней");
+        var parts=SemanticSearch.passages(rule);assertTrue(parts.size()>3);assertTrue(parts.getFirst().contains(rule.title()));
+        assertTrue(parts.stream().anyMatch(part->part.contains("Уникальное условие в самом конце")));assertTrue(parts.getLast().contains("Бан 7 дней"));
     }
     @Test void disabledSemanticSearchDoesNotCreateOrDownloadAnything() throws Exception {
         var folder=root.resolve("model");var lexical=List.of(new RuleSearch.Match(rule("1.1","Текст",""),10));
@@ -64,6 +71,6 @@ class AssistantFeaturesTest {
         var commerce=rule("1.1","Запрещены продажи игровых предметов за реальные деньги","");var cheats=rule("2.2","Запрещено использовать читы","");
         assertTrue(RuleSearch.matchesIntent("фанпей",commerce));assertFalse(RuleSearch.matchesIntent("фанпей",cheats));
         assertTrue(RuleSearch.matchesIntent("можно продать меч за рубли?",commerce));assertFalse(RuleSearch.matchesIntent("можно продать меч за рубли?",cheats));
-        assertTrue(SemanticSearch.rank(Map.of(commerce,.51f,cheats,.50f),List.of()).isEmpty());
+        assertTrue(SemanticSearch.rank("фанпей",new RuleSearch(book(commerce,cheats)),Map.of(commerce,.7f,cheats,.5f)).stream().noneMatch(m->m.rule().equals(cheats)));
     }
 }

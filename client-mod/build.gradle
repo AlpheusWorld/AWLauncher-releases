@@ -4,7 +4,7 @@ import java.util.zip.ZipFile
 
 plugins { id 'java' }
 group = 'ru.aw'
-version = '0.2.0'
+version = '0.3.0'
 def gameVersion = providers.gradleProperty('gameVersion').getOrElse('26.1.2')
 def releases = [
     '26.1.2': ['4e618f09a0c649dde3fdf829df443ce0b8831e65', '0.155.3+26.1.2'],
@@ -93,6 +93,7 @@ tasks.jar {
     from('../LICENSE') { rename { 'LICENSE-AWAssistant' } }
     from('../src/main/resources/fonts/Onest-OFL.txt') { into 'META-INF/licenses'; rename { 'Onest-OFL.txt' } }
     from('../src/main/resources/fonts/Onest-Medium.ttf') { into 'assets/awassistant/font'; rename { 'onest.ttf' } }
+    from('../src/main/resources/fonts/Onest-SemiBold.ttf') { into 'assets/awassistant/font'; rename { 'onest-semibold.ttf' } }
     from('../branding/AWLauncher-mark.png') { into 'assets/awassistant'; rename { 'icon.png' } }
 }
 

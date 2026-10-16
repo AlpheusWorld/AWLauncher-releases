@@ -24,6 +24,13 @@ class RuleSearchTest {
         assertTrue(search.find("фанпей","Аккаунт").isEmpty());
         assertEquals("2.2",search.find("2.2",null).getFirst().rule().number());
     }
+    @Test void directCheatRuleRanksAboveShortInspectionRules(){
+        var main=new RuleBook.Rule("2.4","Нечестное ПО","Игра","Запрещены читы. "+"Подробные условия использования программ. ".repeat(40),"Бан 30 дней",List.of("читы","xray"));
+        var inspection=new RuleBook.Rule("2.5","Правила проверки на читы","Игра","Порядок проверки на читы","",List.of());
+        var index=new RuleSearch(new RuleBook("test","Test",List.of(),"",List.of(main,inspection)));
+        assertEquals("2.4",index.find("читы",null).getFirst().rule().number());
+        assertEquals("2.5",index.find("проверка на читы",null).getFirst().rule().number());
+    }
     @TempDir Path temporary;
     private RuleBook book(String id) { return new RuleBook(id,"Test",List.of(),"",List.of(
         new RuleBook.Rule("2.1","Запрещённые модификации","Игра","Использование читов","Блокировка",List.of("читы","софт")),

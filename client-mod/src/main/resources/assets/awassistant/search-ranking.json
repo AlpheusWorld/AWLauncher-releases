@@ -1,0 +1,43 @@
+{
+  "features": [
+    "bias",
+    "semantic",
+    "bm25",
+    "query_coverage",
+    "title_coverage",
+    "keyword_coverage",
+    "topic_recall",
+    "topic_precision",
+    "missing_topics",
+    "extra_topics",
+    "title_phrase",
+    "keyword_phrase",
+    "title_precision",
+    "has_topics"
+  ],
+  "weights": [
+    -3.7692141317039893,
+    4.375572470076063,
+    2.818288799673281,
+    0.7618440425177391,
+    -1.0229146778399079,
+    1.526537186136351,
+    1.280673914448976,
+    3.393028190216596,
+    -1.5693492439493801,
+    -1.0471956487417993,
+    0.010318822903709376,
+    1.2513108827998267,
+    1.303660015640809,
+    -0.2886753295003902
+  ],
+  "threshold": 0.87,
+  "encoder": "sergeyzh/rubert-mini-frida",
+  "encoderSha256": "6839e61573be6adee64a252354a47b42a0aaabf6a78132885007f23291b92e62",
+  "training": {
+    "method": "query-balanced logistic regression, L2, leave-one-server-out calibration",
+    "penalty": 0.1,
+    "queries": 200,
+    "featuresSha256": "edc98044d5b0bef6723d7e38a6b1110a44954eee2acdbe433f8d76ad221fcc52"
+  }
+}

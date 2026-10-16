@@ -1,0 +1,41 @@
+AWAssistant optional local search model
+
+Encoder: sergeyzh/rubert-mini-frida (MIT)
+https://huggingface.co/sergeyzh/rubert-mini-frida/tree/32a82388a9f99c99eca74494731f7ee6e9a9fe3a
+The upstream author distills ai-forever/FRIDA into a seven-layer, 312-dimensional encoder.
+ONNX export: crazyfrogspb/rubert-mini-frida-onnx, revision 6af2c2b286c01d292ce0dadb3ade0fff585d7413.
+https://huggingface.co/crazyfrogspb/rubert-mini-frida-onnx
+
+AWLauncher applies per-channel dynamic INT8 quantization to MatMul and Gather.
+Reproduction: tools/prepare_assistant_search.py (onnx==1.20.1, onnxruntime==1.31.0).
+Source SHA-256: 38c72d258f4ee40ab87a6fba8103645ac93c5d82c560c534b07329ce3e362d4a
+INT8 SHA-256: 6839e61573be6adee64a252354a47b42a0aaabf6a78132885007f23291b92e62
+INT8 file size: 32699796 bytes.
+
+AWLauncher does not claim to have trained or fine-tuned the encoder.
+A separate small logistic relevance classifier is trained on labelled rule-query pairs;
+its features, coefficients, training tool and evaluation queries are included in the source repository.
+Neither component generates server rules or punishments.
+
+The upstream model card declares the MIT license. The MIT permission text follows.
+Attribution: sergeyzh (encoder), crazyfrogspb (ONNX export), AWLauncher contributors (quantization and integration).
+
+MIT License
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

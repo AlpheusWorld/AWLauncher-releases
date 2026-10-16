@@ -31,7 +31,7 @@ final class BuiltinRules {
     );
     private static final Pattern NUMBER = Pattern.compile("(?m)^\\h*(\\d{1,2}(?:\\.\\d{1,3}){1,4})\\.?\\h*(?:>\\h*)?(?=\\p{L}|[«\"(])");
     private static final Pattern SECTION = Pattern.compile("(?m)^\\h*(\\d{1,2})\\.\\h+([^\\n]{3,100})$");
-    private static final String PENALTY="бан|мут|блокиров|кик|предупрежд|удал|снят|снос|отключ|штраф|изъят|обнул|тюрьм|лишени|заключ|ограничен|навсегда|перманент|наказани|санкци";
+    private static final String PENALTY="бан|мут|блокиров|кик|предупрежд|удал|снят|снос|штраф|изъят|обнул|тюрьм|лишени|заключ|ограничен|навсегда|перманент|наказани|санкци";
     private static final Pattern SANCTION = Pattern.compile("(?iu)\\[([^]\\n]*(?:"+PENALTY+")[^]\\n]*)]|\\(([^)\\n]*(?:"+PENALTY+")[^)\\n]*)\\)|(?:^|\\n)\\h*[-—–]?\\h*((?:Наказание|Санкция|Санкции)[^\\n]*)");
     private static final HttpClient HTTP = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).followRedirects(HttpClient.Redirect.NEVER).build();
     private static final int LIMIT = 4 * 1024 * 1024;
@@ -45,10 +45,14 @@ final class BuiltinRules {
         } catch (RuntimeException invalid) { throw new IOException("Некорректная памятка: " + source.name(), invalid); }
     }
     static RuleBook withShortTitles(Source source, RuleBook book) throws IOException {
-        var titles = new HashMap<String, String>();
-        for (var rule : bundled(source).rules()) titles.put(rule.number(), rule.title());
-        var rules = book.rules().stream().map(rule -> new RuleBook.Rule(rule.number(), titles.getOrDefault(rule.number(), rule.title()),
-            rule.category(), rule.description(), rule.sanction().isBlank()?extractSanctions(rule.description()):rule.sanction(), rule.keywords())).toList();
+        var references = new HashMap<String, RuleBook.Rule>();
+        for (var rule : bundled(source).rules()) references.put(rule.number(), rule);
+        var rules = book.rules().stream().map(rule -> {
+            var reference=references.get(rule.number());var keywords=new LinkedHashSet<>(rule.keywords());
+            if(reference!=null)keywords.addAll(reference.keywords());
+            return new RuleBook.Rule(rule.number(), reference==null?rule.title():reference.title(), rule.category(), rule.description(),
+                rule.sanction().isBlank()?extractSanctions(rule.description()):rule.sanction(),List.copyOf(keywords));
+        }).toList();
         return new RuleBook(book.id(), book.name(), book.addresses(), book.sourceUrl(), rules);
     }
     static String extractSanctions(String text){

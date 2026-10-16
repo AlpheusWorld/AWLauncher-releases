@@ -95,6 +95,8 @@ class BuiltinRulesTest {
         assertEquals("Читы и нечестные моды", rule.title());
         assertEquals(original.rules().getFirst().description(), rule.description());
         assertEquals(original.rules().getFirst().sanction(), rule.sanction());
-        assertEquals(original.rules().getFirst().keywords(), rule.keywords());
+        assertTrue(rule.keywords().containsAll(original.rules().getFirst().keywords()));
+        assertTrue(rule.keywords().containsAll(BuiltinRules.bundled(source).rules().stream().filter(r->r.number().equals("2.2")).findFirst().orElseThrow().keywords()));
     }
+    @Test void instructionToDisconnectIsNotAPunishment(){assertEquals("",BuiltinRules.extractSanctions("(Если проверяющий просит включить веб-камеру — отключайтесь от проверки и сообщите администрации)"));}
 }

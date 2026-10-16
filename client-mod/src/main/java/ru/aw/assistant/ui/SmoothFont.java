@@ -28,9 +28,10 @@ final class SmoothFont {
     static synchronized void preload() {
         if(prepared!=null)return;
         prepared=java.util.concurrent.CompletableFuture.supplyAsync(()->{
-            try(var input=Objects.requireNonNull(SmoothFont.class.getResourceAsStream("/assets/awassistant/font/onest.ttf"))) {
+            try(var input=Objects.requireNonNull(SmoothFont.class.getResourceAsStream("/assets/awassistant/font/onest.ttf"));
+                var emphasis=Objects.requireNonNull(SmoothFont.class.getResourceAsStream("/assets/awassistant/font/onest-semibold.ttf"))) {
                 var regular=java.awt.Font.createFont(java.awt.Font.TRUETYPE_FONT,input).deriveFont(java.awt.Font.PLAIN,15f*SAMPLE);
-                var bold=regular.deriveFont(java.awt.Font.BOLD);
+                var bold=java.awt.Font.createFont(java.awt.Font.TRUETYPE_FONT,emphasis).deriveFont(java.awt.Font.PLAIN,15f*SAMPLE);
                 var image=new BufferedImage(4096,72,BufferedImage.TYPE_INT_ARGB);
                 var graphics=image.createGraphics();
                 try {
