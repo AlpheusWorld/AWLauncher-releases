@@ -3,7 +3,6 @@ package ru.aw.launcher.launch
 import java.io.IOException
 import java.nio.file.Path
 import kotlin.io.path.createDirectories
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -102,6 +101,7 @@ object GameLauncher {
     ): PreparedLaunch {
         val options = withContext(Dispatchers.IO) {
             gameDir.createDirectories()
+            CompanionMod.retire(gameDir)
             if (!java.nio.file.Files.exists(gameDir.resolve(InstanceStore.FILE_NAME))) InstanceStore.update(gameDir) { it }
             InstanceStore.get(gameDir)
         }
@@ -158,10 +158,6 @@ object GameLauncher {
             else withContext(Dispatchers.IO) { installer.resolve(profileId) }
 
             val installed = installer.install(version, gameDir, onStage, progress.sink("game"))
-            try { CompanionMod.ensure(versionId, loader, gameDir, settings.companionModAutoDownload, onStage, progress.sink("companion"), onNotice,
-                fabricVersion = version.libraries.firstOrNull { it.name.startsWith("net.fabricmc:fabric-loader:") }?.name?.substringAfterLast(':')) }
-            catch (failure: CancellationException) { throw failure }
-            catch (failure: Exception) { onNotice("Не удалось скачать AWAssistant — игра запустится без него"); Log.warn("AWAssistant download failed", failure) }
             PreparedLaunch(installed, gameDir, awaitJava(), settings.memoryMb, settings, options)
         }
     }

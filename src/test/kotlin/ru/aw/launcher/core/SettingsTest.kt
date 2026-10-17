@@ -21,13 +21,13 @@ class SettingsTest {
     }
 
     @Test
-    fun `old settings enable the companion and an explicit opt out survives persistence`() {
-        val old = Json.decodeFromString<LauncherSettings>("""{"memoryMb":3584,"language":"RU"}""")
-        assertEquals(true, old.companionModAutoDownload)
-        val encoded = Json.encodeToString(LauncherSettings.serializer(), old.copy(companionModAutoDownload = false))
+    fun retiredCompanionSettingsAreIgnoredWithoutLosingPreferences() {
+        val old = Json.decodeFromString<LauncherSettings>("""{"memoryMb":3584,"language":"RU","companionModAutoDownload":true}""")
+        val encoded = Json.encodeToString(LauncherSettings.serializer(), old)
         val restored = Json.decodeFromString<LauncherSettings>(encoded)
-        assertEquals(false, restored.companionModAutoDownload)
         assertEquals(3584, restored.memoryMb)
+        assertEquals(Language.RU, restored.language)
+        org.junit.jupiter.api.Assertions.assertFalse(encoded.contains("companionModAutoDownload"))
     }
 
     @Test

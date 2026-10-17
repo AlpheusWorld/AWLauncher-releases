@@ -1,12 +1,11 @@
 package ru.aw.launcher.mods
 
-import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.encodeToString
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
-import ru.aw.launcher.core.sha1Of
+import ru.aw.launcher.core.Json
 import ru.aw.launcher.core.toHex
-import ru.aw.launcher.core.writeAtomically
 import java.io.ByteArrayOutputStream
 import java.nio.file.Files
 import java.nio.file.Path
@@ -15,54 +14,59 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
 class CompanionModTest {
-    @TempDir lateinit var temporary: Path
-    private fun jar(version: String) = ByteArrayOutputStream().also { buffer -> ZipOutputStream(buffer).use { zip ->
-        zip.putNextEntry(ZipEntry("fabric.mod.json"));zip.write("""{"id":"awassistant","name":"AWAssistant","version":"$version"}""".toByteArray());zip.closeEntry()
-    } }.toByteArray()
-    private fun artifact(bytes: ByteArray) = CompanionArtifact("26.1.2","test","https://github.com/AlpheusWorld/AWLauncher-releases/releases/download/test/test.jar",
-        sha1Of(bytes.inputStream()),MessageDigest.getInstance("SHA-256").digest(bytes).toHex(),bytes.size.toLong())
+    @TempDir lateinit var root: Path
+    private fun jar(id: String = "awassistant", version: String = "1") = ByteArrayOutputStream().also { buffer ->
+        ZipOutputStream(buffer).use { zip ->
+            zip.putNextEntry(ZipEntry("fabric.mod.json"))
+            zip.write(Json.encodeToString(mapOf("id" to id,"version" to version,"name" to id)).toByteArray())
+            zip.closeEntry()
+        }
+    }.toByteArray()
+    private fun target(bytes: ByteArray): Path = Files.createDirectories(root.resolve("mods")).resolve("awassistant.jar").also { Files.write(it,bytes) }
+    private fun own(bytes: ByteArray) {
+        val sha = MessageDigest.getInstance("SHA-256").digest(bytes).toHex()
+        Files.createDirectories(root.resolve("config"))
+        Files.writeString(root.resolve("config/awassistant-managed.json"),Json.encodeToString(mapOf("sha256" to sha)))
+    }
 
-    @Test fun `an incompatible or unknown loader never receives the companion`() {
-        assertFalse(CompanionMod.supportsLoader(null))
-        assertFalse(CompanionMod.supportsLoader("0.18.4"))
-        assertFalse(CompanionMod.supportsLoader("0.19.3-beta"))
-        assertTrue(CompanionMod.supportsLoader("0.19.3"))
-        assertTrue(CompanionMod.supportsLoader("0.20.0"))
+    @Test fun ownedModIsDisabledWithoutRemovingUserDataOrOtherMods() {
+        val bytes=jar();val active=target(bytes);own(bytes)
+        val settings=Files.createDirectories(root.resolve("config/awassistant")).resolve("ui.json")
+        Files.writeString(settings,"personal assistant settings")
+        val world=Files.createDirectories(root.resolve("saves/My World")).resolve("level.dat");Files.writeString(world,"world data")
+        val other=root.resolve("mods/other.jar");Files.writeString(other,"another mod")
+        assertTrue(CompanionMod.retire(root))
+        assertFalse(Files.exists(active));assertArrayEquals(bytes,Files.readAllBytes(root.resolve("mods/awassistant.jar.disabled")))
+        assertEquals("personal assistant settings",Files.readString(settings));assertEquals("world data",Files.readString(world));assertEquals("another mod",Files.readString(other))
+        assertFalse(Files.exists(root.resolve("config/awassistant-managed.json")))
+        assertFalse(CompanionMod.retire(root))
     }
-    @Test fun `fresh installs and owned updates use the verified cache without duplicate mods`() = runBlocking {
-        val first=jar("1");var downloads=0
-        val download: suspend (ru.aw.launcher.net.DownloadTask) -> Unit = { downloads++;it.dest.writeAtomically(first) }
-        CompanionMod.ensureArtifact(artifact(first),temporary,download=download,cacheDir=temporary.resolve("cache"))
-        CompanionMod.ensureArtifact(artifact(first),temporary,download=download,cacheDir=temporary.resolve("cache"))
-        assertEquals(1,downloads)
-        val second=jar("2")
-        CompanionMod.ensureArtifact(artifact(second),temporary,download={it.dest.writeAtomically(second)},cacheDir=temporary.resolve("cache"))
-        assertEquals("2",ModCompat.read(temporary.resolve("mods/awassistant.jar"))!!.version)
+    @Test fun manualInstallWithoutOwnershipIsPreserved() {
+        val bytes=jar();val active=target(bytes)
+        assertFalse(CompanionMod.retire(root));assertArrayEquals(bytes,Files.readAllBytes(active))
     }
-    @Test fun `disabled and manually installed companions are never replaced`() = runBlocking {
-        val mods=Files.createDirectories(temporary.resolve("mods"))
-        Files.write(mods.resolve("awassistant.jar.disabled"),jar("manual"))
-        val download: suspend (ru.aw.launcher.net.DownloadTask) -> Unit = { error("Disabled mods must not be downloaded") }
-        CompanionMod.ensureArtifact(artifact(jar("2")),temporary,download=download,cacheDir=temporary.resolve("cache"))
-        assertFalse(Files.exists(mods.resolve("awassistant.jar")))
-        Files.delete(mods.resolve("awassistant.jar.disabled"));Files.write(mods.resolve("custom-name.jar"),jar("manual"))
-        CompanionMod.ensureArtifact(artifact(jar("2")),temporary,download=download,cacheDir=temporary.resolve("cache"))
-        assertEquals("manual",ModCompat.read(mods.resolve("custom-name.jar"))!!.version)
+    @Test fun manuallyReplacedOwnedFileIsPreserved() {
+        val original=jar();own(original);val changed=jar(version="custom");val active=target(changed)
+        assertFalse(CompanionMod.retire(root));assertArrayEquals(changed,Files.readAllBytes(active))
     }
-    @Test fun `manual installation during a download does not create a duplicate companion`() = runBlocking {
-        val bytes=jar("auto")
-        CompanionMod.ensureArtifact(artifact(bytes),temporary,download={ task ->
-            Files.createDirectories(temporary.resolve("mods"))
-            Files.write(temporary.resolve("mods/manual.jar"),jar("manual"))
-            task.dest.writeAtomically(bytes)
-        },cacheDir=temporary.resolve("cache"))
-        assertFalse(Files.exists(temporary.resolve("mods/awassistant.jar")))
-        assertEquals("manual",ModCompat.read(temporary.resolve("mods/manual.jar"))!!.version)
+    @Test fun unrelatedModAtTheOldFilenameIsPreservedEvenWithMatchingRecord() {
+        val bytes=jar(id="another_mod");val active=target(bytes);own(bytes)
+        assertFalse(CompanionMod.retire(root));assertArrayEquals(bytes,Files.readAllBytes(active))
     }
-    @Test fun `corrupt downloads do not become game mods`() = runBlocking<Unit> {
-        assertThrows(IllegalArgumentException::class.java) { runBlocking {
-            CompanionMod.ensureArtifact(artifact(jar("1")),temporary,download={it.dest.writeAtomically(byteArrayOf(1,2,3))},cacheDir=temporary.resolve("cache"))
-        } }
-        assertFalse(Files.exists(temporary.resolve("mods/awassistant.jar")))
+    @Test fun existingDisabledFilesAreNeverOverwritten() {
+        val bytes=jar();target(bytes);own(bytes);val existing=root.resolve("mods/awassistant.jar.disabled");Files.writeString(existing,"old disabled copy")
+        assertTrue(CompanionMod.retire(root));assertEquals("old disabled copy",Files.readString(existing))
+        val archived=Files.list(root.resolve("mods")).use { stream -> stream.filter { it.fileName.toString().startsWith("awassistant-retired-") }.toList() }
+        assertEquals(1,archived.size);assertArrayEquals(bytes,Files.readAllBytes(archived.single()))
     }
+    @Test fun brokenOwnershipRecordDoesNotDisableAMod() {
+        val bytes=jar();val active=target(bytes);own(bytes);Files.writeString(root.resolve("config/awassistant-managed.json"),"invalid")
+        assertFalse(CompanionMod.retire(root));assertArrayEquals(bytes,Files.readAllBytes(active))
+    }
+    @Test fun retiredFileCanBeExplicitlyReenabledAsAManualMod() {
+        val bytes=jar();val active=target(bytes);own(bytes);assertTrue(CompanionMod.retire(root))
+        Files.move(root.resolve("mods/awassistant.jar.disabled"),active)
+        assertFalse(CompanionMod.retire(root));assertArrayEquals(bytes,Files.readAllBytes(active))
+    }
+    @Test fun downloadCatalogIsNoLongerPackaged() { assertNull(javaClass.getResource("/companion/catalog.json")) }
 }
