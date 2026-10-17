@@ -8,45 +8,27 @@ import java.nio.file.StandardCopyOption
 import kotlin.io.path.createDirectories
 
 internal object UpdateSplash {
+    private val ASSETS = listOf("brand/wordmark.png", "fonts/Onest-Regular.ttf", "fonts/Onest-Bold.ttf", "update/splash.cs", "update/splash.manifest", "update/app.ico")
 
-    private val ASSETS = listOf("brand/wordmark.png", "fonts/Onest-Regular.ttf", "fonts/Onest-Bold.ttf", "update/splash.cs")
-
-    fun prepare(dir: Path) {
+    fun prepare(dir: Path): Path {
         dir.createDirectories()
         ASSETS.forEach { resource ->
-            val stream = UpdateSplash::class.java.getResourceAsStream("/$resource") ?: throw IOException("В лаунчере нет $resource")
+            val stream = UpdateSplash::class.java.getResourceAsStream("/" + resource) ?: throw IOException("В лаунчере нет " + resource)
             stream.use { Files.copy(it, dir.resolve(resource.substringAfterLast('/')), StandardCopyOption.REPLACE_EXISTING) }
         }
+        val compiler = Path.of(System.getenv("SystemRoot") ?: "C:/Windows", "Microsoft.NET", "Framework64", "v4.0.30319", "csc.exe")
+        if (!Files.isRegularFile(compiler)) throw IOException("Не найден компонент .NET для окна обновления")
+        val executable = dir.resolve("AWLauncher.Update.exe")
+        val arguments = listOf("/nologo", "/target:winexe", "/platform:x64", "/optimize+", "/main:AwUpdateSplash",
+            "/out:" + executable, "/win32icon:" + dir.resolve("app.ico"), "/win32manifest:" + dir.resolve("splash.manifest"),
+            "/reference:System.Windows.Forms.dll", "/reference:System.Drawing.dll", dir.resolve("splash.cs").toString())
+        val script = "& " + Shell.psLiteral(compiler.toString()) + " @(" + arguments.joinToString(", ", transform = Shell::psLiteral) +
+            ") *> " + Shell.psLiteral(dir.resolve("compile.log").toString()) + "\nexit \$LASTEXITCODE"
+        if (Shell.runHidden(Shell.powershell(script), waitMs = 60_000) != 0 || !Files.isRegularFile(executable))
+            throw IOException("Не удалось подготовить окно обновления. Журнал: " + dir.resolve("compile.log"))
+        return executable
     }
 
-    fun script(launcher: Long, installer: String, arguments: String, app: Path, assets: Path, version: String, ready: Path): String {
-        val install = if (arguments.isEmpty()) {
-            "Start-Process -FilePath \$installer -Wait"
-        } else {
-            "Start-Process -FilePath \$installer -ArgumentList \$arguments.Replace('/qn', '/passive') -Wait"
-        }
-        val run = listOf(
-            "\$launcher", "\$installer", "\$arguments", "\$app", "\$assets",
-            Shell.psLiteral(version),
-            Shell.psLiteral("Обновляю AWLauncher до $version"),
-            Shell.psLiteral("Обновление не встало (код {0}), открываю прежнюю версию"),
-            "\$ready",
-        ).joinToString(", ")
-        return listOf(
-            "\$launcher = $launcher",
-            "\$installer = ${Shell.psLiteral(installer)}",
-            "\$arguments = ${Shell.psLiteral(arguments)}",
-            "\$app = ${Shell.psLiteral(app.toString())}",
-            "\$assets = ${Shell.psLiteral(assets.toString())}",
-            "\$ready = ${Shell.psLiteral(ready.toString())}",
-            "try {",
-            "    Add-Type -Path (Join-Path \$assets 'splash.cs') -ReferencedAssemblies System.Windows.Forms, System.Drawing",
-            "    [void][AwUpdateSplash]::Run($run)",
-            "} catch {",
-            "    Wait-Process -Id \$launcher -Timeout 60 -ErrorAction SilentlyContinue",
-            "    $install",
-            "    Start-Process -FilePath \$app",
-            "}",
-        ).joinToString("\n")
-    }
+    fun command(executable: Path, launcher: Long, installer: String, arguments: String, app: Path, assets: Path, version: String, ready: Path): List<String> =
+        listOf(executable.toString(), "--run", launcher.toString(), installer, arguments, app.toString(), assets.toString(), version, ready.toString())
 }

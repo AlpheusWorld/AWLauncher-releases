@@ -227,11 +227,21 @@ private fun sinceProcessStart(): Long =
         .orElse(-1L)
 
 private fun shutdownAndExit() {
-    runCatching { DiscordPresence.stop() }
+    Log.info("shutdown: saving data")
     runCatching { VerifyCache.save() }
     runCatching { Settings.save() }
-    runCatching { Http.shutdown() }
+    if (!finishBackgroundShutdown()) Log.warn("background services did not close in time; exiting after saving data")
     Log.info("bye")
     Log.close()
     exitProcess(0)
+}
+
+/** Optional IPC/network cleanup must never hold the updater or the UI indefinitely. */
+internal fun finishBackgroundShutdown(timeoutMillis: Long = 1_500, close: () -> Unit = {
+    runCatching { DiscordPresence.stop() }
+    runCatching { Http.shutdown() }
+}): Boolean {
+    val cleanup = Thread({ runCatching(close) }, "AWLauncher-shutdown").apply { isDaemon = true; start() }
+    try { cleanup.join(timeoutMillis) } catch (_: InterruptedException) { Thread.currentThread().interrupt() }
+    return !cleanup.isAlive
 }

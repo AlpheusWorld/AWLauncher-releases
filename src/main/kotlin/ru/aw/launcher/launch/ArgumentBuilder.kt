@@ -147,7 +147,7 @@ class ArgumentBuilder(
 
     companion object {
         const val LAUNCHER_NAME = "AWLauncher"
-        const val LAUNCHER_VERSION = "1.0.25"
+        const val LAUNCHER_VERSION = "1.0.26"
 
         fun parseJvmArguments(value: String): List<String> {
             val result = ArrayList<String>()

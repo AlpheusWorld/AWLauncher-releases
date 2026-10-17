@@ -13,7 +13,7 @@ plugins {
 }
 
 group = "ru.aw"
-version = "1.0.25"
+version = "1.0.26"
 
 kotlin {
     jvmToolchain(21)
@@ -79,7 +79,10 @@ val generateLauncherConfig = tasks.register("generateLauncherConfig") {
 }
 
 sourceSets["main"].resources.srcDir(generatedLauncherConfig)
-tasks.processResources.configure { dependsOn(generateLauncherConfig) }
+tasks.processResources.configure {
+    dependsOn(generateLauncherConfig)
+    from("branding/AWLauncher.ico") { into("update"); rename { "app.ico" } }
+}
 
 val validateReleaseConfiguration = tasks.register("validateReleaseConfiguration") {
     doLast {

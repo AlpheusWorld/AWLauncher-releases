@@ -5,454 +5,283 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.Drawing.Text;
+using System.Globalization;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
+using System.Text;
 using System.Threading;
 using System.Windows.Forms;
 
 public static class AwUpdateSplash
 {
-    [DllImport("user32.dll")]
-    private static extern bool SetProcessDPIAware();
+    internal const string AppId = "AlpheusWorld.AWLauncher.Updater";
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode)] private static extern int SetCurrentProcessExplicitAppUserModelID(string id);
 
-    public static int Run(int launcher, string installer, string arguments, string app, string assets,
-                          string version, string status, string failure, string ready)
+    [STAThread]
+    public static int Main(string[] args)
     {
-        Installation job = new Installation(launcher, installer, arguments);
-        SplashForm form = null;
         try
         {
-            SetProcessDPIAware();
+            SetCurrentProcessExplicitAppUserModelID(AppId);
+            Application.SetUnhandledExceptionMode(UnhandledExceptionMode.ThrowException);
             Application.EnableVisualStyles();
-            form = new SplashForm(new SplashLook(assets, version, status), job, app, failure, ready);
+            Application.SetCompatibleTextRenderingDefault(true);
+            if (args.Length == 6 && args[0] == "--render")
+            {
+                float scale = float.Parse(args[4], CultureInfo.InvariantCulture);
+                if (scale < .75f || scale > 3 || float.IsNaN(scale)) return 2;
+                Render(args[1], args[2], args[3], args[5], scale, false);
+                return 0;
+            }
+            if (args.Length != 8 || args[0] != "--run") return 2;
+            return Run(int.Parse(args[1], CultureInfo.InvariantCulture), args[2], args[3], args[4], args[5], args[6], args[7]);
         }
-        catch (Exception)
+        catch (Exception error)
         {
-            form = null;
+            if (args.Length == 8 && args[0] == "--run")
+                try { File.WriteAllText(args[7] + ".error", error.ToString()); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+            return 78;
         }
+    }
 
-        if (form != null)
+    public static int Run(int launcher, string installer, string arguments, string app, string assets, string version, string ready)
+    {
+        Trace(ready,"starting native updater");
+        string identity;
+        using (SHA256 hash = SHA256.Create()) identity = BitConverter.ToString(hash.ComputeHash(Encoding.UTF8.GetBytes(Path.GetFullPath(app).ToUpperInvariant()))).Replace("-", "");
+        Trace(ready,"identity prepared");
+        using (Mutex owner = new Mutex(false, "Local\\AWLauncher.Update." + identity))
         {
+            bool acquired;
+            try { acquired = owner.WaitOne(0); } catch (AbandonedMutexException) { acquired = true; }
+            if (!acquired) return 79;
+            Trace(ready,"update lock acquired");
             try
             {
-                Application.Run(form);
+                Installation job = new Installation(launcher, installer, arguments);
+                using (SplashLook look = new SplashLook(assets, version))
+                using (SplashForm form = new SplashForm(look, job, app, ready)) { Trace(ready,"window constructed"); Application.Run(form); }
+                return job.ExitCode;
             }
-            catch (Exception)
-            {
-            }
+            finally { owner.ReleaseMutex(); }
         }
-        if (!job.Started)
-        {
-            Touch(ready);
-            job.Run();
-        }
-        while (!job.Done) Thread.Sleep(200);
-        if (form == null || !form.Launched) StartApp(app);
-        return job.ExitCode;
     }
 
     public static void Render(string assets, string version, string status, string output, float scale, bool failed)
     {
-        SplashLook look = new SplashLook(assets, version, status);
-        look.Failed = failed;
-        int width = (int)(SplashLook.Width * scale);
-        int height = (int)(SplashLook.Height * scale);
-        using (Bitmap bitmap = new Bitmap(width, height))
+        using (SplashLook look = new SplashLook(assets, version))
+        using (Bitmap bitmap = new Bitmap((int)(SplashLook.Width * scale), (int)(SplashLook.Height * scale)))
         using (Graphics graphics = Graphics.FromImage(bitmap))
         {
-            look.Paint(graphics, width, height, scale, 0.45f);
+            look.Paint(graphics, bitmap.Width, bitmap.Height, scale, .45f, status, failed, false);
             bitmap.Save(output, ImageFormat.Png);
         }
     }
 
-    internal static void Touch(string path)
-    {
-        try
-        {
-            File.WriteAllText(path, "");
-        }
-        catch (Exception)
-        {
-        }
-    }
+    internal static void Trace(string ready,string message) { try { File.AppendAllText(ready+".log",DateTime.Now.ToString("O")+" "+message+Environment.NewLine); } catch(IOException){} catch(UnauthorizedAccessException){} }
 
     internal static bool StartApp(string app)
     {
-        if (string.IsNullOrEmpty(app)) return false;
         try
         {
-            ProcessStartInfo info = new ProcessStartInfo(app);
-            info.WorkingDirectory = Path.GetDirectoryName(app);
-            info.UseShellExecute = true;
-            Process.Start(info);
-            return true;
+            ProcessStartInfo info = new ProcessStartInfo(app) { WorkingDirectory = Path.GetDirectoryName(app), UseShellExecute = true };
+            Process.Start(info); return true;
         }
-        catch (Exception)
-        {
-            return false;
-        }
+        catch (Exception) { return false; }
     }
 
     internal static bool AppWindowShown(string app)
     {
-        if (string.IsNullOrEmpty(app)) return true;
         foreach (Process process in Process.GetProcessesByName(Path.GetFileNameWithoutExtension(app)))
-        {
-            try
-            {
-                if (process.MainWindowHandle != IntPtr.Zero) return true;
-            }
-            catch (Exception)
-            {
-            }
-            finally
-            {
-                process.Dispose();
-            }
-        }
+            using (process) { try { if (process.MainWindowHandle != IntPtr.Zero) return true; } catch (InvalidOperationException) { } }
         return false;
     }
 }
 
 internal sealed class Installation
 {
-    private readonly int launcher;
-    private readonly string installer;
-    private readonly string arguments;
-    private volatile bool started;
-    private volatile bool done;
+    internal const int LauncherTimeout = -2;
+    private readonly int launcher, launcherWaitMillis, retryMillis, busyWaitMillis;
+    private readonly string installer, arguments;
+    private volatile bool started, done;
     private volatile int exitCode = -1;
-
-    public Installation(int launcher, string installer, string arguments)
+    private volatile string status = "Закрываем лаунчер";
+    internal Installation(int launcher, string installer, string arguments, int launcherWaitMillis = 120000, int retryMillis = 3000, int busyWaitMillis = 300000)
+    { this.launcher = launcher; this.installer = installer; this.arguments = arguments; this.launcherWaitMillis = launcherWaitMillis; this.retryMillis = retryMillis; this.busyWaitMillis = busyWaitMillis; }
+    internal bool Started { get { return started; } }
+    internal bool Done { get { return done; } }
+    internal int ExitCode { get { return exitCode; } }
+    internal string Status { get { return status; } }
+    internal bool Succeeded { get { return exitCode == 0 || exitCode == 3010; } }
+    internal string Failure
     {
-        this.launcher = launcher;
-        this.installer = installer;
-        this.arguments = arguments;
+        get
+        {
+            if (exitCode == LauncherTimeout) return "Лаунчер ещё не завершился. Закрой его и нажми «Повторить»";
+            if (exitCode == 1618) return "Windows всё ещё устанавливает другую программу. Повтори обновление после её завершения";
+            return exitCode < 0 ? "Не удалось запустить установку. Подробности сохранены в журнале" : "Windows не завершила установку (код " + exitCode + "). Можно повторить обновление";
+        }
     }
-
-    public bool Started { get { return started; } }
-    public bool Done { get { return done; } }
-    public int ExitCode { get { return exitCode; } }
-    public bool Succeeded { get { return exitCode == 0 || exitCode == 3010; } }
-
-    public void Start()
+    internal void Start()
     {
-        started = true;
-        Thread thread = new Thread(Run);
-        thread.IsBackground = true;
-        thread.Start();
+        if (started && !done) return;
+        done = false; exitCode = -1; started = true; status = "Закрываем лаунчер";
+        new Thread(Run) { IsBackground = true, Name = "AWLauncher-update" }.Start();
     }
-
-    public void Run()
+    internal void Run()
     {
         started = true;
         try
         {
-            try
+            Process previous = null;
+            try { previous = Process.GetProcessById(launcher); } catch (ArgumentException) { }
+            if (previous != null) using (previous)
             {
-                using (Process previous = Process.GetProcessById(launcher))
-                {
-                    if (!previous.WaitForExit(60000))
-                    {
-                        exitCode = 1618;
-                        return;
-                    }
-                }
+                if (!previous.WaitForExit(launcherWaitMillis)) { exitCode = LauncherTimeout; return; }
             }
-            catch (Exception)
+            Stopwatch busy = Stopwatch.StartNew();
+            while (true)
             {
-            }
-            ProcessStartInfo info = new ProcessStartInfo(installer, arguments);
-            info.UseShellExecute = false;
-            info.CreateNoWindow = true;
-            using (Process process = Process.Start(info))
-            {
-                process.WaitForExit();
-                exitCode = process.ExitCode;
+                status = "Устанавливаем новую версию AWLauncher";
+                ProcessStartInfo info = new ProcessStartInfo(installer, arguments) { UseShellExecute = false, CreateNoWindow = true };
+                using (Process process = Process.Start(info)) { process.WaitForExit(); exitCode = process.ExitCode; }
+                if (exitCode != 1618 || busy.ElapsedMilliseconds >= busyWaitMillis) break;
+                status = "Windows завершает другую установку. Обновление продолжится автоматически";
+                Thread.Sleep((int)Math.Min(retryMillis, Math.Max(1, busyWaitMillis - busy.ElapsedMilliseconds)));
             }
         }
-        catch (Exception)
+        catch (Exception error)
         {
             exitCode = -1;
+            try { File.AppendAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "helper.log"), DateTime.Now.ToString("O") + " " + error + Environment.NewLine); } catch (IOException) { } catch (UnauthorizedAccessException) { }
         }
-        finally
-        {
-            done = true;
-        }
+        finally { done = true; }
     }
 }
 
-internal sealed class SplashLook
+internal sealed class SplashLook : IDisposable
 {
-    public const int Width = 520;
-    public const int Height = 180;
-
-    private static readonly Color Surface = Color.FromArgb(0x10, 0x11, 0x12);
-    private static readonly Color Track = Color.FromArgb(0x24, 0x26, 0x29);
-    private static readonly Color Accent = Color.FromArgb(0x2B, 0xC6, 0x7C);
-    private static readonly Color AccentPressed = Color.FromArgb(0x23, 0xAB, 0x68);
-    private static readonly Color Text = Color.FromArgb(0xEE, 0xEC, 0xF3);
-    private static readonly Color Muted = Color.FromArgb(0x8F, 0x8B, 0x9C);
-    private static readonly Color Danger = Color.FromArgb(0xF5, 0x8E, 0x8E);
-    private const float Sweep = 0.35f;
-
-    private readonly List<PrivateFontCollection> collections = new List<PrivateFontCollection>();
+    internal const int Width = 560, Height = 280;
+    internal static readonly Color Background = Color.FromArgb(0x12, 0x14, 0x16);
+    internal static readonly Color Ink = Color.FromArgb(0xF0, 0xF2, 0xF3);
+    internal static readonly Color Muted = Color.FromArgb(0x99, 0xA1, 0xA6);
+    internal static readonly Color Accent = Color.FromArgb(0x54, 0xD9, 0xA1);
     private readonly Image wordmark;
-    private readonly FontFamily regular;
-    private readonly FontFamily bold;
+    private readonly List<PrivateFontCollection> collections = new List<PrivateFontCollection>();
+    private readonly FontFamily regular, bold;
     private readonly string version;
-
-    public string Status;
-    public bool Failed;
-
-    public SplashLook(string assets, string version, string status)
+    internal SplashLook(string assets, string version)
     {
         wordmark = Image.FromFile(Path.Combine(assets, "wordmark.png"));
-        regular = Family(Path.Combine(assets, "Onest-Regular.ttf"));
-        bold = Family(Path.Combine(assets, "Onest-Bold.ttf"));
-        this.version = "v" + version;
-        Status = status;
+        regular = Family(Path.Combine(assets, "Onest-Regular.ttf")); bold = Family(Path.Combine(assets, "Onest-Bold.ttf")); this.version = "v" + version;
     }
-
-    public static Color Background { get { return Surface; } }
-
-    public void Paint(Graphics g, int width, int height, float scale, float phase)
-    {
-        g.SmoothingMode = SmoothingMode.AntiAlias;
-        g.InterpolationMode = InterpolationMode.HighQualityBicubic;
-        g.PixelOffsetMode = PixelOffsetMode.HighQuality;
-        g.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
-        g.Clear(Surface);
-
-        float pad = 26 * scale;
-        float markWidth = 312 * scale;
-        g.DrawImage(wordmark, pad, pad, markWidth, markWidth * wordmark.Height / wordmark.Width);
-
-        StringFormat typographic = StringFormat.GenericTypographic;
-        using (Font small = MakeFont(bold, 11 * scale))
-        using (Brush muted = new SolidBrush(Muted))
-        {
-            float spacing = 0.9f * scale;
-            float[] advances = new float[version.Length];
-            float total = 0;
-            for (int i = 0; i < version.Length; i++)
-            {
-                advances[i] = g.MeasureString(version[i].ToString(), small, PointF.Empty, typographic).Width + spacing;
-                total += advances[i];
-            }
-            float x = width - pad - total + spacing;
-            for (int i = 0; i < version.Length; i++)
-            {
-                g.DrawString(version[i].ToString(), small, muted, x, pad, typographic);
-                x += advances[i];
-            }
-        }
-
-        float barHeight = 8 * scale;
-        float barTop = height - pad - 24 * scale - barHeight;
-        using (Font body = MakeFont(regular, 14 * scale))
-        using (Brush brush = new SolidBrush(Failed ? Danger : Text))
-        {
-            float line = body.GetHeight(g);
-            g.DrawString(Status, body, brush, pad, barTop - 10 * scale - line, typographic);
-        }
-
-        RectangleF track = new RectangleF(pad, barTop, width - 2 * pad, barHeight);
-        using (GraphicsPath trackPath = Pill(track))
-        using (Brush trackBrush = new SolidBrush(Track))
-        {
-            g.FillPath(trackBrush, trackPath);
-            if (Failed) return;
-            float eased = phase < 0.5f ? 4 * phase * phase * phase : 1 - (float)Math.Pow(-2 * phase + 2, 3) / 2;
-            float left = track.X + track.Width * (-Sweep + (1 + Sweep) * eased);
-            RectangleF segment = new RectangleF(left, track.Y, track.Width * Sweep, track.Height);
-            Region clip = g.Clip;
-            g.SetClip(trackPath);
-            using (GraphicsPath segmentPath = Pill(segment))
-            using (LinearGradientBrush fill = new LinearGradientBrush(
-                       new RectangleF(segment.X - 1, segment.Y, segment.Width + 2, segment.Height), AccentPressed, AccentPressed, 0f))
-            {
-                ColorBlend blend = new ColorBlend(3);
-                blend.Colors = new Color[] { AccentPressed, Accent, AccentPressed };
-                blend.Positions = new float[] { 0f, 0.5f, 1f };
-                fill.InterpolationColors = blend;
-                g.FillPath(fill, segmentPath);
-            }
-            g.Clip = clip;
-        }
-    }
-
-    private static GraphicsPath Pill(RectangleF bounds)
-    {
-        float d = Math.Min(bounds.Height, bounds.Width);
-        GraphicsPath path = new GraphicsPath();
-        path.AddArc(bounds.X, bounds.Y, d, d, 90, 180);
-        path.AddArc(bounds.Right - d, bounds.Y, d, d, 270, 180);
-        path.CloseFigure();
-        return path;
-    }
-
+    internal Font Font(float pixels, bool strong) { var family = strong ? bold : regular; return new Font(family, pixels, family.IsStyleAvailable(FontStyle.Regular) ? FontStyle.Regular : FontStyle.Bold, GraphicsUnit.Pixel); }
     private FontFamily Family(string file)
     {
-        try
-        {
-            PrivateFontCollection collection = new PrivateFontCollection();
-            collection.AddFontFile(file);
-            collections.Add(collection);
-            return collection.Families[0];
-        }
-        catch (Exception)
-        {
-            return new FontFamily("Segoe UI");
-        }
+        PrivateFontCollection collection = new PrivateFontCollection(); collection.AddFontFile(file); collections.Add(collection); return collection.Families[0];
     }
-
-    private static Font MakeFont(FontFamily family, float pixels)
+    internal static GraphicsPath Rounded(RectangleF rect, float radius)
     {
-        FontStyle style = family.IsStyleAvailable(FontStyle.Regular) ? FontStyle.Regular : FontStyle.Bold;
-        return new Font(family, pixels, style, GraphicsUnit.Pixel);
+        GraphicsPath path = new GraphicsPath(); float d = radius * 2;
+        path.AddArc(rect.X, rect.Y, d, d, 180, 90); path.AddArc(rect.Right-d, rect.Y, d, d, 270, 90);
+        path.AddArc(rect.Right-d, rect.Bottom-d, d, d, 0, 90); path.AddArc(rect.X, rect.Bottom-d, d, d, 90, 90);path.CloseFigure();return path;
     }
+    internal void Paint(Graphics g, int width, int height, float scale, float phase, string status, bool failed, bool launching)
+    {
+        g.SmoothingMode = SmoothingMode.AntiAlias; g.InterpolationMode = InterpolationMode.HighQualityBicubic;g.PixelOffsetMode = PixelOffsetMode.HighQuality;g.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;g.Clear(Background);
+        g.DrawImage(wordmark, 24*scale, 20*scale, 176*scale, 176*scale*wordmark.Height/wordmark.Width);
+        using (Font font = Font(12*scale,false)) using (Brush brush = new SolidBrush(Muted)) g.DrawString(version,font,brush,new RectangleF(width-160*scale,25*scale,90*scale,22*scale),new StringFormat { Alignment=StringAlignment.Far });
+        using (Pen line = new Pen(Color.FromArgb(0x2D,0x32,0x36))) g.DrawLine(line,0,64*scale,width,64*scale);
+        using (Font title = Font(23*scale,true)) using (Brush brush = new SolidBrush(Ink)) g.DrawString(failed?"Не удалось обновить лаунчер":launching?"Открываем AWLauncher":"Устанавливаем обновление",title,brush,24*scale,83*scale,StringFormat.GenericTypographic);
+        using (Font body = Font(14*scale,false)) using (Brush brush = new SolidBrush(failed?Color.FromArgb(0xEB,0xAA,0xAF):Muted))
+            g.DrawString(status,body,brush,new RectangleF(24*scale,126*scale,width-48*scale,52*scale),StringFormat.GenericTypographic);
+        RectangleF track=new RectangleF(24*scale,192*scale,width-48*scale,5*scale);
+        using(GraphicsPath path=Rounded(track,2.5f*scale)) using(Brush brush=new SolidBrush(Color.FromArgb(0x2B,0x31,0x35)))
+        {
+            g.FillPath(brush,path);
+            if(!failed){var saved=g.Save();g.SetClip(path);using(Brush fill=new SolidBrush(Accent))g.FillRectangle(fill,track.X+track.Width*(-.3f+1.3f*phase),track.Y,track.Width*.3f,track.Height);g.Restore(saved);}
+        }
+        if(!failed)using(Font small=Font(12*scale,false))using(Brush brush=new SolidBrush(Muted))g.DrawString("Окно можно свернуть — обновление продолжится",small,brush,24*scale,228*scale,StringFormat.GenericTypographic);
+    }
+    public void Dispose(){wordmark.Dispose();foreach(var fonts in collections)fonts.Dispose();}
 }
 
 internal sealed class SplashForm : Form
 {
-    [DllImport("dwmapi.dll")]
-    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
-
-    private const int CornerPreference = 33;
-    private const int BorderColor = 34;
-    private const int Round = 2;
-    private const int Outline = 0x00352D2E;
-    private const long CycleMillis = 1300;
-    private const long FailureMillis = 3500;
-    private const long WindowWaitMillis = 15000;
-    private const long LookupMillis = 250;
-
+    [DllImport("dwmapi.dll")] private static extern int DwmSetWindowAttribute(IntPtr window,int attribute,ref int value,int size);
+    [DllImport("user32.dll")] private static extern uint GetDpiForWindow(IntPtr window);
+    [StructLayout(LayoutKind.Sequential)] private struct NativeRect { public int Left,Top,Right,Bottom; }
     private readonly SplashLook look;
     private readonly Installation job;
-    private readonly string app;
-    private readonly string failure;
-    private readonly string ready;
-    private readonly System.Windows.Forms.Timer timer = new System.Windows.Forms.Timer();
-    private readonly Stopwatch clock = Stopwatch.StartNew();
-    private readonly float scale;
-    private long finishedAt = -1;
-    private long launchedAt = -1;
-    private long lookedAt = -1;
-
-    public SplashForm(SplashLook look, Installation job, string app, string failure, string ready)
+    private readonly string app,ready;
+    private readonly System.Windows.Forms.Timer timer=new System.Windows.Forms.Timer();
+    private readonly Stopwatch clock=Stopwatch.StartNew();
+    internal readonly Button MinimizeButton,RetryButton,ReturnButton;
+    private readonly Dictionary<int,Font> fonts=new Dictionary<int,Font>();
+    private float scale=1;
+    private long launchedAt=-1;
+    private bool finishing,failed;
+    internal bool Launched {get;private set;}
+    internal SplashForm(SplashLook look,Installation job,string app,string ready)
     {
-        this.look = look;
-        this.job = job;
-        this.app = app;
-        this.failure = failure;
-        this.ready = ready;
-
-        using (Graphics screen = Graphics.FromHwnd(IntPtr.Zero))
-        {
-            scale = screen.DpiX / 96f;
-        }
-        FormBorderStyle = FormBorderStyle.None;
-        StartPosition = FormStartPosition.Manual;
-        ShowInTaskbar = true;
-        TopMost = true;
-        Text = "AWLauncher";
-        BackColor = SplashLook.Background;
-        ClientSize = new Size((int)(SplashLook.Width * scale), (int)(SplashLook.Height * scale));
-        Rectangle area = Screen.FromPoint(Cursor.Position).WorkingArea;
-        Location = new Point(area.Left + (area.Width - Width) / 2, area.Top + (area.Height - Height) / 2);
-        SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.UserPaint, true);
-        try
-        {
-            Icon = Icon.ExtractAssociatedIcon(app);
-        }
-        catch (Exception)
-        {
-        }
-        timer.Interval = 15;
-        timer.Tick += OnTick;
+        this.look=look;this.job=job;this.app=app;this.ready=ready;
+        AutoScaleMode=AutoScaleMode.None;FormBorderStyle=FormBorderStyle.None;StartPosition=FormStartPosition.Manual;
+        ShowInTaskbar=true;TopMost=false;Text="Обновление AWLauncher";BackColor=SplashLook.Background;DoubleBuffered=true;KeyPreview=true;MaximizeBox=false;MinimizeBox=true;
+        Icon=new Icon(Path.Combine(Path.GetDirectoryName(ready),"app.ico"));
+        MinimizeButton=Button("−","Свернуть обновление",false);MinimizeButton.Click+=delegate{WindowState=FormWindowState.Minimized;};
+        RetryButton=Button("Повторить","Повторить обновление",true);RetryButton.Click+=delegate{failed=false;RetryButton.Visible=ReturnButton.Visible=false;job.Start();Invalidate();};
+        ReturnButton=Button("Открыть лаунчер","Вернуться в лаунчер",false);ReturnButton.Click+=delegate{Launched=AwUpdateSplash.StartApp(app);Finish();};
+        RetryButton.Visible=ReturnButton.Visible=false;AcceptButton=RetryButton;SetScale(1);
+        timer.Interval=25;timer.Tick+=delegate{Advance();};
     }
-
+    protected override CreateParams CreateParams {get{var p=base.CreateParams;p.Style|=0x00020000|0x00080000;return p;}}
+    private Button Button(string text,string accessible,bool primary)
+    {
+        Button b=new Button{Text=text,AccessibleName=accessible,FlatStyle=FlatStyle.Flat,TabStop=true,BackColor=primary?SplashLook.Accent:Color.FromArgb(0x27,0x2C,0x30),ForeColor=primary?Color.FromArgb(0x10,0x33,0x27):SplashLook.Ink,UseVisualStyleBackColor=false};
+        b.Text="";b.Tag=text;b.FlatAppearance.BorderSize=0;
+        b.Paint+=delegate(object sender,PaintEventArgs e){
+            Graphics g=e.Graphics;g.SmoothingMode=SmoothingMode.AntiAlias;g.TextRenderingHint=TextRenderingHint.AntiAliasGridFit;g.Clear(BackColor);
+            bool hover=b.ClientRectangle.Contains(b.PointToClient(Cursor.Position));
+            Color fill=primary?(hover?Color.FromArgb(0x73,0xE4,0xB5):SplashLook.Accent):(hover?Color.FromArgb(0x34,0x3D,0x43):Color.FromArgb(0x27,0x2C,0x30));
+            using(GraphicsPath path=SplashLook.Rounded(new RectangleF(0,0,b.Width,b.Height),6*scale))using(Brush brush=new SolidBrush(fill)){g.FillPath(brush,path);if(b.Focused)using(Pen border=new Pen(SplashLook.Muted))g.DrawPath(border,path);}
+            if(text=="−")using(Pen pen=new Pen(SplashLook.Ink,Math.Max(1,scale))){g.DrawLine(pen,b.Width/2f-5*scale,b.Height/2f,b.Width/2f+5*scale,b.Height/2f);}
+            else using(Brush brush=new SolidBrush(b.ForeColor))using(StringFormat format=new StringFormat{Alignment=StringAlignment.Center,LineAlignment=StringAlignment.Center})g.DrawString(text,b.Font,brush,b.ClientRectangle,format);
+        };
+        Controls.Add(b);return b;
+    }
+    internal void SetScale(float value)
+    {
+        scale=Math.Max(.75f,value);ClientSize=new Size(P(SplashLook.Width),P(SplashLook.Height));
+        MinimizeButton.Bounds=new Rectangle(ClientSize.Width-P(56),P(14),P(36),P(34));
+        RetryButton.Bounds=new Rectangle(P(24),P(220),P(192),P(40));ReturnButton.Bounds=new Rectangle(P(228),P(220),P(308),P(40));
+        foreach(Button b in new[]{MinimizeButton,RetryButton,ReturnButton}){int pixels=P(b==MinimizeButton?20:14),key=pixels*2+(b==MinimizeButton?0:1);Font font;if(!fonts.TryGetValue(key,out font)){font=look.Font(pixels,b!=MinimizeButton);fonts.Add(key,font);}b.Font=font;}
+        Invalidate();
+    }
+    private int P(float v){return (int)Math.Round(v*scale);}
     protected override void OnHandleCreated(EventArgs e)
     {
-        base.OnHandleCreated(e);
-        try
-        {
-            int round = Round;
-            DwmSetWindowAttribute(Handle, CornerPreference, ref round, 4);
-            int outline = Outline;
-            DwmSetWindowAttribute(Handle, BorderColor, ref outline, 4);
-        }
-        catch (Exception)
-        {
-        }
+        base.OnHandleCreated(e);AwUpdateSplash.Trace(ready,"window handle created");try{SetScale(GetDpiForWindow(Handle)/96f);}catch(EntryPointNotFoundException){using(Graphics g=CreateGraphics())SetScale(g.DpiX/96f);}
+        Rectangle area=Screen.FromPoint(Cursor.Position).WorkingArea;Location=new Point(area.Left+(area.Width-Width)/2,area.Top+(area.Height-Height)/2);
+        try{int corner=2;DwmSetWindowAttribute(Handle,33,ref corner,4);int outline=0x0036322D;DwmSetWindowAttribute(Handle,34,ref outline,4);}catch(DllNotFoundException){}
     }
-
-    protected override void OnShown(EventArgs e)
+    protected override void WndProc(ref Message m)
     {
-        base.OnShown(e);
-        AwUpdateSplash.Touch(ready);
-        job.Start();
-        timer.Start();
-        Activate();
+        if(m.Msg==0x02E0){var bounds=(NativeRect)Marshal.PtrToStructure(m.LParam,typeof(NativeRect));SetScale((m.WParam.ToInt64()&0xffff)/96f);Location=new Point(bounds.Left,bounds.Top);m.Result=IntPtr.Zero;return;}
+        base.WndProc(ref m);
+        if(m.Msg==0x0084&&m.Result.ToInt32()==1){long point=m.LParam.ToInt64();Point client=PointToClient(new Point((short)(point&0xffff),(short)((point>>16)&0xffff)));if(client.Y<P(64)&&!MinimizeButton.Bounds.Contains(client))m.Result=new IntPtr(2);}
     }
-
-    protected override void OnFormClosing(FormClosingEventArgs e)
-    {
-        if (!job.Done && e.CloseReason == CloseReason.UserClosing) e.Cancel = true;
-        base.OnFormClosing(e);
-    }
-
-    protected override void OnPaint(PaintEventArgs e)
-    {
-        float phase = (clock.ElapsedMilliseconds % CycleMillis) / (float)CycleMillis;
-        look.Paint(e.Graphics, ClientSize.Width, ClientSize.Height, scale, phase);
-    }
-
-    public bool Launched { get; private set; }
-
-    private void OnTick(object sender, EventArgs e)
-    {
-        try
-        {
-            Advance();
-        }
-        catch (Exception)
-        {
-            Finish();
-        }
-    }
-
+    protected override void OnShown(EventArgs e){base.OnShown(e);AwUpdateSplash.Trace(ready,"window shown");File.WriteAllText(ready,"");job.Start();timer.Start();}
+    protected override void OnFormClosing(FormClosingEventArgs e){if(!finishing&&e.CloseReason==CloseReason.UserClosing){e.Cancel=true;WindowState=FormWindowState.Minimized;}base.OnFormClosing(e);}
+    protected override void OnKeyDown(KeyEventArgs e){if(e.KeyCode==Keys.Escape){WindowState=FormWindowState.Minimized;e.Handled=true;}base.OnKeyDown(e);}
+    protected override void OnPaint(PaintEventArgs e){look.Paint(e.Graphics,ClientSize.Width,ClientSize.Height,scale,(clock.ElapsedMilliseconds%1500)/1500f,failed?job.Failure:Launched?"Запускаем новую версию":job.Status,failed,Launched);}
     private void Advance()
     {
-        Invalidate();
-        long now = clock.ElapsedMilliseconds;
-        if (finishedAt < 0 && job.Done)
-        {
-            finishedAt = now;
-            if (!job.Succeeded)
-            {
-                look.Failed = true;
-                look.Status = failure.Replace("{0}", job.ExitCode.ToString());
-            }
-        }
-        if (finishedAt < 0) return;
-
-        if (launchedAt < 0 && (job.Succeeded || now - finishedAt >= FailureMillis))
-        {
-            launchedAt = now;
-            Launched = AwUpdateSplash.StartApp(app);
-            if (!Launched) Finish();
-            return;
-        }
-        if (launchedAt < 0 || now - lookedAt < LookupMillis) return;
-        lookedAt = now;
-        if (now - launchedAt > WindowWaitMillis || AwUpdateSplash.AppWindowShown(app)) Finish();
+        Invalidate();if(!job.Done)return;
+        if(!job.Succeeded){if(!failed){failed=true;RetryButton.Visible=ReturnButton.Visible=true;}return;}
+        if(launchedAt<0){Launched=AwUpdateSplash.StartApp(app);launchedAt=clock.ElapsedMilliseconds;if(!Launched)Finish();return;}
+        if(clock.ElapsedMilliseconds-launchedAt>15000||AwUpdateSplash.AppWindowShown(app))Finish();
     }
-
-    private void Finish()
-    {
-        timer.Stop();
-        Close();
-    }
+    internal void Finish(){finishing=true;timer.Stop();Close();}
+    protected override void Dispose(bool disposing){Icon owned=disposing?Icon:null;base.Dispose(disposing);if(disposing){timer.Dispose();if(owned!=null)owned.Dispose();foreach(Font font in fonts.Values)font.Dispose();fonts.Clear();}}
 }
