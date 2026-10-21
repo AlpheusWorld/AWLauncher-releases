@@ -1,7 +1,5 @@
 package ru.aw.launcher.ui.dialogs
 
-import androidx.compose.foundation.ScrollbarStyle
-import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -9,18 +7,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Checkbox
@@ -37,12 +29,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import kotlin.io.path.exists
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -60,10 +49,10 @@ import ru.aw.launcher.ui.components.ChoiceChip
 import ru.aw.launcher.ui.components.AWButton
 import ru.aw.launcher.ui.components.AWDialog
 import ru.aw.launcher.ui.components.AWIcons
+import ru.aw.launcher.ui.components.LogLines
 import ru.aw.launcher.ui.components.formatBytes
 import ru.aw.launcher.ui.theme.AWColors
 import ru.aw.launcher.ui.theme.AWDimens
-import ru.aw.launcher.ui.theme.PillShape
 
 @Composable
 fun ModalHost(state: LauncherState) {
@@ -207,16 +196,12 @@ private fun LogDialog(state: LauncherState, modal: Modal.Logs) {
     var share by remember(file) { mutableStateOf<ShareState>(ShareState.Idle) }
     val clipboard = LocalClipboardManager.current
     val scope = rememberCoroutineScope()
-    val listState = rememberLazyListState()
 
     LaunchedEffect(file) {
         if (file == null) return@LaunchedEffect
         runCatching { withContext(Dispatchers.IO) { GameLogs.readForView(file) } }
             .onSuccess { lines = it }
             .onFailure { readError = it.message }
-    }
-    LaunchedEffect(lines) {
-        lines?.takeIf { it.isNotEmpty() }?.let { listState.scrollToItem(it.lastIndex) }
     }
 
     val close = { state.modal = null }
@@ -273,32 +258,7 @@ private fun LogDialog(state: LauncherState, modal: Modal.Logs) {
                 shown == null -> LogHint("Читаю…")
                 shown.isEmpty() -> LogHint("Лог пуст")
                 else -> {
-                    SelectionContainer {
-                        LazyColumn(state = listState, modifier = Modifier.fillMaxSize().padding(start = 12.dp, end = 16.dp, top = 8.dp, bottom = 8.dp)) {
-                            items(shown) { line ->
-                                Text(
-                                    line.replace("\t", "    "),
-                                    fontFamily = FontFamily.Monospace,
-                                    fontSize = 12.sp,
-                                    lineHeight = 16.sp,
-                                    color = lineColor(line),
-                                    translate = false,
-                                )
-                            }
-                        }
-                    }
-                    VerticalScrollbar(
-                        adapter = rememberScrollbarAdapter(listState),
-                        modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(vertical = 4.dp),
-                        style = ScrollbarStyle(
-                            minimalHeight = 24.dp,
-                            thickness = 6.dp,
-                            shape = PillShape,
-                            hoverDurationMillis = 250,
-                            unhoverColor = AWColors.Text.copy(alpha = 0.18f),
-                            hoverColor = AWColors.Text.copy(alpha = 0.40f),
-                        ),
-                    )
+                    androidx.compose.runtime.key(file) { LogLines(shown, Modifier.fillMaxSize()) }
                 }
             }
         }
@@ -325,14 +285,6 @@ private fun emptyLogText(source: LogSource): String = when (source) {
     LogSource.GAME -> "Лога пока нет: эту сборку ещё не запускали."
     LogSource.CRASH -> "Крэш-репортов нет — игра в этой сборке не падала."
     LogSource.LAUNCHER -> "Лог лаунчера не найден."
-}
-
-@Composable
-private fun lineColor(line: String): Color = when {
-    line.contains("ERROR") || line.contains("FATAL") || line.contains("Exception") ||
-        line.startsWith("\tat ") || line.startsWith("Caused by") -> AWColors.Danger
-    line.contains("WARN") -> AWColors.Warning
-    else -> AWColors.Text
 }
 
 @Composable

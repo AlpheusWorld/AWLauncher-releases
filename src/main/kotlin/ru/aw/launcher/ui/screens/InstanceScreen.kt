@@ -24,7 +24,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -338,15 +337,14 @@ private fun InstanceJournal(state: LauncherState, entry: VersionEntry) {
     var lines by remember(entry.key) { mutableStateOf<List<String>?>(null) }
     var error by remember(entry.key) { mutableStateOf<String?>(null) }
     LaunchedEffect(entry.key) {
-        var previous: Pair<Path, Long>? = null
+        var previous: Triple<Path, Long, Long>? = null
         while (isActive) {
             try {
                 val fresh = withContext(Dispatchers.IO) {
                     val file = GameLogs.locate(LogSource.GAME, state.gameDirOf(entry))
-                    val stamp = file?.let { it to it.getLastModifiedTime().toMillis() }
+                    val stamp = file?.let { Triple(it, it.getLastModifiedTime().toMillis(), it.fileSize()) }
                     if (stamp == null) emptyList<String>() else if (stamp != previous) {
-                        previous = stamp
-                        GameLogs.readForView(stamp.first).map { GameLogs.redact(it) }
+                        GameLogs.readForView(stamp.first).map { GameLogs.redact(it) }.also { previous = stamp }
                     } else null
                 }
                 if (fresh != null) lines = fresh
@@ -366,10 +364,9 @@ private fun InstanceJournal(state: LauncherState, entry: VersionEntry) {
             error != null -> ListHint(error.orEmpty())
             lines == null -> ListHint("Читаю журнал…")
             lines!!.isEmpty() -> EmptyState(AWIcons.Log, "Журнал пока пуст", "Он появится после первого запуска игры", Modifier.weight(1f).fillMaxWidth())
-            else -> LazyColumn(Modifier.weight(1f).fillMaxWidth().background(AWColors.Surface).padding(12.dp)) {
-                items(lines.orEmpty().filter { query.isBlank() || it.contains(query, true) }) { line ->
-                    Text(line, color = AWColors.TextSoft, style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace), translate = false)
-                }
+            else -> key(entry.key) {
+                val shown = remember(lines, query) { lines.orEmpty().filter { query.isBlank() || it.contains(query, true) } }
+                LogLines(shown, Modifier.weight(1f).fillMaxWidth().background(AWColors.Surface))
             }
         }
     }

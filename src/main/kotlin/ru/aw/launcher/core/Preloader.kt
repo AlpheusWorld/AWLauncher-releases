@@ -78,7 +78,7 @@ object Preloader {
         onStep(0.90f, loaders)
         val (installed, profiles) = localData("installed versions") { scanInstalled() }
         val packs = localData("modpacks") { Modpacks.list() }
-        val builds = localData("builds") { LocalBuilds.list() }
+        val builds = localData("builds") { LocalBuilds.migrateDirectories() }
 
         onStep(1f, loaders)
         val elapsed = (System.nanoTime() - startedAt) / 1_000_000

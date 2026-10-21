@@ -169,4 +169,99 @@ class LocalBuildsTest {
         assertEquals(0L, copy.importedPlayTimeMillis)
         assertEquals("old session", Files.readString(source.resolve("logs/latest.log")))
     }
+
+    @Test
+    fun readableDirectoryNamesKeepSpacesAndUnicodeWithoutOverwritingExistingFolders() {
+        val unrelated = Settings.buildsDir().resolve("Моя сборка").also { Files.createDirectories(it) }
+        Files.writeString(unrelated.resolve("keep.txt"), "existing data")
+        try {
+            val build = LocalBuilds.create("Моя сборка", "1.21.1", LoaderKind.FABRIC)
+            assertEquals("Моя сборка (2)", LocalBuilds.dirOf(build).fileName.toString())
+            assertEquals(build, LocalBuilds.list().single())
+            assertEquals("existing data", Files.readString(unrelated.resolve("keep.txt")))
+            val first = LocalBuilds.create("Test:pack", "1.21.1", LoaderKind.FABRIC)
+            val second = LocalBuilds.create("Test?pack", "1.21.1", LoaderKind.FABRIC)
+            assertEquals("Test_pack", LocalBuilds.dirOf(first).fileName.toString())
+            assertEquals("Test_pack (2)", LocalBuilds.dirOf(second).fileName.toString())
+        } finally { Storage.deleteTree(unrelated) }
+    }
+
+    @Test
+    fun directoryNamesHandleWindowsDevicesAndPathSeparators() {
+        for (name in listOf("CON", "NUL.txt", "LPT1", "COM¹", "..", "../outside", "C:\\Games", "Ending. ")) {
+            val build = LocalBuilds.create(name, "1.21.1", LoaderKind.VANILLA)
+            val directory = LocalBuilds.dirOf(build).toAbsolutePath().normalize()
+            assertEquals(Settings.buildsDir().toAbsolutePath().normalize(), directory.parent)
+            assertFalse(directory.fileName.toString().endsWith('.'))
+            assertTrue(Files.isDirectory(directory))
+        }
+    }
+
+    @Test
+    fun legacyFoldersMigrateWithWorldsOptionsAndIdentityIntact() {
+        val legacy = LocalBuild(java.util.UUID.randomUUID().toString(), "Survival", "1.21.1", LoaderKind.FABRIC)
+        buildsFile(listOf(legacy))
+        val old = LocalBuilds.dirOf(legacy).also { Files.createDirectories(it.resolve("saves/World")) }
+        Files.writeString(old.resolve("saves/World/level.dat"), "world data")
+        Files.writeString(old.resolve("aw-instance.json"), "{\"memoryMb\":3584}")
+        val migrated = LocalBuilds.migrateDirectories().single()
+        val directory = LocalBuilds.dirOf(migrated)
+        assertEquals("Survival", directory.fileName.toString())
+        assertEquals(legacy.id, migrated.id)
+        assertFalse(Files.exists(old))
+        assertEquals("world data", Files.readString(directory.resolve("saves/World/level.dat")))
+        assertEquals("{\"memoryMb\":3584}", Files.readString(directory.resolve("aw-instance.json")))
+        assertEquals(listOf(migrated), LocalBuilds.migrateDirectories())
+        assertEquals(directory, LocalBuilds.dirOf(LocalBuilds.list().single()))
+    }
+
+    @Test
+    fun interruptedMigrationFindsTheOriginalDirectoryAndResumesWithoutOverwritingFiles() {
+        val legacy = LocalBuild(java.util.UUID.randomUUID().toString(), "Recovery", "1.21.1", LoaderKind.FABRIC)
+        val old = LocalBuilds.dirOf(legacy).also { Files.createDirectories(it) }
+        Files.writeString(old.resolve("options.txt"), "personal options")
+        val pending = legacy.copy(directoryName = "Recovery")
+        buildsFile(listOf(pending))
+        assertEquals(old, LocalBuilds.dirOf(LocalBuilds.list().single()))
+        val migrated = LocalBuilds.migrateDirectories().single()
+        assertEquals("Recovery", LocalBuilds.dirOf(migrated).fileName.toString())
+        assertEquals("personal options", Files.readString(LocalBuilds.dirOf(migrated).resolve("options.txt")))
+    }
+
+    @Test
+    fun folderMigrationDoesNotDuplicateSavedPlayHistory() {
+        val history = ru.aw.launcher.activity.PlayHistory
+        val oldHistory = history.historyFile
+        val oldCache = history.cacheFile
+        try {
+            history.historyFile = temp.resolve("activity.json")
+            history.cacheFile = null
+            history.resetForTests()
+            val legacy = LocalBuild(java.util.UUID.randomUUID().toString(), "History", "1.21.1", LoaderKind.FABRIC)
+            buildsFile(listOf(legacy))
+            val old = LocalBuilds.dirOf(legacy)
+            Files.createDirectories(old.resolve("logs"))
+            Files.writeString(old.resolve("logs/latest.log"), "[10:00:00] Start\n[11:00:00] Stop\n")
+            val original = history.scan(listOf(Settings.buildsDir()))
+            assertEquals(1, original.size)
+            val migrated = LocalBuilds.migrateDirectories().single()
+            assertEquals("History", LocalBuilds.dirOf(migrated).fileName.toString())
+            assertEquals(original, history.scan(listOf(Settings.buildsDir())))
+            history.resetForTests()
+            val restored = history.scan(listOf(Settings.buildsDir()))
+            assertEquals(1, restored.size)
+            assertEquals(3_600_000L, restored.sumOf { it.millis })
+            assertEquals(legacy.id, restored.single().buildId)
+        } finally {
+            history.historyFile = oldHistory
+            history.cacheFile = oldCache
+            history.resetForTests()
+        }
+    }
+
+    private fun buildsFile(builds: List<LocalBuild>) {
+        Files.writeString(LocalBuilds.buildsFile, ru.aw.launcher.core.Json.encodeToString(
+            kotlinx.serialization.builtins.ListSerializer(LocalBuild.serializer()), builds))
+    }
+
 }

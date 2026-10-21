@@ -168,7 +168,8 @@ object PlayHistory {
                     if (build == null) session else session.copy(versionId = build.versionId, loader = build.loader, buildId = build.id, buildName = build.name)
                 }
             }
-            val session = runCatching { read(file, date, zone, instance.name, versionId, loader, pack?.title, build?.id, build?.name) }
+            val identity = build?.let { "aw-build-${it.id}" } ?: instance.name
+            val session = runCatching { read(file, date, zone, identity, versionId, loader, pack?.title, build?.id, build?.name) }
                 .onFailure { Log.warn("activity: could not read ${file.name}: ${it.message}") }
                 .getOrNull()
             cache[key] = Cached(size, modified, session)

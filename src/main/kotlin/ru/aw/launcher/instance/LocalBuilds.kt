@@ -13,6 +13,7 @@ import ru.aw.launcher.core.writeAtomically
 import ru.aw.launcher.meta.LoaderKind
 import ru.aw.launcher.net.DownloadProgress
 import java.io.IOException
+import java.nio.file.FileAlreadyExistsException
 import java.nio.file.FileVisitResult
 import java.nio.file.Files
 import java.nio.file.Path
@@ -39,6 +40,7 @@ data class LocalBuild(
     val lastPlayed: Long? = null,
     val iconFile: String? = null,
     val importedLaunchCount: Long = 0,
+    val directoryName: String? = null,
 )
 
 object LocalBuilds {
@@ -65,10 +67,20 @@ object LocalBuilds {
         if (versionId.isBlank()) throw IOException("Выберите версию Minecraft")
         val existing = list()
         ensureUnique(cleanName, existing)
-        val build = LocalBuild(UUID.randomUUID().toString(), cleanName, versionId, loader, loaderVersion)
-        dirOf(build).createDirectories()
-        save(existing + build)
-        return build
+        val root = Settings.buildsDir().toAbsolutePath().normalize().also { it.createDirectories() }
+        while (true) {
+            val folder = availableDirectoryName(cleanName, existing)
+            val directory = root.resolve(folder)
+            try { Files.createDirectory(directory) }
+            catch (_: FileAlreadyExistsException) { continue }
+            val build = LocalBuild(UUID.randomUUID().toString(), cleanName, versionId, loader, loaderVersion, directoryName = folder)
+            try { save(existing + build) }
+            catch (failure: IOException) {
+                runCatching { Files.deleteIfExists(directory) }
+                throw failure
+            }
+            return build
+        }
     }
 
     @Throws(IOException::class)
@@ -139,11 +151,72 @@ object LocalBuilds {
 
     fun dirOf(build: LocalBuild): Path {
         require(idPattern.matches(build.id)) { "Invalid local build ID" }
-        return Settings.buildsDir().resolve("aw-build-${build.id}")
+        val root = Settings.buildsDir()
+        val legacy = root.resolve("aw-build-${build.id}")
+        val folder = build.directoryName ?: return legacy
+        require(safeDirectoryName(folder)) { "Invalid local build directory" }
+        // An interrupted migration still uses the original folder until the move succeeds.
+        return if (Files.exists(legacy, NOFOLLOW_LINKS)) legacy else root.resolve(folder)
     }
 
+    @Synchronized
+    fun migrateDirectories(): List<LocalBuild> {
+        var builds = list()
+        val root = Settings.buildsDir().toAbsolutePath().normalize()
+        if (builds.none { Files.isDirectory(root.resolve("aw-build-${it.id}"), NOFOLLOW_LINKS) }) return builds
+        val runningDirectories = runCatching {
+            ProcessHandle.allProcesses().use { processes ->
+                processes.flatMap { process ->
+                    val args = process.info().arguments().orElse(emptyArray())
+                    args.indices.asSequence().filter { args[it] == "--gameDir" }.mapNotNull { args.getOrNull(it + 1) }
+                        .map { Path.of(it).toAbsolutePath().normalize() }.toList().stream()
+                }.toList().toSet()
+            }
+        }.getOrElse { return builds }
+        builds.toList().forEach { build ->
+            val old = root.resolve("aw-build-${build.id}")
+            if (!Files.isDirectory(old, NOFOLLOW_LINKS)) return@forEach
+            if (old in runningDirectories) return@forEach
+            val destination = build.directoryName?.takeIf { !Files.exists(root.resolve(it), NOFOLLOW_LINKS) }
+                ?: availableDirectoryName(build.name, builds)
+            val renamed = build.copy(directoryName = destination)
+            val target = root.resolve(renamed.directoryName!!).normalize()
+            require(old.parent == root && target.parent == root && old != target) { "Invalid build directory move" }
+            try {
+                // Persist the destination first so a crash before or after the move is recoverable.
+                val updated = builds.map { if (it.id == build.id) renamed else it }
+                save(updated)
+                builds = updated
+                Files.move(old, target)
+                InstanceStore.forget(old)
+            } catch (failure: IOException) {
+                Log.warn("could not rename build directory: $old", failure)
+            }
+        }
+        return builds
+    }
+
+    private fun availableDirectoryName(name: String, builds: List<LocalBuild>): String {
+        var stem = name.map { if (it.code < 32 || it in "<>:\"/\\|?*") '_' else it }.joinToString("").trim().trimEnd('.', ' ')
+        if (stem.isBlank()) stem = "Minecraft"
+        if (reservedDirectoryName(stem)) stem = "_$stem"
+        val reserved = builds.map { (it.directoryName ?: "aw-build-${it.id}").lowercase(java.util.Locale.ROOT) }.toSet()
+        for (index in 1..10000) {
+            val candidate = if (index == 1) stem else "$stem ($index)"
+            if (candidate.lowercase(java.util.Locale.ROOT) !in reserved && !Files.exists(Settings.buildsDir().resolve(candidate), NOFOLLOW_LINKS)) return candidate
+        }
+        throw IOException("Не удалось подобрать имя папки сборки")
+    }
+
+    private fun reservedDirectoryName(name: String): Boolean =
+        Regex("(?i)^(CON|PRN|AUX|NUL|COM[1-9¹²³]|LPT[1-9¹²³])$").matches(name.substringBefore('.').trimEnd())
+
+    private fun safeDirectoryName(name: String): Boolean = name.isNotBlank() && name.length <= 100 &&
+        name != "." && name != ".." && name.none { it.code < 32 || it in "<>:\"/\\|?*" } &&
+        !name.endsWith('.') && !name.endsWith(' ') && !reservedDirectoryName(name)
+
     private fun valid(build: LocalBuild): Boolean = idPattern.matches(build.id) &&
-        build.name.isNotBlank() && build.versionId.isNotBlank()
+        build.name.isNotBlank() && build.versionId.isNotBlank() && (build.directoryName == null || safeDirectoryName(build.directoryName))
 
     private fun copyDirectory(source: Path, target: Path, onFile: (Path) -> Unit, copyHistory: Boolean,
                               icon: Path?, onProgress: ((DownloadProgress) -> Unit)?) {
