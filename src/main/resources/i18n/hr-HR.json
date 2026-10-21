@@ -1043,5 +1043,6 @@
   "На {0} нет подходящей версии для {1} и {2}": "Nema kompatibilne verzije na {0} za {1} i {2}",
   "Не удалось проверить совместимость: {0}": "Nije moguće provjeriti kompatibilnost: {0}",
   "Все сборки": "Sve instance",
-  "Попробуй другое имя файла или сборки": "Pokušajte s drugim imenom datoteke ili instance"
+  "Попробуй другое имя файла или сборки": "Pokušajte s drugim imenom datoteke ili instance",
+  "В конец": "Na kraj"
 }

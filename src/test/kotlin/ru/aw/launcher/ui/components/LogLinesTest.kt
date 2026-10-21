@@ -44,7 +44,7 @@ class LogLinesTest {
             // GameLogs keeps a fixed-size tail, so following must work when the count stays at 3000.
             lines.value = lines.value.drop(1) + "[ERROR] New line\n".repeat(50)
             settle()
-            assertFalse(state.canScrollForward, "Even a final row taller than the viewport must be shown at its end")
+            assertFalse(state.canScrollForward, "Even a final row taller than the viewport must be shown at its end: index=${state.firstVisibleItemIndex}, offset=${state.firstVisibleItemScrollOffset}, lastOffset=${state.layoutInfo.visibleItemsInfo.lastOrNull()?.offset}, lastSize=${state.layoutInfo.visibleItemsInfo.lastOrNull()?.size}, viewport=${state.layoutInfo.viewportEndOffset}")
             scene.sendPointerEvent(PointerEventType.Move, Offset(260f, 110f))
             repeat(5) { scene.sendPointerEvent(PointerEventType.Scroll, Offset(260f, 110f), scrollDelta = Offset(0f, -3f)); settle() }
             assertTrue(state.canScrollForward, "Wheel scrolling must leave the bottom")

@@ -1043,5 +1043,6 @@
   "На {0} нет подходящей версии для {1} и {2}": "Nincs kompatibilis verzió a(z) {0} webhelyen {1} és {2} számára",
   "Не удалось проверить совместимость: {0}": "Nem sikerült ellenőrizni a kompatibilitást: {0}",
   "Все сборки": "Minden példány",
-  "Попробуй другое имя файла или сборки": "Try a different file or instance name"
+  "Попробуй другое имя файла или сборки": "Try a different file or instance name",
+  "В конец": "Ugrás a végére"
 }

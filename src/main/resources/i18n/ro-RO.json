@@ -1043,5 +1043,6 @@
   "На {0} нет подходящей версии для {1} и {2}": "Nicio versiune compatibilă pe {0} pentru {1} și {2}",
   "Не удалось проверить совместимость: {0}": "Nu s-a putut verifica compatibilitatea: {0}",
   "Все сборки": "Toate cazurile",
-  "Попробуй другое имя файла или сборки": "Încercați un alt nume de fișier sau instanță"
+  "Попробуй другое имя файла или сборки": "Încercați un alt nume de fișier sau instanță",
+  "В конец": "Mergi la final"
 }

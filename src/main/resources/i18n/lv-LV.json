@@ -1043,5 +1043,6 @@
   "На {0} нет подходящей версии для {1} и {2}": "Nav saderīgas versijas vietnē {0} {1} un {2}",
   "Не удалось проверить совместимость: {0}": "Nevarēja pārbaudīt saderību: {0}",
   "Все сборки": "Visi gadījumi",
-  "Попробуй другое имя файла или сборки": "Izmēģiniet citu faila vai instances nosaukumu"
+  "Попробуй другое имя файла или сборки": "Izmēģiniet citu faila vai instances nosaukumu",
+  "В конец": "Uz beigām"
 }

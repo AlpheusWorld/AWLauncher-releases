@@ -1043,5 +1043,6 @@
   "На {0} нет подходящей версии для {1} и {2}": "No compatible version on {0} for {1} and {2}",
   "Не удалось проверить совместимость: {0}": "Could not check compatibility: {0}",
   "Все сборки": "Alle tilfeller",
-  "Попробуй другое имя файла или сборки": "Prøv et annet fil- eller instansnavn"
+  "Попробуй другое имя файла или сборки": "Prøv et annet fil- eller instansnavn",
+  "В конец": "Gå til bunnen"
 }

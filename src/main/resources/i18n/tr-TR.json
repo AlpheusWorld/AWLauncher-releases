@@ -1043,5 +1043,6 @@
   "На {0} нет подходящей версии для {1} и {2}": "{1} ve {2} için {0} üzerinde uyumlu sürüm yok",
   "Не удалось проверить совместимость: {0}": "Uyumluluk kontrol edilemedi: {0}",
   "Все сборки": "Tüm örnekler",
-  "Попробуй другое имя файла или сборки": "Farklı bir dosya veya örnek adı deneyin"
+  "Попробуй другое имя файла или сборки": "Farklı bir dosya veya örnek adı deneyin",
+  "В конец": "Sona git"
 }

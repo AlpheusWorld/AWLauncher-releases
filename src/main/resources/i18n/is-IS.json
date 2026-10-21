@@ -1043,5 +1043,6 @@
   "На {0} нет подходящей версии для {1} и {2}": "Engin samhæf útgáfa á {0} fyrir {1} og {2}",
   "Не удалось проверить совместимость: {0}": "Gat ekki athugað eindrægni: {0}",
   "Все сборки": "Öll tilvik",
-  "Попробуй другое имя файла или сборки": "Prófaðu annað skráar- eða tilviksnafn"
+  "Попробуй другое имя файла или сборки": "Prófaðu annað skráar- eða tilviksnafn",
+  "В конец": "Fara neðst"
 }

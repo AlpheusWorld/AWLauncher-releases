@@ -1043,5 +1043,6 @@
   "На {0} нет подходящей версии для {1} и {2}": "Ingen kompatibel version på {0} för {1} och {2}",
   "Не удалось проверить совместимость: {0}": "Kunde inte kontrollera kompatibilitet: {0}",
   "Все сборки": "Alla instanser",
-  "Попробуй другое имя файла или сборки": "Försök med ett annat fil- eller instansnamn"
+  "Попробуй другое имя файла или сборки": "Försök med ett annat fil- eller instansnamn",
+  "В конец": "Gå till slutet"
 }

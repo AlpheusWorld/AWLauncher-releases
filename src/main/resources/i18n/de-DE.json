@@ -1043,5 +1043,6 @@
   "На {0} нет подходящей версии для {1} и {2}": "Keine kompatible Version auf {0} für {1} und {2}",
   "Не удалось проверить совместимость: {0}": "Kompatibilität konnte nicht überprüft werden: {0}",
   "Все сборки": "Alle Instanzen",
-  "Попробуй другое имя файла или сборки": "Versuchen Sie es mit einem anderen Datei- oder Instanznamen"
+  "Попробуй другое имя файла или сборки": "Versuchen Sie es mit einem anderen Datei- oder Instanznamen",
+  "В конец": "Zum Ende"
 }

@@ -1043,5 +1043,6 @@
   "На {0} нет подходящей версии для {1} и {2}": "Geen compatibele versie op {0} voor {1} en {2}",
   "Не удалось проверить совместимость: {0}": "Kan de compatibiliteit niet controleren: {0}",
   "Все сборки": "Alle exemplaren",
-  "Попробуй другое имя файла или сборки": "Probeer een andere bestands- of instantienaam"
+  "Попробуй другое имя файла или сборки": "Probeer een andere bestands- of instantienaam",
+  "В конец": "Naar onderen"
 }

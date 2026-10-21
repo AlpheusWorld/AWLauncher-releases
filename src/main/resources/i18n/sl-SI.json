@@ -1043,5 +1043,6 @@
   "На {0} нет подходящей версии для {1} и {2}": "Ni združljive različice na {0} za {1} in {2}",
   "Не удалось проверить совместимость: {0}": "Ni bilo mogoče preveriti združljivosti: {0}",
   "Все сборки": "Vsi primeri",
-  "Попробуй другое имя файла или сборки": "Poskusite z drugim imenom datoteke ali primerka"
+  "Попробуй другое имя файла или сборки": "Poskusite z drugim imenom datoteke ali primerka",
+  "В конец": "Na konec"
 }

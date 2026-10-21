@@ -1043,5 +1043,6 @@
   "На {0} нет подходящей версии для {1} и {2}": "Ei yhteensopivaa versiota verkkotunnuksessa {0} kohteille {1} ja {2}",
   "Не удалось проверить совместимость: {0}": "Yhteensopivuutta ei voitu tarkistaa: {0}",
   "Все сборки": "Kaikki tapaukset",
-  "Попробуй другое имя файла или сборки": "Kokeile toista tiedostoa tai ilmentymän nimeä"
+  "Попробуй другое имя файла или сборки": "Kokeile toista tiedostoa tai ilmentymän nimeä",
+  "В конец": "Siirry loppuun"
 }

@@ -1043,5 +1043,6 @@
   "На {0} нет подходящей версии для {1} и {2}": "No hi ha cap versió compatible a {0} per a {1} i {2}",
   "Не удалось проверить совместимость: {0}": "No s'ha pogut comprovar la compatibilitat: {0}",
   "Все сборки": "Tots els casos",
-  "Попробуй другое имя файла или сборки": "Prova amb un nom de fitxer o instància diferent"
+  "Попробуй другое имя файла или сборки": "Prova amb un nom de fitxer o instància diferent",
+  "В конец": "Ves al final"
 }

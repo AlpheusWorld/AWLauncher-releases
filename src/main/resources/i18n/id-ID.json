@@ -1043,5 +1043,6 @@
   "На {0} нет подходящей версии для {1} и {2}": "Tidak ada versi yang kompatibel di {0} untuk {1} dan {2}",
   "Не удалось проверить совместимость: {0}": "Tidak dapat memeriksa kompatibilitas: {0}",
   "Все сборки": "Semua contoh",
-  "Попробуй другое имя файла или сборки": "Coba nama file atau contoh lain"
+  "Попробуй другое имя файла или сборки": "Coba nama file atau contoh lain",
+  "В конец": "Ke akhir"
 }

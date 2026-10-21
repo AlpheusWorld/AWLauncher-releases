@@ -156,7 +156,11 @@ internal fun LogLines(
         listState.scrollBy((last.offset + last.size - layout.viewportEndOffset).coerceAtLeast(0).toFloat())
     }
     LaunchedEffect(lines) {
-        if (followTail) scrollToEnd()
+        if (followTail) {
+            // Wait for the new lazy item content to be measured, including a changed final row.
+            withFrameNanos { }
+            scrollToEnd()
+        }
     }
     Box(modifier.nestedScroll(scrolling)) {
         SelectionContainer {
