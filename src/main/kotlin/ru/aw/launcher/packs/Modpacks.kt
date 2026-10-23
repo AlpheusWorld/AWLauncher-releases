@@ -271,6 +271,7 @@ object Modpacks {
     internal fun safePath(raw: String): String? {
         val path = raw.replace('\\', '/')
         if (path.isBlank() || path.startsWith("/") || ':' in path || path == MANIFEST) return null
+        if (path.substringBefore('/').lowercase() in setOf(ru.aw.launcher.instance.BuildHistory.FOLDER, "aw-migration-backups")) return null
         if (path.split('/').any { it.isEmpty() || it == "." || it == ".." }) return null
         return path
     }

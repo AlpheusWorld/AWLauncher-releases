@@ -139,12 +139,12 @@ object LocalBuilds {
     }
 
     @Synchronized
-    fun changeGameVersion(id: String, expectedVersion: String, targetVersion: String): LocalBuild {
+    fun changeGameVersion(id: String, expectedVersion: String, targetVersion: String, loaderVersion: String? = null): LocalBuild {
         val existing = list()
         val current = existing.firstOrNull { it.id == id } ?: throw IOException("Сборка больше не найдена")
         if (current.versionId != expectedVersion) throw IOException("Версия сборки уже изменилась")
         require(targetVersion.isNotBlank()) { "Выбери версию Minecraft" }
-        val updated = current.copy(versionId = targetVersion, loaderVersion = null)
+        val updated = current.copy(versionId = targetVersion, loaderVersion = loaderVersion)
         save(existing.map { if (it.id == id) updated else it })
         return updated
     }

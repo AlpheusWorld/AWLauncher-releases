@@ -233,7 +233,8 @@ class LauncherState(
         val key = entry.key
         return contentModels.getOrPut(key) {
             ContentModel(gameDirOf(entry), entry.loader, entry.id, scope,
-                onChanged = { modsChanged(entry) }, source = source, downloads = downloads, entryKey = entry.key, entryTitle = entry.title)
+                onChanged = { modsChanged(entry) }, source = source, downloads = downloads, entryKey = entry.key, entryTitle = entry.title,
+                checkEditable = { checkContentEditable(entry) }, profileLoaderVersion = entry.build?.loaderVersion ?: entry.pack?.loaderVersion)
         }.also {
             it.useSource(source)
             if (contentModels.size > 8) contentModels.entries.firstOrNull { old -> old.key != key && old.value.working.isEmpty() && !old.value.refreshing }
@@ -850,10 +851,15 @@ class LauncherState(
     }
 
     fun fixMods(entry: VersionEntry, source: Notice? = null) {
+        if (!canChangeHistory(entry)) return
         startJob(entry, "fix mods") {
+            checkContentEditable(entry)
             stageChanged("Подбираю совместимые версии модов")
             val changes = try {
-                ModManager.fixConflicts(gameDirOf(entry), entry.loader, entry.id) { progress = it }
+                ru.aw.launcher.instance.BuildHistory.record(gameDirOf(entry), entry.id, entry.loader, "Исправление совместимости модов",
+                    entry.build?.loaderVersion ?: entry.pack?.loaderVersion) {
+                    ModManager.fixConflicts(gameDirOf(entry), entry.loader, entry.id) { progress = it }
+                }
             } catch (e: IOException) {
                 fail(e.message, entry, "Моды не исправлены", listOf(NoticeAction.MODS))
                 return@startJob
@@ -881,6 +887,8 @@ class LauncherState(
     }
 
     private suspend fun launch(entry: VersionEntry, account: Account, serverAddress: String?, skipModCheck: Boolean) {
+        if (contentModels[entry.key]?.working?.isNotEmpty() == true)
+            throw IOException("Дождись завершения изменений этой сборки")
         val gameDir = gameDirOf(entry)
         if (!skipModCheck && entry.loader.isModded) {
             val conflicts = withContext(Dispatchers.IO) {
@@ -945,13 +953,19 @@ class LauncherState(
 
     fun installPack(source: PackSource) {
         val existing = packs.firstOrNull { it.id == source.id }
+        if (existing != null && !canChangeHistory(entryFor(existing))) return
         if (existing != null && downloads.contains("migration:${entryFor(existing).key}")) {
             fail("Дождись завершения изменения версии сборки"); return
         }
         startJob(packs.firstOrNull { it.id == source.id }?.let(::entryFor), "pack", source.title, "pack:${source.projectId}") {
             installingPack = source.projectId
             try {
-                val pack = Modpacks.install(source, onStage = ::stageChanged, onProgress = { progress = it })
+                if (existing != null) checkContentEditable(entryFor(existing))
+                val pack = if (existing == null) Modpacks.install(source, onStage = ::stageChanged, onProgress = { progress = it })
+                else ru.aw.launcher.instance.BuildHistory.record(Modpacks.dirOf(existing), existing.gameVersion, existing.loader,
+                    "Обновление сборки ${existing.version} → ${source.version}", existing.loaderVersion) {
+                    Modpacks.install(source, onStage = ::stageChanged, onProgress = { progress = it })
+                }
                 packs = withContext(Dispatchers.IO) { Modpacks.list() }
                 packUpdates = packUpdates - pack.id
                 val entry = entryFor(pack)
@@ -1129,17 +1143,23 @@ class LauncherState(
             val current = entryByKey(entry.key) ?: throw IOException("Сборка больше не найдена")
             if (current.id != plan.sourceVersion || gameDirOf(current).toAbsolutePath().normalize() != plan.directory)
                 throw IOException("Сборка изменилась. Проверь моды ещё раз")
-            val backup = try { ru.aw.launcher.instance.BuildMigration.apply(plan, keepEnabled, onStage = { text ->
-                stageChanged(text)
-                if (text == "Применяю новую версию сборки") downloads.reportCancellable(false)
-            }, onProgress = { progress = it },
-                prepareGame = { dir -> GameLauncher.prepare(plan.targetVersion, entry.loader, gameDir = dir,
-                    onStage = ::stageChanged, onProgress = { progress = it }) },
-                commitVersion = {
-                    entry.build?.let { LocalBuilds.changeGameVersion(it.id, plan.sourceVersion, plan.targetVersion) }
-                        ?: entry.pack?.let { Modpacks.changeGameVersion(it, plan.targetVersion) }
-                        ?: throw IOException("У этой версии нет отдельного профиля сборки")
-                }) } catch (failure: ru.aw.launcher.instance.MigrationModFailure) {
+            val backup = try {
+                ru.aw.launcher.instance.BuildHistory.record(plan.directory, entry.id, entry.loader,
+                    "Смена версии Minecraft", entry.build?.loaderVersion ?: entry.pack?.loaderVersion,
+                    targetGameVersion = plan.targetVersion) {
+                    ru.aw.launcher.instance.BuildMigration.apply(plan, keepEnabled, onStage = { text ->
+                        stageChanged(text)
+                        if (text == "Применяю новую версию сборки") downloads.reportCancellable(false)
+                    }, onProgress = { progress = it },
+                        prepareGame = { dir -> GameLauncher.prepare(plan.targetVersion, entry.loader, gameDir = dir,
+                            onStage = ::stageChanged, onProgress = { progress = it }) },
+                        commitVersion = {
+                            entry.build?.let { LocalBuilds.changeGameVersion(it.id, plan.sourceVersion, plan.targetVersion) }
+                                ?: entry.pack?.let { Modpacks.changeGameVersion(it, plan.targetVersion) }
+                                ?: throw IOException("У этой версии нет отдельного профиля сборки")
+                        })
+                }
+            } catch (failure: ru.aw.launcher.instance.MigrationModFailure) {
                 modal = Modal.Migrate(entry, plan, keepEnabled, failure)
                 throw failure
             }
@@ -1402,6 +1422,78 @@ class LauncherState(
     }
 
     fun modsChanged(entry: VersionEntry) = instanceChanged(entry)
+
+    private fun checkContentEditable(entry: VersionEntry) {
+        if (runningGames.any { it.isAlive }) throw IOException("Закрой Minecraft перед изменением сборки")
+        if (savingInstanceSettings || libraryBusy || buildsBusy) throw IOException("Дождись сохранения настроек сборки")
+        if (entryByKey(entry.key)?.id != entry.id) throw IOException("Версия сборки изменилась. Открой сборку заново")
+    }
+
+    private fun canChangeHistory(entry: VersionEntry): Boolean {
+        try {
+            checkContentEditable(entry)
+            if (libraryEntryBusy(entry)) throw IOException("Дождись завершения изменений этой сборки")
+        } catch (e: IOException) { fail(e.message, entry); return false }
+        return true
+    }
+
+    fun saveHistoryWorlds(entry: VersionEntry, include: Boolean) {
+        if (!canChangeHistory(entry)) return
+        savingInstanceSettings = true
+        scope.launch {
+            try {
+                withContext(Dispatchers.IO) { InstanceStore.update(gameDirOf(entry)) { it.copy(historyIncludeWorlds = include) } }
+                instanceChanged(entry)
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { fail(e.message, entry, "Не удалось сохранить настройку истории") }
+            finally { savingInstanceSettings = false }
+        }
+    }
+
+    fun createHistorySnapshot(entry: VersionEntry) {
+        if (!canChangeHistory(entry)) return
+        startJob(entry, "history", "Сохранение состояния · ${entry.title}", "history:${entry.key}") {
+            checkContentEditable(entry)
+            stageChanged("Сохраняю состояние сборки")
+            ru.aw.launcher.instance.BuildHistory.create(gameDirOf(entry), entry.id, entry.loader, "Сохранено вручную",
+                entry.build?.loaderVersion ?: entry.pack?.loaderVersion, completed = true)
+            instanceChanged(entry)
+            inform("Состояние сборки сохранено", entry)
+        }
+    }
+
+    fun deleteHistorySnapshot(entry: VersionEntry, id: String) {
+        if (!canChangeHistory(entry)) return
+        startJob(entry, "history", "Удаление снимка · ${entry.title}", "history:${entry.key}") {
+            ru.aw.launcher.instance.BuildHistory.delete(gameDirOf(entry), id)
+            instanceChanged(entry)
+        }
+    }
+
+    fun restoreHistorySnapshot(entry: VersionEntry, snapshot: ru.aw.launcher.instance.BuildHistoryEntry, worlds: Boolean) {
+        if (!canChangeHistory(entry)) return
+        if (snapshot.gameVersion != entry.id && entry.build == null && entry.pack == null) {
+            fail("Снимок относится к другой версии Minecraft", entry); return
+        }
+        startJob(entry, "history", "Восстановление · ${entry.title}", "history:${entry.key}") {
+            checkContentEditable(entry)
+            stageChanged("Возвращаю сохранённое состояние")
+            downloads.reportCancellable(false)
+            ru.aw.launcher.instance.BuildHistory.restore(gameDirOf(entry), snapshot.id, entry.id, entry.loader,
+                entry.build?.loaderVersion ?: entry.pack?.loaderVersion, worlds,
+                allowLoaderChange = entry.pack != null) { saved ->
+                entry.build?.let { LocalBuilds.changeGameVersion(it.id, entry.id, saved.gameVersion, saved.loaderVersion) }
+            }
+            builds = withContext(Dispatchers.IO) { LocalBuilds.list() }
+            packs = withContext(Dispatchers.IO) { Modpacks.list() }
+            contentModels.remove(entry.key)
+            val updated = entryByKey(entry.key) ?: entry
+            if (catalogTarget?.key == entry.key) catalogTarget = updated
+            instanceChanged(updated)
+            refreshInstalled()
+            inform("Сохранённое состояние сборки восстановлено", updated)
+        }
+    }
 
     fun openCatalog(entry: VersionEntry? = null, tab: CatalogTab? = null, query: String = "") {
         catalogTarget = entry

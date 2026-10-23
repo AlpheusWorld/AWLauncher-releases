@@ -86,7 +86,7 @@ fun InstanceScreen(state: LauncherState, initialTab: Int = 0) {
                 }
                 HorizontalDivider(color = AWColors.Outline)
                 Row(Modifier.horizontalScroll(rememberScrollState()).clip(PillShape).background(AWColors.Surface).padding(4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    listOf("Контент", "Файлы", "Миры", "Журнал", "Статистика", "Скриншоты").forEachIndexed { index, title ->
+                    listOf("Контент", "Файлы", "Миры", "Журнал", "Статистика", "Скриншоты", "История").forEachIndexed { index, title ->
                         ChoiceChip(title, selected = tab == index, onClick = { tab = index })
                     }
                 }
@@ -97,6 +97,7 @@ fun InstanceScreen(state: LauncherState, initialTab: Int = 0) {
                         2 -> InstanceFiles(state, entry, worlds = true)
                         3 -> InstanceJournal(state, entry)
                         4 -> ActivityScreen(state, entry)
+                        6 -> InstanceHistory(state, entry)
                         else -> ScreenshotsScreen(state, entry)
                     }
                 }

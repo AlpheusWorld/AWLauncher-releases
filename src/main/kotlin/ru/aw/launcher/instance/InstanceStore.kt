@@ -48,6 +48,7 @@ data class InstanceOptions(
     val iconUrl: String? = null,
     // An explicit per-instance choice overrides an imported build or modpack pin.
     val loaderVersion: String? = null,
+    val historyIncludeWorlds: Boolean = false,
 ) {
     fun launchLoaderVersion(profileVersion: String?): String? = loaderVersion ?: profileVersion
 

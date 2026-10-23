@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import ru.aw.launcher.meta.LoaderKind
+import ru.aw.launcher.instance.BuildHistory
 import ru.aw.launcher.mods.*
 import java.nio.file.Files
 import java.nio.file.Path
@@ -31,11 +32,19 @@ class ContentBatchTest {
         run { it.toggleMany(listOf(normal, second), false) }
         assertTrue(Files.exists(dir.resolve("mods/normal.jar.disabled")))
         assertTrue(Files.exists(dir.resolve("mods/second.jar.disabled")))
+        val toggleSnapshot = BuildHistory.list(dir).single()
+        assertEquals(2, toggleSnapshot.changes.size)
+        assertTrue(toggleSnapshot.changes.all { !it.before.orEmpty().contains("выключен") && it.after.orEmpty().contains("выключен") })
         val disabled = normal.copy(file = dir.resolve("mods/normal.jar.disabled"), enabled = false)
         val secondDisabled = second.copy(file = dir.resolve("mods/second.jar.disabled"), enabled = false)
         run { it.removeMany(listOf(disabled, secondDisabled)) }
         assertFalse(Files.exists(disabled.file))
         assertFalse(Files.exists(secondDisabled.file))
+        val removal = BuildHistory.list(dir).single { it.title == "Удаление проектов" }
+        assertTrue(removal.changes.all { it.before != null && it.after == null })
+        BuildHistory.restore(dir, removal.id, "1.21.1", LoaderKind.FABRIC, null)
+        assertTrue(Files.exists(disabled.file))
+        assertTrue(Files.exists(secondDisabled.file))
     }
 
     @Test

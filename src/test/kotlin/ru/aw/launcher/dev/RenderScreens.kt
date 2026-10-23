@@ -433,10 +433,18 @@ fun main(args: Array<String>) {
         Files.writeString(instanceDir.resolve("mods/Iris-1.8.8.jar.disabled"), "preview content")
         for(index in 1..70) Files.writeString(instanceDir.resolve("mods/Project-${index.toString().padStart(2,'0')}.jar"), "preview content")
         Files.writeString(instanceDir.resolve("options.txt"), "fullscreen:false")
+        if (selectedScreens?.any { it.startsWith("instance-history") } == true) runBlocking {
+            val snapshot = ru.aw.launcher.instance.BuildHistory.create(instanceDir, localBuild.versionId, localBuild.loader,
+                "Обновлено 12 модов", completed = true)
+            val changes = (1..12).map { index -> ru.aw.launcher.instance.BuildChange(
+                listOf("Sodium", "Iris Shaders", "Fabric API", "Lithium")[(index - 1) % 4], "1.0.$index", "1.1.$index") }
+            instanceDir.resolve(ru.aw.launcher.instance.BuildHistory.FOLDER).resolve(snapshot.id).resolve("snapshot.json")
+                .toFile().writeText(Json.encodeToString(snapshot.copy(changes = changes)))
+        }
         Files.writeString(instanceDir.resolve("logs/latest.log"), "[19:22:14] [main/INFO]: Loading Minecraft 26.2 with Fabric Loader 0.19.5\n[19:24:10] [Render thread/INFO]: Preparing spawn area\n")
         withBuilds.openInstance(withBuilds.entryFor(localBuild))
-        for (index in 0..4) {
-            render("instance-${listOf("content", "files", "worlds", "journal", "statistics")[index]}", 1280, 780) {
+        for (index in listOf(0, 1, 2, 3, 4, 6)) {
+            render("instance-${listOf("content", "files", "worlds", "journal", "statistics", "screenshots", "history")[index]}", 1280, 780) {
                 AWTheme(ThemeMode.OLED) {
                     Column(Modifier.fillMaxSize()) {
                         ru.aw.launcher.ui.LauncherTitleBar(withBuilds)
@@ -444,6 +452,9 @@ fun main(args: Array<String>) {
                     }
                 }
             }
+        }
+        render("instance-history-small", 600, 540) {
+            AWTheme(ThemeMode.OLED) { InstanceScreen(withBuilds, initialTab = 6) }
         }
         render("instance-content-small", 1050, 660) { AWTheme(ThemeMode.OLED) { App(withBuilds, onGameStarted = {}) } }
         render("instance-content-minimum",600,420) { AWTheme(ThemeMode.OLED) { App(withBuilds,onGameStarted={}) } }

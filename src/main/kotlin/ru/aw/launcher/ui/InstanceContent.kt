@@ -3,6 +3,7 @@ package ru.aw.launcher.ui
 import androidx.compose.runtime.*
 import kotlinx.coroutines.*
 import ru.aw.launcher.core.Shell
+import ru.aw.launcher.instance.BuildHistory
 import ru.aw.launcher.meta.LoaderKind
 import ru.aw.launcher.mods.*
 import ru.aw.launcher.net.DownloadProgress
@@ -22,6 +23,8 @@ internal class ContentModel(
     private val downloads: DownloadQueue? = null,
     private val entryKey: String = dir.toString(),
     private val entryTitle: String = gameVersion,
+    private val checkEditable: () -> Unit = {},
+    private val profileLoaderVersion: String? = null,
 ) {
     private var provider = source
     private val searchCache = HashMap<CatalogSource, Map<ContentKind, CatalogSearch>>()
@@ -52,7 +55,7 @@ internal class ContentModel(
 
     val installedProjects: Set<String> get() = installed.values.flatten().mapNotNull { it.projectId }.toSet()
     val updates: List<InstalledItem> get() = installed.values.flatten().filter { it.update != null }
-    val migrating: Boolean get() = downloads?.contains("migration:$entryKey") == true
+    val migrating: Boolean get() = downloads?.contains("migration:$entryKey") == true || downloads?.contains("history:$entryKey") == true
     fun waiting(key: String): Boolean = downloads?.items?.any {
         it.key == "content:$entryKey:$key" && it.status == DownloadStatus.WAITING
     } == true
@@ -127,7 +130,7 @@ internal class ContentModel(
 
     fun addFiles(files: List<Path>, kind: ContentKind, world: Path? = null) {
         if (kind == ContentKind.DATA_PACK && world == null) { if (!migrating && working.isEmpty()) dataPackFiles = files; return }
-        work(ALL) {
+        work(ALL, historyTitle = "Добавление файлов: ${files.size}") {
         withContext(Dispatchers.IO) {
             val destination = if (kind == ContentKind.DATA_PACK) {
                 val selected = requireNotNull(world).toAbsolutePath().normalize()
@@ -169,7 +172,7 @@ internal class ContentModel(
             if (!migrating && ALL !in working) dataPackRequest = hit to version
             return
         }
-        work(hit.projectId, "${hit.title} · $entryTitle") {
+        work(hit.projectId, "${hit.title} · $entryTitle", historyTitle = "Установка ${hit.title}") {
         version?.let { ModManager.requireCompatibleVersion(it, hit.projectId, gameVersion, ModManager.catalogLoaders(kind, loader)) }
         message = when (kind) {
             ContentKind.SHADER -> {
@@ -199,12 +202,12 @@ internal class ContentModel(
         }
     }
 
-    fun update(mod: InstalledItem) = work(mod.rowKey, "${mod.title} · $entryTitle") {
+    fun update(mod: InstalledItem) = work(mod.rowKey, "${mod.title} · $entryTitle", historyTitle = "Обновление ${mod.title}") {
         updateWithDependencies(mod)
         message = "${mod.title} обновлён до ${mod.update?.versionNumber.orEmpty()}".trimEnd()
     }
 
-    fun updateAll() = work(ALL, "Обновление проектов · $entryTitle") {
+    fun updateAll() = work(ALL, "Обновление проектов · $entryTitle", historyTitle = "Обновление проектов") {
         var pending = updates
         var done = 0
         var skipped = emptyList<String>()
@@ -260,10 +263,15 @@ internal class ContentModel(
         installed = editable.fold(installed) { rows, item -> replaceEnabled(rows, item.copy(enabled = enabled)) }
         scope.launch {
             try {
-                for (item in editable) {
-                    val changed = withContext(Dispatchers.IO) { ModManager.setEnabled(item, enabled) }
-                    confirmed = replaceEnabled(confirmed, changed)
+                checkEditable()
+                val change: suspend () -> Unit = {
+                    for (item in editable) {
+                        val changed = withContext(Dispatchers.IO) { ModManager.setEnabled(item, enabled) }
+                        confirmed = replaceEnabled(confirmed, changed)
+                    }
                 }
+                if (editable.size > 1) recordChange(if (enabled) "Включение проектов" else "Выключение проектов", change)
+                else change()
                 installed = if (scanned) confirmed else retainRows(scanAll(remote = false))
                 scanned = true; scannedAt = System.currentTimeMillis()
                 if (items.size > 1) message = "Изменено проектов: ${editable.size}"
@@ -281,13 +289,13 @@ internal class ContentModel(
         }
     }
 
-    fun removeMany(items: List<InstalledItem>) = work(ALL) {
+    fun removeMany(items: List<InstalledItem>) = work(ALL, historyTitle = "Удаление проектов") {
         val editable = items.distinctBy { it.file }
         withContext(Dispatchers.IO) { editable.forEach { ensureActive(); ModManager.remove(it) } }
         message = "Удалено проектов: ${editable.size}"
     }
 
-    fun updateMany(items: List<InstalledItem>) = work(ALL, "Обновление проектов · $entryTitle") {
+    fun updateMany(items: List<InstalledItem>) = work(ALL, "Обновление проектов · $entryTitle", historyTitle = "Обновление проектов") {
         var done = 0
         val failures = ArrayList<String>()
         for (item in items.filter { it.update != null }.distinctBy { it.file }) {
@@ -312,14 +320,18 @@ internal class ContentModel(
         ModManager.update(mod) { progress = it }
     }
 
-    fun remove(item: InstalledItem) = work(item.rowKey) {
+    fun remove(item: InstalledItem) = work(item.rowKey, historyTitle = "Удаление ${item.title}") {
         withContext(Dispatchers.IO) { ModManager.remove(item) }
         message = "${item.title} удалён"
     }
 
     fun folder(kind: ContentKind?): Path = kind?.dir(dir) ?: dir
 
-    private fun work(key: String, title: String? = null, block: suspend () -> Unit) {
+    private suspend fun recordChange(title: String, block: suspend () -> Unit) {
+        BuildHistory.record(dir, gameVersion, loader, title, profileLoaderVersion, knownItems = installed.values.flatten(), block = block)
+    }
+
+    private fun work(key: String, title: String? = null, historyTitle: String = "Изменение контента", block: suspend () -> Unit) {
         if (migrating) { error = "Дождись завершения изменения версии сборки"; return }
         if (title != null && downloads != null) {
             if (ALL in working || (key == ALL && working.isNotEmpty())) return
@@ -332,7 +344,9 @@ internal class ContentModel(
                 error = null; message = null
                 reporter.stage("Загружаю")
                 try {
-                    block()
+                    checkEditable()
+                    reporter.stage("Сохраняю состояние сборки")
+                    recordChange(historyTitle, block)
                     installed = retainRows(scanAll(remote = false))
                     scanned = true; scannedAt = 0
                     onChanged()
@@ -349,7 +363,8 @@ internal class ContentModel(
         stopScan()
         scope.launch {
             try {
-                block()
+                checkEditable()
+                recordChange(historyTitle, block)
                 installed = retainRows(scanAll(remote = false))
                 scanned = true
                 scannedAt = 0
