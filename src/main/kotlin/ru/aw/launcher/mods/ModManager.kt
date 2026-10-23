@@ -443,7 +443,7 @@ object ModManager {
                     val title = if (id in rootIds && rootTitle != null) rootTitle else resolver.title(id).takeIf { it != id }
                         ?: pair.first.name.ifBlank { id }
                     rememberCatalog(staging, ContentKind.MOD, pair.first, title,
-                        iconUrl = installed.firstOrNull { it.projectId == id }?.iconUrl, lookupIcon = false)
+                        iconUrl = installed.firstOrNull { it.projectId == id }?.iconUrl)
                 }
                 for (path in untrackedIncoming)
                     Files.copy(path, stagedMods.resolve(path.name))
@@ -813,11 +813,11 @@ object ModManager {
         item.file.parent?.parent?.parent?.parent else item.file.parent?.parent
 
     internal fun rememberCatalog(gameDir: Path, kind: ContentKind, version: Modrinth.Version, title: String, iconUrl: String? = null,
-                                 directory: Path = kind.dir(gameDir), lookupIcon: Boolean = true) {
+                                 directory: Path = kind.dir(gameDir)) {
         val file = version.primaryFile ?: return
         val name = kind.safeName(file.filename) ?: return
         val path = directory.resolve(name).let { if (it.exists()) it else it.resolveSibling(name + DISABLED) }
-        val icon = iconUrl ?: if (lookupIcon && CurseForge.owns(version.projectId)) remote("CurseForge icon") { CurseForge.projectInfo(version.projectId).logo?.url } else null
+        val icon = iconUrl ?: if (CurseForge.owns(version.projectId)) remote("CurseForge icon") { CurseForge.projectInfo(version.projectId).logo?.url } else null
         val relative = gameDir.toAbsolutePath().normalize().relativize(directory.toAbsolutePath().normalize()).toString().replace('\\', '/')
         val record = ManagedMod(version.projectId, version.id, "$relative/$name", hashOf(path), title,
             version.versionNumber, version.datePublished, icon)
