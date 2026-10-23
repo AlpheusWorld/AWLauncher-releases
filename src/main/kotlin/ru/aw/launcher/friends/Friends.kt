@@ -35,7 +35,6 @@ import ru.aw.launcher.discord.GameEvent
 import ru.aw.launcher.discord.GameEvents
 import ru.aw.launcher.meta.LoaderKind
 import ru.aw.launcher.net.Http
-import ru.aw.launcher.servers.ServerPing
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
@@ -81,6 +80,7 @@ object Friends {
     private val idPattern = Regex("[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}")
     private val network = Mutex()
     private val worlds = ConcurrentHashMap<Long, HostedWorld>()
+    private val closeMessages = ConcurrentHashMap<Long, Set<String>>()
     private val mutable = MutableStateFlow(FriendsState())
     val state = mutable.asStateFlow()
     private var identity: FriendsIdentity? = null
@@ -91,21 +91,9 @@ object Friends {
 
     suspend fun run() = withContext(Dispatchers.IO) {
         var wasEnabled = false
-        var checkedSession: String? = null
-        var failedChecks = 0
         while (currentCoroutineContext().isActive) {
             val enabled = Settings.current.friendsEnabled
             try {
-                val hosted = mutable.value.world
-                if (hosted?.info?.id != checkedSession) { checkedSession = hosted?.info?.id; failedChecks = 0 }
-                if (enabled && hosted != null && hosted.info.address.isNotEmpty()) {
-                    if (ServerPing.ping(hosted.info.address) == null) failedChecks++ else failedChecks = 0
-                    if (failedChecks >= 3) {
-                        val stopped = hosted.copy(info = hosted.info.copy(address = ""),error = "Мир больше не доступен через интернет. Для повторного открытия используй /e4mc restart в игре")
-                        if (worlds.replace(hosted.processId,hosted,stopped))
-                            mutable.update { if (it.world == hosted) it.copy(world = stopped) else it }
-                    }
-                }
                 if (enabled || wasEnabled) network.withLock { sync(enabled) }
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) {
@@ -208,13 +196,22 @@ object Friends {
     fun track(processId: Long, gameDir: Path, version: String, loader: LoaderKind, title: String) {
         if (!Settings.current.friendsEnabled || !loader.isModded || !FriendsMod.isPresent(gameDir)) return
         val world = HostedWorld(processId,WorldInvitation(UUID.randomUUID().toString(),"",title.take(120),version,loader,FriendsMod.fingerprint(gameDir)))
+        closeMessages[processId] = FriendsMod.closeMessages(gameDir)
         worlds[processId] = world
         mutable.update { it.copy(world = world) }
     }
 
     fun line(processId: Long, line: String) {
-        if ("[CHAT]" in line) return
         val previous = worlds[processId] ?: return
+        if ("[CHAT]" in line) {
+            // Match the installed mod's exact system messages; player chat has a sender prefix.
+            val message = line.substringAfter("[CHAT]").trim().replace(Regex("§."),"")
+            if (message in closeMessages[processId].orEmpty()) {
+                val closed = previous.copy(info = previous.info.copy(address = ""),error = null)
+                if (worlds.replace(processId,previous,closed)) mutable.update { if (it.world?.processId == processId) it.copy(world = closed) else it }
+            }
+            return
+        }
         val next = when {
             "e4mc" in line && assigned.containsMatchIn(line) -> {
                 if (!Settings.current.friendsEnabled) return
@@ -226,12 +223,12 @@ object Friends {
             "error in e4mc" in line -> previous.copy(info = previous.info.copy(address = ""),error = "Не удалось открыть мир через интернет — проверь соединение и попробуй /e4mc restart")
             else -> return
         }
-        worlds[processId] = next
-        mutable.update { it.copy(world = next) }
+        if (worlds.replace(processId,previous,next)) mutable.update { it.copy(world = next) }
     }
 
     fun stopped(processId: Long) {
         worlds.remove(processId)
+        closeMessages.remove(processId)
         mutable.update { if (it.world?.processId == processId) it.copy(world = worlds.values.firstOrNull()) else it }
     }
 }

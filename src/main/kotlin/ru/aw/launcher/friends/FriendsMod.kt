@@ -22,6 +22,9 @@ import java.nio.file.Files
 import java.nio.file.LinkOption.NOFOLLOW_LINKS
 import java.nio.file.Path
 import java.security.MessageDigest
+import java.util.zip.ZipFile
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 @Serializable
 private data class FriendsManagedMod(val fileName: String, val sha1: String, val gameVersion: String, val loader: LoaderKind)
@@ -80,6 +83,28 @@ object FriendsMod {
             files.filter { Files.isRegularFile(it,NOFOLLOW_LINKS) && it.fileName.toString().endsWith(".jar") }
                 .anyMatch { runCatching { ModCompat.read(it)?.id in ids }.getOrDefault(false) }
         } else false
+    }
+
+    fun closeMessages(gameDir: Path): Set<String> {
+        val fallback = setOf("Local game no longer publicly hosted")
+        val dir = ModManager.modsDir(gameDir)
+        if (!Files.isDirectory(dir)) return fallback
+        val file = Files.list(dir).use { files ->
+            files.filter { Files.isRegularFile(it,NOFOLLOW_LINKS) && it.fileName.toString().endsWith(".jar") }
+                .filter { runCatching { ModCompat.read(it)?.id in ids }.getOrDefault(false) }.findFirst().orElse(null)
+        } ?: return fallback
+        return runCatching {
+            ZipFile(file.toFile()).use { zip ->
+                fallback + zip.entries().asSequence().filter { entry ->
+                    !entry.isDirectory && entry.name.startsWith("assets/e4mc_minecraft/lang/") && entry.name.endsWith(".json") && entry.size in 1..131072
+                }.take(100).mapNotNull { entry ->
+                    runCatching {
+                        val bytes = zip.getInputStream(entry).use { it.readNBytes(131073) }
+                        if (bytes.size > 131072) null else Json.parseToJsonElement(bytes.toString(Charsets.UTF_8)).jsonObject["text.e4mc_minecraft.closeServer"]?.jsonPrimitive?.content
+                    }.getOrNull()
+                }.toSet()
+            }
+        }.getOrDefault(fallback)
     }
 
     fun fingerprint(gameDir: Path): String {
