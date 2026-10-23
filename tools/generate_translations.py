@@ -17,6 +17,7 @@ import requests
 ROOT = Path(__file__).resolve().parents[1]
 DIRECTORY = ROOT / "src/main/resources/i18n"
 CACHE = ROOT / "build/locale-generation"
+COMMANDS = {"/e4mc stop": "AWFCMD70401", "/e4mc restart": "AWFCMD70402"}
 LANGUAGES = {
     "de-DE": "de", "fr-FR": "fr", "pt-BR": "pt", "it-IT": "it", "nl-NL": "nl", "pl-PL": "pl", "tr-TR": "tr",
     "zh-CN": "zh", "ja-JP": "ja", "id-ID": "id", "fa-IR": "fa", "cs-CZ": "cs", "vi-VN": "vi", "ko-KR": "ko",
@@ -35,7 +36,7 @@ requests.Session.request = bounded_request
 def write(path, values):
     path.parent.mkdir(parents=True, exist_ok=True)
     temp = path.with_suffix(".tmp")
-    temp.write_text(json.dumps(values, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    temp.write_text(json.dumps(values, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
     temp.replace(path)
 
 def slots(value):
@@ -45,6 +46,11 @@ def normalize(value):
     value = html.unescape(re.sub(r'</?span\b[^>]*>', '', value))
     value = re.sub(r"\{\s*(\d+)\s*\}", lambda m: "{" + str(int(m[1])) + "}", value)
     return value.replace("\u200e", "").replace("\u200f", "").strip()
+
+def translation_input(text):
+    for command, token in COMMANDS.items():
+        text = text.replace(command, token)
+    return re.sub(r"\{\d+\}|AWFCMD7040[12]", lambda m: '<span translate="no">' + m[0] + '</span>', html.escape(text))
 
 def generate(tag, target, source):
     path = CACHE / (tag + ".json")
@@ -64,8 +70,8 @@ def generate(tag, target, source):
             try:
                 response = translator.session.post(translator._api_url.format(endpoint="translate"),
                     params={"ucid": translator._ucid(), "srv": "android", "format": "html"},
-                    data=[("text", re.sub(r"\{\d+\}", lambda m: '<span translate="no">' + m[0] + '</span>', html.escape(text))) for _, text in batch] + [("lang", "en-" + target)])
-            except (requests.Timeout, requests.ConnectionError):
+                    data=[("text", translation_input(text)) for _, text in batch] + [("lang", "en-" + target)])
+            except requests.RequestException:
                 if attempt == 2: raise
                 time.sleep(2 + attempt)
                 continue
@@ -80,6 +86,10 @@ def generate(tag, target, source):
             raise RuntimeError(f"Invalid translation batch for {tag}")
         for (key, text), translated in zip(batch, result):
             translated = normalize(translated)
+            for command, token in COMMANDS.items():
+                translated = translated.replace(token, command)
+                if command in text and command not in translated:
+                    raise RuntimeError(f"A command was changed during translation for {tag}")
             if not translated or slots(translated) != slots(key):
                 raise RuntimeError(f"Invalid placeholders for {tag}: {key} -> {translated}")
             saved[key] = translated

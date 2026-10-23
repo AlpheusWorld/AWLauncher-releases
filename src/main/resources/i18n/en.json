@@ -1110,5 +1110,17 @@
   "{0} хочет добавить тебя в друзья. Подтверди заявку во вкладке «Друзья»": "{0} sent you a friend request. Open Friends to accept",
   "Не удалось открыть мир через интернет — проверь соединение и попробуй /e4mc restart": "Could not share the world over the internet. Check your connection and try /e4mc restart",
   "Мир больше не доступен через интернет. Для повторного открытия используй /e4mc restart в игре": "The world is no longer reachable. Run /e4mc restart in game to reopen it",
-  "Для {0} {1} пока нет мода друзей. Подключение к чужому миру остаётся доступным": "The networking mod is not available for {0} {1}. You can still join other worlds"
+  "Для {0} {1} пока нет мода друзей. Подключение к чужому миру остаётся доступным": "The networking mod is not available for {0} {1}. You can still join other worlds",
+  "Подключено": "Connected",
+  "Не удалось защитить профиль друзей — проверь хранилище ключей системы": "Could not protect your friends profile. Check the system credential store",
+  "Не удалось открыть защищённый профиль друзей на этом компьютере": "Could not unlock the friends profile on this computer",
+  "Сервис вернул некорректный адрес мира": "The service returned an invalid world address",
+  "Слишком большой ответ сервиса друзей": "The friends service response is too large",
+  "Нужен вход в сервис друзей": "Sign in to the friends service first",
+  "Профиль друзей не найден": "Friends profile not found",
+  "Проверь код друга": "Check the friend code",
+  "Достигнут предел списка друзей": "The friend list is full",
+  "Заявка больше не доступна": "The friend request is no longer available",
+  "Заявка не найдена": "Friend request not found",
+  "Не удалось подготовить мод друзей: {0}. Можно повторить запуск или выключить игру с друзьями в настройках": "Could not prepare the networking mod: {0}. Try launching again or disable playing with friends in Settings"
 }
