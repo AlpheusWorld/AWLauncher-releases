@@ -58,6 +58,11 @@ class ModCompatTest {
         assertFalse(FabricVersion.satisfies("1.3.0", "~1.2.3"))
         assertTrue(FabricVersion.satisfies("1.9.0", "^1.2.3"))
         assertFalse(FabricVersion.satisfies("2.0.0", "^1.2.3"))
+        assertTrue(FabricVersion.satisfies("0.2.9", "^0.2.3"))
+        assertFalse(FabricVersion.satisfies("0.3.0", "^0.2.3"))
+        assertTrue(FabricVersion.satisfies("0.0.3", "^0.0.3"))
+        assertFalse(FabricVersion.satisfies("0.0.4", "^0.0.3"))
+        assertTrue(FabricVersion.satisfies("1.9.0", "~1"))
         assertTrue(FabricVersion.satisfies("1.21.4", "1.21.x"))
         assertFalse(FabricVersion.satisfies("1.22.0", "1.21.x"))
         assertTrue(FabricVersion.satisfies("anything", "*"))
@@ -105,5 +110,38 @@ class ModCompatTest {
             zip.write((fabricModJson ?: "modLoader=\"javafml\"").toByteArray())
             zip.closeEntry()
         }
+    }
+
+    @Test fun `required dependency ranges and provided aliases are checked`() {
+        val root = ModCompat.parse(Json.parseToJsonElement("""{"id":"root","version":"1","depends":{"library":[">=2 <3","1.4"],"minecraft":"1.21.1","java":">=21","fabricloader":">=0.16"}}""").jsonObject)!!
+        assertEquals(listOf(">=2 <3", "1.4"), root.dependencyVersions["library"])
+        assertTrue(ModCompat.missingDependencies(listOf(root, ModMeta("fork", "Library", "1.4", provides = setOf("library")))).isEmpty())
+        assertEquals("1.0", ModCompat.missingDependencies(listOf(root, ModMeta("library", "Library", "1.0"))).single().installed)
+        assertNull(ModCompat.missingDependencies(listOf(root)).single().installed)
+    }
+
+    @Test fun `bundled modules satisfy dependencies without separate downloads`(@TempDir dir: Path) {
+        val nested = java.io.ByteArrayOutputStream().also { out -> ZipOutputStream(out).use { zip ->
+            zip.putNextEntry(ZipEntry("fabric.mod.json"))
+            zip.write("""{"id":"library","version":"2.0"}""".toByteArray())
+            zip.closeEntry()
+        } }.toByteArray()
+        val file = dir.resolve("bundle.jar")
+        ZipOutputStream(file.outputStream()).use { zip ->
+            zip.putNextEntry(ZipEntry("fabric.mod.json"))
+            zip.write("""{"id":"root","version":"1","depends":{"library":">=2"},"jars":[{"file":"META-INF/jars/library.jar"}]}""".toByteArray())
+            zip.closeEntry()
+            zip.putNextEntry(ZipEntry("META-INF/jars/library.jar")); zip.write(nested); zip.closeEntry()
+        }
+        val mods = ModCompat.readAll(file)
+        assertEquals(setOf("root", "library"), mods.map { it.id }.toSet())
+        assertTrue(ModCompat.missingDependencies(mods).isEmpty())
+    }
+
+    @Test fun `missing nested archives are reported rather than counted as installed`(@TempDir dir: Path) {
+        val file = dir.resolve("broken-bundle.jar")
+        jar(file, """{"id":"root","version":"1","jars":[{"file":"absent.jar"}]}""")
+        org.junit.jupiter.api.assertThrows<java.io.IOException> { ModCompat.readAll(file) }
+        Unit
     }
 }

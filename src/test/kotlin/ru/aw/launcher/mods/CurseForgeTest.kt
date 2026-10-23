@@ -40,7 +40,9 @@ class CurseForgeTest {
         assertEquals(listOf("1.21.1"), version.gameVersions)
         assertEquals(listOf("neoforge"), version.loaders)
         assertEquals("a".repeat(40), version.primaryFile?.sha1)
-        assertEquals(listOf("cf:61"), version.dependencies.map { it.projectId })
+        assertEquals(listOf("cf:61"), version.dependencies.filter { it.type == "required" }.map { it.projectId })
+        assertEquals(listOf("cf:62"), version.dependencies.filter { it.type == "optional" }.map { it.projectId })
+        assertEquals(listOf("cf:63"), version.dependencies.filter { it.type == "incompatible" }.map { it.projectId })
         ModManager.requireCompatibleVersion(version, "cf:51", "1.21.1", listOf("neoforge"))
         assertThrows<IllegalArgumentException> { ModManager.requireCompatibleVersion(version, "cf:51", "1.21.1", listOf("fabric")) }
     }

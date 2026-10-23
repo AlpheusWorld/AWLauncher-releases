@@ -130,7 +130,13 @@ internal class ContentModel(
 
     fun addFiles(files: List<Path>, kind: ContentKind, world: Path? = null) {
         if (kind == ContentKind.DATA_PACK && world == null) { if (!migrating && working.isEmpty()) dataPackFiles = files; return }
-        work(ALL, historyTitle = "Добавление файлов: ${files.size}") {
+        work(ALL, title = if (kind == ContentKind.MOD) "Импорт модов · $entryTitle" else null,
+            historyTitle = "Добавление файлов: ${files.size}") {
+        if (kind == ContentKind.MOD) {
+            val added = ModManager.importMods(dir, loader, gameVersion, files) { progress = it }
+            message = "Добавлено файлов: ${files.size}" + if (added.isEmpty()) "" else ". Проверены зависимости: ${added.joinToString()}"
+            return@work
+        }
         withContext(Dispatchers.IO) {
             val destination = if (kind == ContentKind.DATA_PACK) {
                 val selected = requireNotNull(world).toAbsolutePath().normalize()
@@ -265,12 +271,30 @@ internal class ContentModel(
             try {
                 checkEditable()
                 val change: suspend () -> Unit = {
-                    for (item in editable) {
-                        val changed = withContext(Dispatchers.IO) { ModManager.setEnabled(item, enabled) }
+                    for (selected in editable) {
+                        val item = confirmed[selected.kind].orEmpty().firstOrNull { it.rowKey == selected.rowKey } ?: selected
+                        if (item.enabled == enabled) continue
+                        val (changed, freshMods) = if (enabled && item.kind == ContentKind.MOD)
+                            ModManager.enableMod(dir, loader, gameVersion, item) { progress = it }
+                        else withContext(Dispatchers.IO) { ModManager.setEnabled(item, enabled) to null }
                         confirmed = replaceEnabled(confirmed, changed)
+                        if (freshMods != null) {
+                            val old = confirmed[ContentKind.MOD].orEmpty()
+                            confirmed = confirmed + (ContentKind.MOD to freshMods.map { fresh ->
+                                val previous = old.firstOrNull { it.file == fresh.file ||
+                                    it.fileName.removeSuffix(".disabled") == fresh.fileName.removeSuffix(".disabled") ||
+                                    (fresh.projectId != null && it.projectId == fresh.projectId) }
+                                when {
+                                    previous == null -> fresh
+                                    previous.sha1 == fresh.sha1 -> previous.copy(file = fresh.file, enabled = fresh.enabled)
+                                    else -> fresh.copy(rowKey = previous.rowKey)
+                                }
+                            })
+                        }
                     }
                 }
-                if (editable.size > 1) recordChange(if (enabled) "Включение проектов" else "Выключение проектов", change)
+                if (editable.size > 1 || (enabled && editable.any { it.kind == ContentKind.MOD }))
+                    recordChange(if (enabled) "Включение проектов" else "Выключение проектов", change)
                 else change()
                 installed = if (scanned) confirmed else retainRows(scanAll(remote = false))
                 scanned = true; scannedAt = System.currentTimeMillis()
@@ -308,16 +332,9 @@ internal class ContentModel(
     }
 
     private suspend fun updateWithDependencies(mod: InstalledItem) {
-        val version = mod.update ?: return
-        if (mod.kind == ContentKind.MOD && CurseForge.owns(version.projectId)) {
-            val present = (installedProjects + version.projectId).toMutableSet()
-            for (dependency in version.dependencies.filter { it.type == "required" }) {
-                val id = dependency.projectId ?: continue
-                if (id !in present) ModManager.install(dir, loader, gameVersion, id, id, present,
-                    onInstalled = { present += it }) { progress = it }
-            }
-        }
-        ModManager.update(mod) { progress = it }
+        if (mod.update == null) return
+        if (mod.kind == ContentKind.MOD) ModManager.updateMod(dir, loader, gameVersion, mod) { progress = it }
+        else ModManager.update(mod) { progress = it }
     }
 
     fun remove(item: InstalledItem) = work(item.rowKey, historyTitle = "Удаление ${item.title}") {
@@ -328,7 +345,10 @@ internal class ContentModel(
     fun folder(kind: ContentKind?): Path = kind?.dir(dir) ?: dir
 
     private suspend fun recordChange(title: String, block: suspend () -> Unit) {
-        BuildHistory.record(dir, gameVersion, loader, title, profileLoaderVersion, knownItems = installed.values.flatten(), block = block)
+        BuildHistory.record(dir, gameVersion, loader, title, profileLoaderVersion, knownItems = installed.values.flatten()) {
+            activeReport?.stage("Проверяю и применяю изменения")
+            block()
+        }
     }
 
     private fun work(key: String, title: String? = null, historyTitle: String = "Изменение контента", block: suspend () -> Unit) {

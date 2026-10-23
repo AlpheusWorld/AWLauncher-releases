@@ -205,6 +205,9 @@ fun CatalogScreen(state: LauncherState) {
                 else if (kind != null && content != null && allowed) content.install(kind, opened, version)
             },
             onBack = { state.catalogProject = null },
+            onDependency = { dependency ->
+                if (target != null) state.openProject(target, dependency) else state.catalogProject = dependency
+            },
             progress = state.downloads.active?.takeIf {
                 it.key == if (isPack) "pack:${opened.projectId}" else "content:${target?.key}:${opened.projectId}"
             }?.progress,

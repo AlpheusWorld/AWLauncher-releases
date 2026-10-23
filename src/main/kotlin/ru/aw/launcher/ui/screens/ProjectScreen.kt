@@ -61,6 +61,7 @@ internal fun ProjectScreen(
     preview: ProjectPageData? = null,
     initialTab: Int = 0,
     versionVisible: (String) -> Boolean = { true },
+    onDependency: ((Modrinth.SearchHit) -> Unit)? = null,
 ) {
     val settings by Settings.state.collectAsState()
     var data by remember(hit.projectId) { mutableStateOf(preview) }
@@ -246,6 +247,23 @@ internal fun ProjectScreen(
         }
     }
     release?.let { version ->
+        var optionalError by remember(version.id) { mutableStateOf<String?>(null) }
+        val optional by produceState<List<Modrinth.SearchHit>?>(null, version.id) {
+            val dependencies = if (hit.projectType == "mod") version.dependencies.filter { it.type == "optional" } else emptyList()
+            if (dependencies.isEmpty()) { value = emptyList(); return@produceState }
+            try {
+                value = withContext(Dispatchers.IO) {
+                    dependencies.map { dep ->
+                        val id = dep.projectId ?: dep.versionId?.let { ContentCatalog.version(it).projectId }
+                            ?: throw java.io.IOException("Не указан проект дополнительного мода")
+                        val info = ContentCatalog.project(id)
+                        Modrinth.SearchHit(projectId = info.id, slug = info.slug, title = info.title,
+                            description = info.description, iconUrl = info.iconUrl, projectType = info.projectType)
+                    }.distinctBy { it.projectId }
+                }
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { optionalError = "Не удалось загрузить дополнительные моды"; value = emptyList() }
+        }
         var changesError by remember(version.id) { mutableStateOf<String?>(null) }
         var changesRetry by remember(version.id) { mutableStateOf(0) }
         val blocks by produceState<List<Element>?>(null, version.id, changesRetry) {
@@ -260,6 +278,23 @@ internal fun ProjectScreen(
             AWButton("Установить", enabled = installAllowed && !busy && compatible(version) && version.id != installedVersion, onClick = { onInstall(version); release = null })
         }) {
             LazyColumn(Modifier.fillMaxWidth().heightIn(max = 430.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                if (hit.projectType == "mod" && version.dependencies.any { it.type == "required" }) item {
+                    Text("Обязательные зависимости будут установлены автоматически. Если совместимого выпуска нет, сборка останется без изменений",
+                        color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall)
+                }
+                if (hit.projectType == "mod" && version.dependencies.any { it.type == "optional" }) {
+                    item { Text("Дополнительные моды", color = AWColors.Text, fontWeight = FontWeight.Bold) }
+                    item { Text("Они не обязательны для запуска. Установи их отдельно, если нужны дополнительные возможности",
+                        color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall) }
+                    if (optional == null) item { Text("Загружаю…", color = AWColors.TextMuted) }
+                    optionalError?.let { error -> item { Text(error, color = AWColors.TextMuted) } }
+                    items(optional.orEmpty(), key = { it.projectId }) { dependency ->
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text(dependency.title, color = AWColors.Text, modifier = Modifier.weight(1f), translate = false)
+                            AWButton("Посмотреть", enabled = onDependency != null, onClick = { release = null; onDependency?.invoke(dependency) })
+                        }
+                    }
+                }
                 val ready = blocks
                 if (changesError != null) item { ListHint(changesError.orEmpty(), "Повторить") { changesRetry++ } }
                 else if (ready == null) item { Text("Загружаю…", color = AWColors.TextMuted) }

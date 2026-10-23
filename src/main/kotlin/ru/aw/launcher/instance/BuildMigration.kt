@@ -194,7 +194,7 @@ object BuildMigration {
         if (!attributes.isDirectory || attributes.isSymbolicLink || attributes.isOther) throw IOException("Папка сборки содержит ссылку: $path")
     }
 
-    private suspend fun copyTree(source: Path, target: Path) {
+    internal suspend fun copyTree(source: Path, target: Path) {
         Files.walk(source).use { paths ->
             for (path in paths.toList()) {
                 currentCoroutineContext().ensureActive()

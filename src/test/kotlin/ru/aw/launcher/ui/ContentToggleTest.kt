@@ -83,4 +83,30 @@ class ContentToggleTest {
             assertEquals(second.fileName, GameOptions.activeShader(root))
         } finally { scope.cancel() }
     }
+
+    @Test fun `enabling selected mods also enables their local dependencies without losing row identities`() = runBlocking {
+        fun jar(id: String, depends: String): InstalledItem {
+            val file = Files.createDirectories(root.resolve("mods")).resolve("$id.jar.disabled")
+            java.util.zip.ZipOutputStream(Files.newOutputStream(file)).use { zip ->
+                zip.putNextEntry(java.util.zip.ZipEntry("fabric.mod.json"))
+                zip.write("""{"id":"$id","version":"1.0","depends":{$depends}}""".toByteArray())
+                zip.closeEntry()
+            }
+            return InstalledItem(file, ContentKind.MOD, false, ru.aw.launcher.core.sha1Of(file), null, id,
+                "1.0", null, null)
+        }
+        val first = jar("root", "\"library\":\">=1\"")
+        val library = jar("library", "")
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        val model = model(scope)
+        model.installed = mapOf(ContentKind.MOD to listOf(first, library)); model.scanned = true
+        try {
+            model.toggleMany(listOf(first, library), true)
+            idle(model)
+            assertNull(model.error)
+            val rows = model.installed.getValue(ContentKind.MOD)
+            assertTrue(rows.all { it.enabled && Files.exists(it.file) })
+            assertEquals(setOf(first.rowKey, library.rowKey), rows.map { it.rowKey }.toSet())
+        } finally { scope.cancel() }
+    }
 }

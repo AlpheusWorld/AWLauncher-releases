@@ -9,6 +9,8 @@ import ru.aw.launcher.core.Json
 import java.io.IOException
 import java.nio.file.Path
 import java.util.zip.ZipFile
+import java.util.zip.ZipInputStream
+import java.io.ByteArrayInputStream
 import kotlin.io.path.isDirectory
 import kotlin.io.path.listDirectoryEntries
 
@@ -19,6 +21,7 @@ data class ModMeta(
     val provides: Set<String> = emptySet(),
     val breaks: Map<String, List<String>> = emptyMap(),
     val depends: Set<String> = emptySet(),
+    val dependencyVersions: Map<String, List<String>> = depends.associateWith { listOf("*") },
 ) {
     val shortVersion: String get() = version.substringBefore('+')
 }
@@ -30,7 +33,85 @@ data class Conflict(val mod: ModMeta, val other: ModMeta) {
 class IncompatibleModException(val conflicts: List<Conflict>, outcome: String) :
     IOException(conflicts.take(2).joinToString("; ") { it.text } + " — " + outcome)
 
+internal data class MissingDependency(val mod: ModMeta, val id: String, val ranges: List<String>, val installed: String?) {
+    val text: String get() = "${mod.name} требует $id ${ranges.joinToString(" или ")}: " +
+        (installed?.let { "установлена версия $it" } ?: "мод не установлен или выключен")
+}
+
 object ModCompat {
+
+    /** Fabric modules may be bundled as nested jars instead of separate files in mods/. */
+    internal fun readAll(jar: Path): List<ModMeta> {
+        var expanded = 0L
+        var count = 0
+        fun read(input: java.io.InputStream, limit: Int): ByteArray {
+            val bytes = input.use { it.readNBytes(limit + 1) }
+            expanded += bytes.size
+            if (bytes.size > limit || expanded > 128L * 1024 * 1024) throw IOException("Вложенные файлы мода слишком большие")
+            return bytes
+        }
+        fun parseJar(entry: (String) -> ByteArray?, depth: Int): List<ModMeta> {
+            if (depth > 8 || ++count > 512) throw IOException("В моде слишком много вложенных зависимостей")
+            val document = entry("fabric.mod.json") ?: return emptyList()
+            val json = Json.parseToJsonElement(document.decodeToString()).jsonObject
+            val environment = json["environment"]
+            if (environment is JsonPrimitive && environment.contentOrNull == "server") return emptyList()
+            if (environment is JsonArray && environment.none { (it as? JsonPrimitive)?.contentOrNull in setOf("*", "client") }) return emptyList()
+            val meta = parse(json) ?: throw IOException("В описании мода отсутствуют ID или версия")
+            val result = arrayListOf(meta)
+            for (nested in (json["jars"] as? JsonArray).orEmpty()) {
+                val name = (nested as? JsonObject)?.text("file") ?: throw IOException("Некорректное описание вложенного мода")
+                if (name.startsWith('/') || '\\' in name || ':' in name || name.split('/').any { it == ".." || it.isEmpty() })
+                    throw IOException("Некорректный путь вложенного мода")
+                val bytes = entry(name) ?: throw IOException("В моде отсутствует вложенный файл $name")
+                val entries = HashMap<String, ByteArray>()
+                ZipInputStream(ByteArrayInputStream(bytes)).use { zip ->
+                    var seen = 0
+                    while (true) {
+                        val child = zip.nextEntry ?: break
+                        if (++seen > 50_000) throw IOException("Во вложенном моде слишком много файлов")
+                        if (child.name == "fabric.mod.json" || child.name.endsWith(".jar")) {
+                            val limit = if (child.name == "fabric.mod.json") 1024 * 1024 else 64 * 1024 * 1024
+                            val value = zip.readNBytes(limit + 1)
+                            expanded += value.size
+                            if (value.size > limit || expanded > 128L * 1024 * 1024) throw IOException("Вложенные файлы мода слишком большие")
+                            entries[child.name] = value
+                        } else {
+                            val buffer = ByteArray(8192)
+                            while (true) {
+                                val size = zip.read(buffer)
+                                if (size < 0) break
+                                expanded += size
+                                if (expanded > 128L * 1024 * 1024) throw IOException("Вложенные файлы мода слишком большие")
+                            }
+                        }
+                        zip.closeEntry()
+                    }
+                }
+                result += parseJar(entries::get, depth + 1)
+            }
+            return result
+        }
+        return try {
+            ZipFile(jar.toFile()).use { zip -> parseJar({ name -> zip.getEntry(name)?.let { entry ->
+                read(zip.getInputStream(entry), if (name == "fabric.mod.json") 1024 * 1024 else 64 * 1024 * 1024)
+            } }, 0) }
+        } catch (e: java.util.zip.ZipException) {
+            throw IOException("Повреждён файл мода ${jar.fileName}", e)
+        } catch (e: kotlinx.serialization.SerializationException) {
+            throw IOException("Некорректное описание зависимостей в моде ${jar.fileName}", e)
+        }
+    }
+
+    internal fun missingDependencies(mods: List<ModMeta>): List<MissingDependency> = mods.flatMap { mod ->
+        mod.dependencyVersions.mapNotNull { (id, ranges) ->
+            // These components are supplied by the selected game/runtime, not downloaded as mods.
+            if (id in setOf("minecraft", "java", "fabricloader", "quilt_loader")) return@mapNotNull null
+            val available = mods.filter { it.id == id || id in it.provides }
+            if (available.any { FabricVersion.satisfies(it.version, ranges) }) null
+            else MissingDependency(mod, id, ranges, available.firstOrNull()?.version)
+        }
+    }
 
     fun read(jar: Path): ModMeta? = runCatching {
         ZipFile(jar.toFile()).use { zip ->
@@ -57,8 +138,14 @@ object ModCompat {
                 else -> emptyList()
             }
         }
-        val depends = (root["depends"] as? JsonObject).orEmpty().keys
-        return ModMeta(id, root.text("name") ?: id, version, provides, breaks, depends)
+        val dependencies = (root["depends"] as? JsonObject).orEmpty().mapValues { (_, value) ->
+            when (value) {
+                is JsonPrimitive -> listOfNotNull(value.contentOrNull)
+                is JsonArray -> value.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }
+                else -> emptyList()
+            }
+        }
+        return ModMeta(id, root.text("name") ?: id, version, provides, breaks, dependencies.keys, dependencies)
     }
 
     fun conflictsAmong(mods: List<ModMeta>): List<Conflict> =
@@ -118,8 +205,9 @@ internal object FabricVersion {
             "<=" -> order <= 0
             ">" -> order > 0
             "<" -> order < 0
-            "~" -> order >= 0 && sameComponents(version, target, 2)
-            "^" -> order >= 0 && sameComponents(version, target, 1)
+            "~" -> order >= 0 && sameComponents(version, target, minOf(2, target.core.size))
+            "^" -> order >= 0 && sameComponents(version, target, (target.core.indexOfFirst { it != 0 }.takeIf { it >= 0 }
+                ?: target.core.lastIndex) + 1)
             else -> order == 0
         }
     }

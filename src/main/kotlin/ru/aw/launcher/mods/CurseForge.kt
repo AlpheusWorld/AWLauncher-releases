@@ -197,7 +197,13 @@ object CurseForge {
             versionNumber = file.displayName.ifBlank { file.fileName }, versionType = when (file.releaseType) { 1 -> "release"; 2 -> "beta"; else -> "alpha" },
             datePublished = file.fileDate, gameVersions = file.gameVersions.filter(::isGameVersion), loaders = loaders,
             files = download?.let { listOf(Modrinth.VersionFile(it, file.fileName, true, file.fileLength, file.hashes.filter { h -> h.algo == 1 }.associate { h -> "sha1" to h.value })) }.orEmpty(),
-            dependencies = file.dependencies.filter { it.relationType == 3 }.map { Modrinth.Dependency(projectId = "cf:${it.modId}") }, downloads = file.downloadCount)
+            dependencies = file.dependencies.filter { it.relationType in setOf(2, 3, 5) }.map {
+                Modrinth.Dependency(projectId = "cf:${it.modId}", type = when (it.relationType) {
+                    2 -> "optional"
+                    5 -> "incompatible"
+                    else -> "required"
+                })
+            }, downloads = file.downloadCount)
     }
 
     internal fun packIndex(zip: ZipFile): Pair<PackIndex, String> {
