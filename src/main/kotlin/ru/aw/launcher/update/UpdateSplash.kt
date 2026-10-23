@@ -5,6 +5,7 @@ import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
+import java.util.Base64
 import kotlin.io.path.createDirectories
 
 internal object UpdateSplash {
@@ -30,5 +31,8 @@ internal object UpdateSplash {
     }
 
     fun command(executable: Path, launcher: Long, installer: String, arguments: String, app: Path, assets: Path, version: String, ready: Path): List<String> =
-        listOf(executable.toString(), "--run", launcher.toString(), installer, arguments, app.toString(), assets.toString(), version, ready.toString())
+        // Nested quotes in a Windows command line are not preserved by ProcessBuilder.
+        listOf(executable.toString(), "--run-base64", launcher.toString(), installer,
+            Base64.getEncoder().encodeToString(arguments.toByteArray(Charsets.UTF_8)),
+            app.toString(), assets.toString(), version, ready.toString())
 }

@@ -67,6 +67,7 @@ fun LauncherTitleBar(
         Screen.INSTANCE -> state.instanceEntry()?.title ?: "Сборка"
         Screen.SCREENSHOTS -> "Скриншоты"
         Screen.SKINS -> "Выбор скина"
+        Screen.FRIENDS -> "Друзья"
         Screen.DOWNLOADS -> "Загрузки"
         Screen.ACTIVITY -> "Активность"
         Screen.NOTICES -> "Уведомления"

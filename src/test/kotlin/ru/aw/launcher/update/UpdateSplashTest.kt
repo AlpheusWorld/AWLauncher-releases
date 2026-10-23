@@ -8,6 +8,7 @@ import ru.aw.launcher.core.Shell
 import ru.aw.launcher.finishBackgroundShutdown
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.Base64
 import java.util.concurrent.CountDownLatch
 import kotlin.io.path.exists
 
@@ -18,7 +19,7 @@ class UpdateSplashTest {
         val arguments="/i "+34.toChar()+"C:/Users/O'Brien/update.msi"+34.toChar()+" /qn /norestart"
         val command=UpdateSplash.command(assets.resolve("AWLauncher.Update.exe"),4242,"msiexec.exe",arguments,app,assets,"1.0.26",assets.resolve("ready"))
         assertEquals("AWLauncher.Update.exe",Path.of(command.first()).fileName.toString())
-        assertEquals(listOf("--run","4242","msiexec.exe",arguments,app.toString(),assets.toString(),"1.0.26",assets.resolve("ready").toString()),command.drop(1))
+        assertEquals(listOf("--run-base64","4242","msiexec.exe",Base64.getEncoder().encodeToString(arguments.toByteArray(Charsets.UTF_8)),app.toString(),assets.toString(),"1.0.26",assets.resolve("ready").toString()),command.drop(1))
     }
 
     @Test fun optionalBackgroundShutdownCannotHoldUpdaterIndefinitely() {

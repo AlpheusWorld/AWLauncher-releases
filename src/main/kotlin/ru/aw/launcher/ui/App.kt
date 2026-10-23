@@ -143,6 +143,7 @@ private fun ScreenHost(state: LauncherState) {
                     when (screen) {
                         Screen.HOME -> DashboardScreen(state)
                         Screen.INSTANCE -> ru.aw.launcher.ui.screens.InstanceScreen(state)
+                        Screen.FRIENDS -> ru.aw.launcher.ui.screens.FriendsScreen(state)
                         Screen.PLAY, Screen.BUILDS -> PrimaryScreenLayout(state) { BuildsScreen(state) }
                         Screen.CATALOG -> PrimaryScreenLayout(state) { CatalogScreen(state) }
                         Screen.SCREENSHOTS -> ScreenshotsScreen(state)
@@ -174,12 +175,13 @@ private fun PrimaryScreenLayout(state: LauncherState, content: @Composable () ->
 @Composable
 private fun CompactNavRail(state: LauncherState, expanded: Boolean) {
     val notices by state.notices.collectAsState()
+    val friends by ru.aw.launcher.friends.Friends.state.collectAsState()
     val seen by state.noticesSeen.collectAsState()
     val unread = notices.filter { it.id > seen }
     val railWidth = if (expanded) 188.dp else AWDimens.RailWidth
     BoxWithConstraints(Modifier.width(railWidth).fillMaxHeight()) {
     val short = maxHeight < 520.dp
-    val itemHeight = if (short) 32.dp else 46.dp
+    val itemHeight = if (short) 28.dp else 46.dp
     Column(
         Modifier.width(railWidth).fillMaxHeight().background(AWColors.Sidebar).padding(horizontal = 8.dp, vertical = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(if (short) 2.dp else 8.dp),
@@ -187,6 +189,7 @@ private fun CompactNavRail(state: LauncherState, expanded: Boolean) {
         NavItem("Главная", Icons.Default.Home, state.screen == Screen.HOME, compact = !expanded, itemHeight = itemHeight) { state.screen = Screen.HOME }
         NavItem("Играть", Icons.Default.PlayArrow, state.screen in setOf(Screen.PLAY, Screen.BUILDS, Screen.INSTANCE), compact = !expanded, itemHeight = itemHeight) { state.screen = Screen.PLAY }
         NavItem("Каталог", Icons.Default.Search, state.screen == Screen.CATALOG, compact = !expanded, itemHeight = itemHeight) { state.openCatalog() }
+        NavItem("Друзья", AWIcons.Friends, state.screen == Screen.FRIENDS, badge = friends.snapshot.requests.size + friends.snapshot.friends.count { it.invite != null }, compact = !expanded, itemHeight = itemHeight) { state.screen = Screen.FRIENDS }
         NavItem("Скриншоты", AWIcons.Image, state.screen == Screen.SCREENSHOTS, compact = !expanded, itemHeight = itemHeight) { state.screen = Screen.SCREENSHOTS }
         NavItem("Скины", AWIcons.Layers, state.screen == Screen.SKINS, compact = !expanded, itemHeight = itemHeight) { state.screen = Screen.SKINS }
         NavItem("Загрузки", AWIcons.Download, state.screen == Screen.DOWNLOADS, badge = state.downloads.pendingCount, compact = !expanded, itemHeight = itemHeight) { state.screen = Screen.DOWNLOADS }

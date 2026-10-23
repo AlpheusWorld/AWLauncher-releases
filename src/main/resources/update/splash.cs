@@ -34,12 +34,13 @@ public static class AwUpdateSplash
                 Render(args[1], args[2], args[3], args[5], scale, false);
                 return 0;
             }
-            if (args.Length != 8 || args[0] != "--run") return 2;
-            return Run(int.Parse(args[1], CultureInfo.InvariantCulture), args[2], args[3], args[4], args[5], args[6], args[7]);
+            if (args.Length != 8 || (args[0] != "--run" && args[0] != "--run-base64")) return 2;
+            string arguments = args[0] == "--run-base64" ? Encoding.UTF8.GetString(Convert.FromBase64String(args[3])) : args[3];
+            return Run(int.Parse(args[1], CultureInfo.InvariantCulture), args[2], arguments, args[4], args[5], args[6], args[7]);
         }
         catch (Exception error)
         {
-            if (args.Length == 8 && args[0] == "--run")
+            if (args.Length == 8 && (args[0] == "--run" || args[0] == "--run-base64"))
                 try { File.WriteAllText(args[7] + ".error", error.ToString()); } catch (IOException) { } catch (UnauthorizedAccessException) { }
             return 78;
         }

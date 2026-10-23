@@ -113,6 +113,13 @@ internal fun SettingsContent(state: LauncherState, section: Int) {
                     }
                     Text("Окно останется открытым — можно просматривать сборки и управлять контентом",
                         color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall)
+                    SettingsRow("Игра с друзьями", divider = false) {
+                        AWSwitch(settings.friendsEnabled, outlined = true) { checked ->
+                            Settings.update { it.copy(friendsEnabled = checked) }
+                        }
+                    }
+                    Text("Друзья, приглашения и подключение к мирам через интернет. На поддерживаемых сборках e4mc и его зависимости устанавливаются автоматически. Изменение мода применяется при следующем запуске Minecraft",
+                        color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall)
                 }
             }
         }

@@ -21,6 +21,7 @@ import ru.aw.launcher.instance.InstanceOptions
 import ru.aw.launcher.meta.LoaderKind
 import ru.aw.launcher.mods.GameOptions
 import ru.aw.launcher.mods.CompanionMod
+import ru.aw.launcher.friends.FriendsMod
 import ru.aw.launcher.net.DownloadProgress
 import ru.aw.launcher.net.Downloader
 import ru.aw.launcher.net.ProgressMerger
@@ -158,6 +159,8 @@ object GameLauncher {
             else withContext(Dispatchers.IO) { installer.resolve(profileId) }
 
             val installed = installer.install(version, gameDir, onStage, progress.sink("game"))
+            onStage("Подготовка игры с друзьями")
+            FriendsMod.prepare(gameDir,loader,versionId,progress.sink("friends"),onNotice)
             PreparedLaunch(installed, gameDir, awaitJava(), settings.memoryMb, settings, options)
         }
     }

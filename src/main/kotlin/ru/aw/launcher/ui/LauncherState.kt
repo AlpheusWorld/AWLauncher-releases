@@ -76,7 +76,7 @@ import ru.aw.launcher.servers.Servers
 import ru.aw.launcher.update.UpdateManifest
 import ru.aw.launcher.update.Updater
 
-enum class Screen { HOME, PLAY, BUILDS, CATALOG, INSTANCE, SCREENSHOTS, SKINS, DOWNLOADS, ACTIVITY, NOTICES, SETTINGS, ACCOUNTS }
+enum class Screen { HOME, PLAY, BUILDS, CATALOG, INSTANCE, FRIENDS, SCREENSHOTS, SKINS, DOWNLOADS, ACTIVITY, NOTICES, SETTINGS, ACCOUNTS }
 
 data class VersionEntry(
     val version: ManifestVersion,
@@ -943,7 +943,7 @@ class LauncherState(
             packUrl = entry.pack?.let { ContentCatalog.page(it.projectId, "modpack", "") },
         )
         DiscordPresence.show(playing)
-        watchGame(result.process, result.logFile, playing)
+        watchGame(result.process, result.logFile, playing, entry, result.gameDir)
         onGameStarted(result.process)
     }
 
@@ -998,17 +998,29 @@ class LauncherState(
         }
     }
 
-    private fun watchGame(process: Process, logFile: Path, start: Presence.Playing) {
+    fun hasRunningGame(): Boolean = runningGames.any { it.isAlive }
+
+    private fun watchGame(process: Process, logFile: Path, start: Presence.Playing, entry: VersionEntry, gameDir: Path) {
         runningGames.add(process)
-        process.onExit().thenRun { runningGames.remove(process) }
+        process.onExit().thenRun {
+            runningGames.remove(process)
+            ru.aw.launcher.friends.Friends.stopped(process.pid())
+        }
         scope.launch(Dispatchers.IO) {
             val tail = GameEvents.Tail(logFile)
+            runCatching { ru.aw.launcher.friends.Friends.track(process.pid(),gameDir,entry.id,entry.loader,entry.title) }
+                .onFailure { Log.warn("could not prepare world sharing metadata",it) }
+            if (!process.isAlive) {
+                ru.aw.launcher.friends.Friends.stopped(process.pid())
+                return@launch
+            }
             var shown = start
             var iconOf: String? = null
             while (process.isAlive) {
                 delay(GAME_LOG_POLL_MILLIS)
                 var next = shown
                 tail.lines().forEach { line ->
+                    ru.aw.launcher.friends.Friends.line(process.pid(),line)
                     when (val event = GameEvents.parse(line)) {
                         is GameEvent.JoinedServer -> next = next.copy(server = event.address, singleplayer = false)
                         GameEvent.Singleplayer -> next = next.copy(server = null, singleplayer = true)

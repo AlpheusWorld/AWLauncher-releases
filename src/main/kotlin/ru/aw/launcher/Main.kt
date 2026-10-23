@@ -122,6 +122,7 @@ fun main(args: Array<String>) {
                 }
             }
             LaunchedEffect(Unit) { state.refreshActivity() }
+            LaunchedEffect(Unit) { ru.aw.launcher.friends.Friends.run() }
             LaunchedEffect(Unit) {
                 DiscordPresence.show(Presence.Launcher)
                 DiscordPresence.start()
@@ -181,7 +182,7 @@ fun main(args: Array<String>) {
                     }
                     AWTheme(mode = settings.themeMode) {
                         App(state, onGameStarted = {
-                            shownDuringGame = Settings.current.keepLauncherOpen
+                            shownDuringGame = Settings.current.keepLauncherOpen || state.screen == ru.aw.launcher.ui.Screen.FRIENDS
                             gameProcess = it
                         }, titleBar = {
                             LauncherTitleBar(state, this@Window, windowState,
