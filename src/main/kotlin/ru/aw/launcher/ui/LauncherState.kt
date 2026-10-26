@@ -49,6 +49,7 @@ import ru.aw.launcher.core.VerifyCache
 import ru.aw.launcher.discord.DiscordPresence
 import ru.aw.launcher.discord.GameEvent
 import ru.aw.launcher.discord.GameEvents
+import ru.aw.launcher.discord.GameConnection
 import ru.aw.launcher.discord.Presence
 import ru.aw.launcher.instance.InstanceOptions
 import ru.aw.launcher.instance.InstanceStore
@@ -1008,6 +1009,7 @@ class LauncherState(
         }
         scope.launch(Dispatchers.IO) {
             val tail = GameEvents.Tail(logFile)
+            val connection = GameConnection(process.pid())
             runCatching { ru.aw.launcher.friends.Friends.track(process.pid(),gameDir,entry.id,entry.loader,entry.title) }
                 .onFailure { Log.warn("could not prepare world sharing metadata",it) }
             if (!process.isAlive) {
@@ -1027,6 +1029,9 @@ class LauncherState(
                         GameEvent.Menu -> next = next.copy(server = null, singleplayer = false)
                         null -> Unit
                     }
+                }
+                if (connection.disconnected(next.server)) {
+                    next = next.copy(server = null, singleplayer = false)
                 }
                 if (!Settings.current.discordPresence || !Settings.current.discordShowServer) {
                     iconOf = null

@@ -45,6 +45,16 @@ class GameEventsTest {
     }
 
     @Test
+    fun `voicechat disconnect alone cannot change the game status`() {
+        assertNull(GameEvents.parse("[14:18:55] [Render thread/INFO]: [voicechat] Disconnecting voicechat"))
+        assertNull(GameEvents.parse("    <log4j:Message><![CDATA[[voicechat] Disconnecting voicechat]]></log4j:Message>\r"))
+        assertNull(GameEvents.parse("[14:18:55] [Render thread/INFO]: [CHAT] [voicechat] Disconnecting voicechat"))
+        assertNull(GameEvents.parse("[14:18:55] [Render thread/INFO]: [voicechat] Disconnecting from previous connection due to server change"))
+        assertNull(GameEvents.parse("[14:18:55] [VoiceChatConnectionThread/INFO]: [voicechat] Disconnected from server"))
+        assertNull(GameEvents.parse("[14:18:55] [Render thread/INFO]: [othermod] [voicechat] Disconnecting voicechat"))
+    }
+
+    @Test
     fun `log truncation drops an unfinished old line`(@TempDir dir: Path) {
         val log = dir.resolve("game.log").apply { writeText("old unfinished log line") }
         val tail = GameEvents.Tail(log)
