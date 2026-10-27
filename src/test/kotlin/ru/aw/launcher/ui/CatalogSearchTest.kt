@@ -1,12 +1,49 @@
 package ru.aw.launcher.ui
 
 import kotlinx.coroutines.*
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.ImageComposeScene
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import ru.aw.launcher.mods.Modrinth
+import ru.aw.launcher.ui.screens.RunCatalogSearch
 import java.util.concurrent.atomic.AtomicInteger
 
 class CatalogSearchTest {
+    @Test fun `switching sources with the same empty query loads the new source immediately`() {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        val modrinthRequests = AtomicInteger()
+        val curseForgeRequests = AtomicInteger()
+        fun search(name: String, requests: AtomicInteger) = CatalogSearch(scope) { _, _ ->
+            requests.incrementAndGet()
+            Modrinth.SearchPage(hits = listOf(Modrinth.SearchHit(projectId = name)), totalHits = 1)
+        }
+        val modrinth = search("modrinth", modrinthRequests)
+        val curseForge = search("curseforge", curseForgeRequests)
+        val current = mutableStateOf(modrinth)
+        val scene = ImageComposeScene(width = 1, height = 1, content = { RunCatalogSearch(current.value) })
+        var frame = 0L
+        fun awaitResults(search: CatalogSearch) {
+            val deadline = System.nanoTime() + 5_000_000_000L
+            while (search.hits.isEmpty() && System.nanoTime() < deadline) {
+                scene.render(frame).close()
+                frame += 16_000_000L
+                Thread.sleep(10)
+            }
+            assertEquals(1, search.hits.size)
+        }
+        try {
+            awaitResults(modrinth)
+            current.value = curseForge
+            awaitResults(curseForge)
+            assertEquals("curseforge", curseForge.hits.single().projectId)
+            current.value = modrinth
+            repeat(3) { scene.render(frame).close(); frame += 16_000_000L; Thread.sleep(10) }
+            assertEquals(1, modrinthRequests.get())
+            assertEquals(1, curseForgeRequests.get())
+        } finally { scene.close(); scope.cancel() }
+    }
+
     @Test fun `switching back to a previous query restores its pages immediately`() = runBlocking {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
         val count = AtomicInteger()

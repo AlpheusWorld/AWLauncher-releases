@@ -260,10 +260,7 @@ fun CatalogScreen(state: LauncherState) {
 
 @Composable
 private fun ColumnScope.PacksTab(state: LauncherState, model: PacksModel, onProject: (Modrinth.SearchHit, Boolean) -> Unit) {
-    LaunchedEffect(model.search.query) {
-        if (model.search.query.isNotBlank()) delay(350)
-        model.search.run()
-    }
+    RunCatalogSearch(model.search)
     SearchField(
         value = model.search.query,
         onValueChange = { model.search.query = it },
@@ -338,10 +335,7 @@ private fun ColumnScope.ContentTab(state: LauncherState, target: VersionEntry, m
         }
         else -> {
             val search = model.searches.getValue(kind)
-            LaunchedEffect(search, search.query) {
-                if (search.query.isNotBlank()) delay(350)
-                search.run()
-            }
+            RunCatalogSearch(search)
             SearchField(
                 value = search.query,
                 onValueChange = { search.query = it },
@@ -355,6 +349,14 @@ private fun ColumnScope.ContentTab(state: LauncherState, target: VersionEntry, m
         }
     }
     StatusStrip(model.progress, model.error, model.message)
+}
+
+@Composable
+internal fun RunCatalogSearch(search: CatalogSearch) {
+    LaunchedEffect(search, search.query) {
+        if (search.query.isNotBlank()) delay(350)
+        search.run()
+    }
 }
 
 @Composable
