@@ -66,6 +66,19 @@ class SettingsOverlayTest {
     }
 
     @Test
+    fun `settings remain reachable at the compact navigation boundary`() {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        val state = LauncherState(scope, PreloadResult(VersionManifest(), emptyMap(), emptySet()))
+        val scene = ImageComposeScene(815, 503, density = Density(1f)) { AWTheme { App(state, onGameStarted = {}) } }
+        try {
+            repeat(20) { scene.render(it * 16_666_667L).close() }
+            scene.sendPointerEvent(PointerEventType.Press, Offset(32f, 477f))
+            scene.sendPointerEvent(PointerEventType.Release, Offset(32f, 477f))
+            assertTrue(state.modal is Modal.Settings, "The bottom navigation button must remain reachable")
+        } finally { scene.close(); scope.cancel() }
+    }
+
+    @Test
     fun `escape finishes closing the overlay before releasing keyboard navigation`() {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
         val state = LauncherState(scope, PreloadResult(VersionManifest(versions = listOf(ManifestVersion("1.21.1", url = ""))), emptyMap(), emptySet()))

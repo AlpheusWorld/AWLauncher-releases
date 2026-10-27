@@ -180,7 +180,7 @@ private fun CompactNavRail(state: LauncherState, expanded: Boolean) {
     val unread = notices.filter { it.id > seen }
     val railWidth = if (expanded) 214.dp else AWDimens.RailWidth
     BoxWithConstraints(Modifier.width(railWidth).fillMaxHeight()) {
-    val veryShort = maxHeight < 450.dp
+    val veryShort = maxHeight < 470.dp
     val short = maxHeight < 640.dp
     val itemHeight = if (veryShort) 28.dp else if (short) 36.dp else 44.dp
     Column(
