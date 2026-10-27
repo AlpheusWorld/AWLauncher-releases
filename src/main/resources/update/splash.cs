@@ -72,7 +72,7 @@ public static class AwUpdateSplash
     public static void Render(string assets, string version, string status, string output, float scale, bool failed)
     {
         using (SplashLook look = new SplashLook(assets, version))
-        using (Bitmap bitmap = new Bitmap((int)(SplashLook.Width * scale), (int)(SplashLook.Height * scale)))
+        using (Bitmap bitmap = new Bitmap((int)(SplashLook.Width * scale), (int)(SplashLook.Height * scale), PixelFormat.Format32bppRgb))
         using (Graphics graphics = Graphics.FromImage(bitmap))
         {
             look.Paint(graphics, bitmap.Width, bitmap.Height, scale, .45f, status, failed, false);
@@ -172,6 +172,10 @@ internal sealed class SplashLook : IDisposable
     private readonly List<PrivateFontCollection> collections = new List<PrivateFontCollection>();
     private readonly FontFamily regular, bold;
     private readonly string version;
+    private Bitmap background;
+    private string paintedStatus;
+    private float paintedScale;
+    private bool paintedFailed,paintedLaunching;
     internal SplashLook(string assets, string version)
     {
         wordmark = Image.FromFile(Path.Combine(assets, "wordmark.png"));
@@ -190,6 +194,38 @@ internal sealed class SplashLook : IDisposable
     }
     internal void Paint(Graphics g, int width, int height, float scale, float phase, string status, bool failed, bool launching)
     {
+        // Rasterize static content at double resolution once per state/DPI, not on every animation frame.
+        if(background==null||background.Width!=width||background.Height!=height||paintedScale!=scale||paintedStatus!=status||paintedFailed!=failed||paintedLaunching!=launching)
+        {
+            Bitmap next=new Bitmap(width,height,PixelFormat.Format32bppRgb);
+            try
+            {
+                using(Bitmap source=new Bitmap(width*2,height*2,PixelFormat.Format32bppRgb))
+                using(Graphics high=Graphics.FromImage(source))
+                using(Graphics target=Graphics.FromImage(next))
+                {
+                    PaintBackground(high,width*2,height*2,scale*2,status,failed,launching);
+                    target.InterpolationMode=InterpolationMode.HighQualityBicubic;target.PixelOffsetMode=PixelOffsetMode.HighQuality;
+                    target.DrawImage(source,new Rectangle(0,0,width,height),0,0,source.Width,source.Height,GraphicsUnit.Pixel);
+                }
+            }
+            catch{next.Dispose();throw;}
+            if(background!=null)background.Dispose();background=next;
+            paintedScale=scale;paintedStatus=status;paintedFailed=failed;paintedLaunching=launching;
+        }
+        g.DrawImageUnscaled(background,0,0);
+        if(!failed)
+        {
+            g.SmoothingMode=SmoothingMode.AntiAlias;
+            RectangleF track=new RectangleF(24*scale,192*scale,width-48*scale,5*scale);
+            using(GraphicsPath path=Rounded(track,2.5f*scale))
+            {
+                var saved=g.Save();g.SetClip(path);using(Brush fill=new SolidBrush(Accent))g.FillRectangle(fill,track.X+track.Width*(-.3f+1.3f*phase),track.Y,track.Width*.3f,track.Height);g.Restore(saved);
+            }
+        }
+    }
+    private void PaintBackground(Graphics g,int width,int height,float scale,string status,bool failed,bool launching)
+    {
         g.SmoothingMode = SmoothingMode.AntiAlias; g.InterpolationMode = InterpolationMode.HighQualityBicubic;g.PixelOffsetMode = PixelOffsetMode.HighQuality;g.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;g.Clear(Background);
         g.DrawImage(wordmark, 24*scale, 20*scale, 176*scale, 176*scale*wordmark.Height/wordmark.Width);
         using (Font font = Font(12*scale,false)) using (Brush brush = new SolidBrush(Muted)) g.DrawString(version,font,brush,new RectangleF(width-160*scale,25*scale,90*scale,22*scale),new StringFormat { Alignment=StringAlignment.Far });
@@ -201,11 +237,10 @@ internal sealed class SplashLook : IDisposable
         using(GraphicsPath path=Rounded(track,2.5f*scale)) using(Brush brush=new SolidBrush(Color.FromArgb(0x2B,0x31,0x35)))
         {
             g.FillPath(brush,path);
-            if(!failed){var saved=g.Save();g.SetClip(path);using(Brush fill=new SolidBrush(Accent))g.FillRectangle(fill,track.X+track.Width*(-.3f+1.3f*phase),track.Y,track.Width*.3f,track.Height);g.Restore(saved);}
         }
         if(!failed)using(Font small=Font(12*scale,false))using(Brush brush=new SolidBrush(Muted))g.DrawString("Окно можно свернуть — обновление продолжится",small,brush,24*scale,228*scale,StringFormat.GenericTypographic);
     }
-    public void Dispose(){wordmark.Dispose();foreach(var fonts in collections)fonts.Dispose();}
+    public void Dispose(){if(background!=null)background.Dispose();wordmark.Dispose();foreach(var fonts in collections)fonts.Dispose();}
 }
 
 internal sealed class SplashForm : Form
@@ -239,24 +274,42 @@ internal sealed class SplashForm : Form
     protected override CreateParams CreateParams {get{var p=base.CreateParams;p.Style|=0x00020000|0x00080000;return p;}}
     private Button Button(string text,string accessible,bool primary)
     {
-        Button b=new Button{Text=text,AccessibleName=accessible,FlatStyle=FlatStyle.Flat,TabStop=true,BackColor=primary?SplashLook.Accent:Color.FromArgb(0x27,0x2C,0x30),ForeColor=primary?Color.FromArgb(0x10,0x33,0x27):SplashLook.Ink,UseVisualStyleBackColor=false};
-        b.Text="";b.Tag=text;b.FlatAppearance.BorderSize=0;
-        b.Paint+=delegate(object sender,PaintEventArgs e){
-            Graphics g=e.Graphics;g.SmoothingMode=SmoothingMode.AntiAlias;g.TextRenderingHint=TextRenderingHint.AntiAliasGridFit;g.Clear(BackColor);
-            bool hover=b.ClientRectangle.Contains(b.PointToClient(Cursor.Position));
-            Color fill=primary?(hover?Color.FromArgb(0x73,0xE4,0xB5):SplashLook.Accent):(hover?Color.FromArgb(0x34,0x3D,0x43):Color.FromArgb(0x27,0x2C,0x30));
-            using(GraphicsPath path=SplashLook.Rounded(new RectangleF(0,0,b.Width,b.Height),6*scale))using(Brush brush=new SolidBrush(fill)){g.FillPath(brush,path);if(b.Focused)using(Pen border=new Pen(SplashLook.Muted))g.DrawPath(border,path);}
-            if(text=="−")using(Pen pen=new Pen(SplashLook.Ink,Math.Max(1,scale))){g.DrawLine(pen,b.Width/2f-5*scale,b.Height/2f,b.Width/2f+5*scale,b.Height/2f);}
-            else using(Brush brush=new SolidBrush(b.ForeColor))using(StringFormat format=new StringFormat{Alignment=StringAlignment.Center,LineAlignment=StringAlignment.Center})g.DrawString(text,b.Font,brush,b.ClientRectangle,format);
-        };
+        Button b=new SplashButton(text,primary){AccessibleName=accessible,TabStop=true};
         Controls.Add(b);return b;
+    }
+    private sealed class SplashButton : Button
+    {
+        private readonly bool primary,minimize;
+        internal float PaintScale=1;
+        internal SplashButton(string text,bool primary)
+        {
+            this.primary=primary;minimize=text=="−";Text=text;
+            FlatStyle=FlatStyle.Flat;FlatAppearance.BorderSize=0;UseVisualStyleBackColor=false;
+            ForeColor=primary?Color.FromArgb(0x10,0x33,0x27):SplashLook.Ink;
+            SetStyle(ControlStyles.UserPaint|ControlStyles.AllPaintingInWmPaint|ControlStyles.OptimizedDoubleBuffer|ControlStyles.ResizeRedraw,true);
+        }
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            Graphics g=e.Graphics;g.SmoothingMode=SmoothingMode.AntiAlias;g.TextRenderingHint=TextRenderingHint.AntiAliasGridFit;g.Clear(Parent.BackColor);
+            bool hover=ClientRectangle.Contains(PointToClient(Cursor.Position)),highlight=hover||(Focused&&ShowFocusCues);
+            Color fill=primary?(highlight?Color.FromArgb(0x73,0xE4,0xB5):SplashLook.Accent):
+                highlight?Color.FromArgb(0x34,0x3D,0x43):minimize?Parent.BackColor:Color.FromArgb(0x27,0x2C,0x30);
+            using(GraphicsPath path=SplashLook.Rounded(new RectangleF(0,0,Width,Height),6*PaintScale))using(Brush brush=new SolidBrush(fill))g.FillPath(brush,path);
+            if(minimize)using(Pen pen=new Pen(SplashLook.Ink,Math.Max(1,PaintScale)))
+            {
+                g.SmoothingMode=SmoothingMode.None;
+                int x=(int)Math.Round(Width/2f),y=(int)Math.Round(Height/2f);
+                g.DrawLine(pen,x-(int)Math.Round(5*PaintScale),y,x+(int)Math.Round(5*PaintScale),y);
+            }
+            else using(Brush brush=new SolidBrush(ForeColor))using(StringFormat format=new StringFormat{Alignment=StringAlignment.Center,LineAlignment=StringAlignment.Center})g.DrawString(Text,Font,brush,ClientRectangle,format);
+        }
     }
     internal void SetScale(float value)
     {
         scale=Math.Max(.75f,value);ClientSize=new Size(P(SplashLook.Width),P(SplashLook.Height));
         MinimizeButton.Bounds=new Rectangle(ClientSize.Width-P(56),P(14),P(36),P(34));
         RetryButton.Bounds=new Rectangle(P(24),P(220),P(192),P(40));ReturnButton.Bounds=new Rectangle(P(228),P(220),P(308),P(40));
-        foreach(Button b in new[]{MinimizeButton,RetryButton,ReturnButton}){int pixels=P(b==MinimizeButton?20:14),key=pixels*2+(b==MinimizeButton?0:1);Font font;if(!fonts.TryGetValue(key,out font)){font=look.Font(pixels,b!=MinimizeButton);fonts.Add(key,font);}b.Font=font;}
+        foreach(Button b in new[]{MinimizeButton,RetryButton,ReturnButton}){int pixels=P(b==MinimizeButton?20:14),key=pixels*2+(b==MinimizeButton?0:1);Font font;if(!fonts.TryGetValue(key,out font)){font=look.Font(pixels,b!=MinimizeButton);fonts.Add(key,font);}b.Font=font;((SplashButton)b).PaintScale=scale;b.Invalidate();}
         Invalidate();
     }
     private int P(float v){return (int)Math.Round(v*scale);}

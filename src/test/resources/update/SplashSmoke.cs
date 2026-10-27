@@ -51,6 +51,23 @@ internal static class SplashSmoke
                 form.Show();Application.DoEvents();Assert(form.ShowInTaskbar&&!form.TopMost&&form.Icon!=null,"Window identity/icon is missing");
                 Point point=form.PointToScreen(new Point(32,28));long packed=(long)(uint)(point.X&0xffff)|((long)(point.Y&0xffff)<<16);
                 Assert(SendMessage(form.Handle,0x84,IntPtr.Zero,new IntPtr(packed)).ToInt32()==2,"Header does not support native dragging");
+                form.MinimizeButton.Focus();
+                foreach(float scale in new[]{1f,1.5f,2f})
+                {
+                    form.SetScale(scale);
+                    using(var image=new Bitmap(form.ClientSize.Width,form.ClientSize.Height))
+                    {form.DrawToBitmap(image,form.ClientRectangle);image.Save(Path.Combine(assets,"window-"+(int)(scale*100)+".png"),ImageFormat.Png);}
+                    using(var button=new Bitmap(form.MinimizeButton.Width,form.MinimizeButton.Height))
+                    {
+                        form.MinimizeButton.DrawToBitmap(button,form.MinimizeButton.ClientRectangle);
+                        for(int y=0;y<button.Height;y++)for(int x=0;x<button.Width;x++)
+                        {
+                            if(Math.Abs(x-button.Width/2)<=7*scale&&Math.Abs(y-button.Height/2)<=3*scale)continue;
+                            Color pixel=button.GetPixel(x,y);
+                            Assert(Math.Max(pixel.R,Math.Max(pixel.G,pixel.B))<120,"Focused minimize button has a border at "+scale+"x");
+                        }
+                    }
+                }
                 form.MinimizeButton.PerformClick();Application.DoEvents();Assert(IsIconic(form.Handle),"Minimize did not reach the OS");
                 form.WindowState=FormWindowState.Normal;Application.DoEvents();form.SetScale(1.5f);
                 Assert(form.ClientSize==new Size(840,420),"DPI layout is incorrect");
