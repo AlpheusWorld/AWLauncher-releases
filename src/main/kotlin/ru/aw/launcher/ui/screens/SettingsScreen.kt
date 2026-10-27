@@ -68,6 +68,8 @@ import ru.aw.launcher.ui.LauncherState
 import ru.aw.launcher.ui.components.ChoiceChip
 import ru.aw.launcher.ui.components.AWButton
 import ru.aw.launcher.ui.components.AWIcons
+import ru.aw.launcher.ui.components.ThinProgress
+import ru.aw.launcher.ui.components.formatSpeed
 import ru.aw.launcher.ui.components.Brand
 import ru.aw.launcher.ui.components.Wordmark
 import ru.aw.launcher.ui.components.AWSwitch
@@ -152,17 +154,37 @@ internal fun SettingsContent(state: LauncherState, section: Int) {
             BoxWithConstraints(Modifier.fillMaxWidth()) { Wordmark(minOf(280.dp, maxWidth)) }
             Text("Версия лаунчера: ${ArgumentBuilder.LAUNCHER_VERSION}", color = AWColors.TextMuted)
             val update by state.updates.collectAsState()
-            FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                AWButton("Проверить обновления", enabled = update !is UpdateState.Checking && update !is UpdateState.Downloading && update !is UpdateState.Installing,
+            val downloading = update as? UpdateState.Downloading
+            if (downloading != null) {
+                LauncherUpdateProgress(downloading, Updater::cancelDownload)
+            } else FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                AWButton("Проверить обновления", enabled = update !is UpdateState.Checking && update !is UpdateState.Installing,
                     onClick = state::checkForUpdates)
                 ru.aw.launcher.ui.VersionPill(state, compact = true)
-                if (update is UpdateState.Downloading) AWButton("Отменить", onClick = Updater::cancelDownload)
             }
             if (update is UpdateState.UpToDate) Text("Установлена последняя версия", color = AWColors.Success, style = MaterialTheme.typography.bodySmall)
             (update as? UpdateState.Failed)?.let { Text(it.message, color = AWColors.Danger, style = MaterialTheme.typography.bodySmall) }
             HorizontalDivider(color = AWColors.Outline)
             AWButton("Открыть GitHub", icon = AWIcons.OpenInNew, onClick = { Shell.browse("https://github.com/AlpheusWorld/AWLauncher-releases") })
             AWButton("Открыть папку лаунчера", icon = AWIcons.Folder, onClick = { state.openFolder(Paths.root) })
+        }
+    }
+}
+
+@Composable
+internal fun LauncherUpdateProgress(update: UpdateState.Downloading, onCancel: () -> Unit) {
+    Column(Modifier.fillMaxWidth().background(AWColors.SurfaceHigh, RoundedCornerShape(AWDimens.CornerLarge)).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text("Загрузка файлов", color = AWColors.Text, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+            Text("${(update.fraction.coerceIn(0f, 1f) * 100).toInt()}%", color = AWColors.Accent,
+                style = MaterialTheme.typography.titleMedium, translate = false)
+        }
+        ThinProgress(update.fraction, Modifier.fillMaxWidth())
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(formatSpeed(update.bytesPerSecond), color = AWColors.TextMuted,
+                style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f), translate = false)
+            AWButton("Отменить", onClick = onCancel)
         }
     }
 }

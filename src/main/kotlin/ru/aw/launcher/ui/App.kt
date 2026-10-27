@@ -52,9 +52,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -77,6 +75,7 @@ import ru.aw.launcher.ui.components.WithTooltip
 import ru.aw.launcher.ui.components.Wordmark
 import ru.aw.launcher.ui.components.Brand
 import ru.aw.launcher.ui.components.formatSpeed
+import ru.aw.launcher.ui.components.ThinProgress
 import ru.aw.launcher.ui.dialogs.ModalHost
 import ru.aw.launcher.ui.screens.AccountsScreen
 import ru.aw.launcher.ui.screens.CatalogScreen
@@ -105,7 +104,7 @@ fun App(
         Column(Modifier.fillMaxSize().background(AWColors.Background)) {
             titleBar()
             BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
-            val expandedNav = maxWidth >= 1160.dp
+            val expandedNav = maxWidth >= 760.dp
             Row(Modifier.fillMaxSize()) {
                 CompactNavRail(state, expandedNav)
                 Box(Modifier.weight(1f).fillMaxHeight()) {
@@ -141,10 +140,11 @@ private fun ScreenHost(state: LauncherState) {
                     translationX = (1f - entrance.value) * 8.dp.toPx()
                 }) {
                     when (screen) {
-                        Screen.HOME -> DashboardScreen(state)
+                        Screen.HOME -> ru.aw.launcher.ui.screens.LaunchDashboard(state)
                         Screen.INSTANCE -> ru.aw.launcher.ui.screens.InstanceScreen(state)
                         Screen.FRIENDS -> ru.aw.launcher.ui.screens.FriendsScreen(state)
-                        Screen.PLAY, Screen.BUILDS -> PrimaryScreenLayout(state) { BuildsScreen(state) }
+                        Screen.PLAY -> DashboardScreen(state)
+                        Screen.BUILDS -> PrimaryScreenLayout(state) { BuildsScreen(state) }
                         Screen.CATALOG -> PrimaryScreenLayout(state) { CatalogScreen(state) }
                         Screen.SCREENSHOTS -> ScreenshotsScreen(state)
                         Screen.SKINS -> ru.aw.launcher.ui.screens.SkinsScreen(state)
@@ -178,16 +178,17 @@ private fun CompactNavRail(state: LauncherState, expanded: Boolean) {
     val friends by ru.aw.launcher.friends.Friends.state.collectAsState()
     val seen by state.noticesSeen.collectAsState()
     val unread = notices.filter { it.id > seen }
-    val railWidth = if (expanded) 188.dp else AWDimens.RailWidth
+    val railWidth = if (expanded) 214.dp else AWDimens.RailWidth
     BoxWithConstraints(Modifier.width(railWidth).fillMaxHeight()) {
-    val short = maxHeight < 520.dp
-    val itemHeight = if (short) 28.dp else 46.dp
+    val veryShort = maxHeight < 450.dp
+    val short = maxHeight < 640.dp
+    val itemHeight = if (veryShort) 28.dp else if (short) 36.dp else 44.dp
     Column(
         Modifier.width(railWidth).fillMaxHeight().background(AWColors.Sidebar).padding(horizontal = 8.dp, vertical = 12.dp),
-        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(if (short) 2.dp else 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(if (veryShort) 2.dp else if (short) 4.dp else 6.dp),
     ) {
-        NavItem("Главная", Icons.Default.Home, state.screen == Screen.HOME, compact = !expanded, itemHeight = itemHeight) { state.screen = Screen.HOME }
-        NavItem("Играть", Icons.Default.PlayArrow, state.screen in setOf(Screen.PLAY, Screen.BUILDS, Screen.INSTANCE), compact = !expanded, itemHeight = itemHeight) { state.screen = Screen.PLAY }
+        NavItem("Играть", Icons.Default.PlayArrow, state.screen == Screen.HOME, compact = !expanded, itemHeight = itemHeight) { state.screen = Screen.HOME }
+        NavItem("Мои сборки", AWIcons.Layers, state.screen in setOf(Screen.PLAY, Screen.BUILDS, Screen.INSTANCE), compact = !expanded, itemHeight = itemHeight) { state.screen = Screen.PLAY }
         NavItem("Каталог", Icons.Default.Search, state.screen == Screen.CATALOG, compact = !expanded, itemHeight = itemHeight) { state.openCatalog() }
         NavItem("Друзья", AWIcons.Friends, state.screen == Screen.FRIENDS, badge = friends.snapshot.requests.size + friends.snapshot.friends.count { it.invite != null }, compact = !expanded, itemHeight = itemHeight) { state.screen = Screen.FRIENDS }
         NavItem("Скриншоты", AWIcons.Image, state.screen == Screen.SCREENSHOTS, compact = !expanded, itemHeight = itemHeight) { state.screen = Screen.SCREENSHOTS }
@@ -326,11 +327,19 @@ internal fun VersionPill(state: LauncherState, compact: Boolean = false) {
         progress != null -> AWColors.SurfaceHigh to AWColors.Text
         else -> AWColors.SurfaceHigh to AWColors.TextMuted
     }
-    val progressColor = AWColors.Accent.copy(alpha = 0.35f)
     val hint = when {
         current is UpdateState.Available -> "Скачать и установить ${current.update.version}"
         current is UpdateState.Failed -> current.message
         else -> null
+    }
+
+    if (progress != null) {
+        Column(Modifier.width(132.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(text, color = AWColors.TextSoft, style = MaterialTheme.typography.labelMedium,
+                maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+            ThinProgress(progress, Modifier.fillMaxWidth())
+        }
+        return
     }
 
     WithTooltip(hint) {
@@ -340,9 +349,6 @@ internal fun VersionPill(state: LauncherState, compact: Boolean = false) {
                 .height(20.dp)
                 .clip(PillShape)
                 .background(background)
-                .drawBehind {
-                    if (progress != null) drawRect(progressColor, size = Size(size.width * progress, size.height))
-                }
                 .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
                 .padding(horizontal = 9.dp),
             contentAlignment = Alignment.Center,

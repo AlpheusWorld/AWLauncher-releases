@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -34,6 +35,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -47,6 +49,7 @@ import ru.aw.launcher.core.NoticeLevel
 import ru.aw.launcher.core.Settings
 import ru.aw.launcher.meta.LoaderKind
 import ru.aw.launcher.ui.CatalogTab
+import ru.aw.launcher.ui.DownloadStatus
 import ru.aw.launcher.ui.LauncherState
 import ru.aw.launcher.ui.ModIcons
 import ru.aw.launcher.ui.Screen
@@ -61,6 +64,187 @@ import ru.aw.launcher.ui.components.LocalizedText as Text
 import ru.aw.launcher.ui.theme.AWColors
 import ru.aw.launcher.ui.theme.AWMotion
 import ru.aw.launcher.ui.theme.AWDimens
+
+/** The landing screen uses the same selection, queue and activity state as the library. */
+@Composable
+internal fun LaunchDashboard(state: LauncherState) {
+    val builds = remember(state.builds, state.packs, state.versions) { state.buildChoices() }
+    LaunchedEffect(builds) { state.loadLibraryMetadata() }
+    val entry = state.currentEntry() ?: builds.firstOrNull()
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val wide = maxWidth >= 920.dp
+        val paired = maxWidth >= 520.dp
+        val compactHeight = maxHeight < 700.dp
+        val padding = if (compactHeight) 12.dp else if (maxWidth < 620.dp) 16.dp else 24.dp
+        val spacing = if (compactHeight) 10.dp else 16.dp
+        Column(
+            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(padding),
+            verticalArrangement = Arrangement.spacedBy(spacing),
+        ) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("Играть", style = MaterialTheme.typography.displaySmall, color = AWColors.Text, modifier = Modifier.weight(1f))
+                AWButton("Все сборки", onClick = { state.screen = Screen.PLAY })
+            }
+            if (wide) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    LaunchBuildCard(state, entry, Modifier.weight(1f), compactHeight)
+                    Column(Modifier.width(260.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        LaunchDownloads(state, Modifier.fillMaxWidth(), compactHeight)
+                        LaunchActivity(state, Modifier.fillMaxWidth())
+                    }
+                }
+            } else {
+                LaunchBuildCard(state, entry, Modifier.fillMaxWidth(), compactHeight)
+                if (paired) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    LaunchDownloads(state, Modifier.weight(1f), compactHeight)
+                    LaunchActivity(state, Modifier.weight(1f))
+                } else {
+                    LaunchDownloads(state, Modifier.fillMaxWidth(), compactHeight)
+                    LaunchActivity(state, Modifier.fillMaxWidth())
+                }
+            }
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("Мои сборки", style = MaterialTheme.typography.titleLarge, color = AWColors.Text, modifier = Modifier.weight(1f))
+                AWButton("Библиотека", onClick = { state.screen = Screen.PLAY })
+            }
+            if (builds.isEmpty()) {
+                Panel(Modifier.fillMaxWidth()) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text("Сборки пока не созданы", color = AWColors.TextMuted, modifier = Modifier.weight(1f))
+                        AWButton("Создать сборку", onClick = { state.screen = Screen.BUILDS })
+                    }
+                }
+            } else {
+                Column(Modifier.fillMaxWidth().background(AWColors.Surface, RoundedCornerShape(AWDimens.CornerLarge))) {
+                    builds.take(3).forEach { build ->
+                        Row(
+                            Modifier.fillMaxWidth().clip(RoundedCornerShape(AWDimens.CornerMedium))
+                                .clickable { state.openInstance(build) }.padding(horizontal = 16.dp, vertical = 10.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            BuildArtwork(build, Modifier.size(46.dp), 26.dp, state)
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                Text(build.title, color = AWColors.Text, style = MaterialTheme.typography.titleSmall,
+                                    maxLines = 1, overflow = TextOverflow.Ellipsis, translate = false)
+                                Text("${build.id} · ${build.loader.label}", color = AWColors.TextMuted,
+                                    style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis, translate = false)
+                            }
+                            Icon(Icons.Default.KeyboardArrowDown, "Открыть сборку", tint = AWColors.TextMuted,
+                                modifier = Modifier.size(18.dp).rotate(-90f))
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun LaunchBuildCard(state: LauncherState, entry: VersionEntry?, modifier: Modifier, compact: Boolean) {
+    val busy = state.busy || state.buildsBusy || state.savingInstanceSettings
+    BoxWithConstraints(modifier.background(AWColors.SurfaceHigh, RoundedCornerShape(AWDimens.CornerLarge))) {
+        val showArtwork = maxWidth >= 390.dp
+        val artworkSize = if (maxWidth >= 600.dp) 120.dp else 88.dp
+        Column(Modifier.fillMaxWidth().padding(if (compact) 14.dp else 20.dp), verticalArrangement = Arrangement.spacedBy(if (compact) 10.dp else 16.dp)) {
+            Text("Сборка", color = AWColors.TextMuted, style = MaterialTheme.typography.labelMedium)
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(if (compact) 5.dp else 8.dp)) {
+                    Text(entry?.title ?: "Выбери сборку", color = AWColors.Text, style = MaterialTheme.typography.headlineLarge,
+                        maxLines = 2, overflow = TextOverflow.Ellipsis, translate = entry == null)
+                    if (entry != null) {
+                        val lastPlayed = state.lastPlayedOf(entry)
+                        Text(if (lastPlayed == null) "Ещё не запускалась" else
+                            "Последний запуск: ${formatReleaseDate(java.time.Instant.ofEpochMilli(lastPlayed).toString())}",
+                            color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        AWButton(if (entry != null && !state.isEntryInstalled(entry)) "Установить и играть" else "Играть",
+                            icon = Icons.Default.PlayArrow, style = ButtonStyle.PRIMARY, enabled = entry != null && !busy,
+                            modifier = if (busy || entry == null) Modifier.border(1.dp, AWColors.Outline, RoundedCornerShape(AWDimens.CornerMedium)) else Modifier,
+                            onClick = { entry?.let { state.selectEntry(it); state.play() } })
+                        if (entry != null) AWButton("Открыть сборку", enabled = !state.buildsBusy && !state.savingInstanceSettings, onClick = { state.openInstance(entry) })
+                        else AWButton("Создать сборку", onClick = { state.screen = Screen.BUILDS })
+                    }
+                }
+                if (entry != null && showArtwork) BuildArtwork(entry, Modifier.size(artworkSize), 64.dp, state)
+            }
+            if (entry != null) {
+                HorizontalDivider(color = AWColors.Outline)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("Версия Minecraft", color = AWColors.TextMuted, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+                        Text(entry.id, color = AWColors.Text, style = MaterialTheme.typography.bodyMedium, translate = false)
+                    }
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("Загрузчик", color = AWColors.TextMuted, style = MaterialTheme.typography.labelSmall)
+                        Text(entry.loader.label, color = AWColors.Text, style = MaterialTheme.typography.bodyMedium, translate = false)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LaunchDownloads(state: LauncherState, modifier: Modifier, compact: Boolean) {
+    val queue = state.downloads
+    val item = queue.active ?: queue.items.firstOrNull { it.status == DownloadStatus.WAITING }
+    Column(modifier.background(AWColors.Surface, RoundedCornerShape(AWDimens.CornerLarge)).padding(if (compact) 14.dp else 20.dp),
+        verticalArrangement = Arrangement.spacedBy(if (compact) 6.dp else 10.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("Загрузки", style = MaterialTheme.typography.titleSmall, color = AWColors.Text, modifier = Modifier.weight(1f))
+                WithTooltip("Загрузки") { IconButton(onClick = { state.screen = Screen.DOWNLOADS }, modifier = Modifier.size(32.dp)) {
+                    Icon(AWIcons.Download, "Загрузки", tint = AWColors.TextMuted, modifier = Modifier.size(18.dp))
+                } }
+            }
+            if (item == null) Text("Загрузок пока нет", color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall)
+            else {
+                Text(item.title, color = AWColors.Text, style = MaterialTheme.typography.titleSmall,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis, translate = false)
+                Text(if (item.status == DownloadStatus.WAITING) "В очереди" else item.stage.ifBlank { "Готовлюсь" },
+                    color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                item.progress?.let { progress ->
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text("${(progress.fraction * 100).toInt()}%", color = AWColors.Accent,
+                            style = MaterialTheme.typography.headlineMedium, modifier = Modifier.weight(1f), translate = false)
+                        formatSpeed(progress.bytesPerSecond).takeIf { it.isNotBlank() }?.let { speed ->
+                            Text(speed, color = AWColors.TextSoft, style = MaterialTheme.typography.bodySmall, translate = false)
+                        }
+                    }
+                    ThinProgress(progress.fraction, Modifier.fillMaxWidth())
+                    if (progress.totalBytes > 0) Text("${formatBytes(progress.completedBytes)} / ${formatBytes(progress.totalBytes)}",
+                        color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall, translate = false)
+                }
+                if (item.status == DownloadStatus.WAITING && queue.paused) AWButton("Продолжить очередь", onClick = { queue.pauseQueue(false) })
+                else if (item.status == DownloadStatus.RUNNING) AWButton("Отменить", enabled = item.cancellable, onClick = { queue.cancel(item.id) })
+            }
+    }
+}
+
+@Composable
+private fun LaunchActivity(state: LauncherState, modifier: Modifier) {
+    val stats = state.activity
+    Panel(modifier.clickable { state.screen = Screen.ACTIVITY }) {
+        Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+            Text("Активность", style = MaterialTheme.typography.titleSmall, color = AWColors.Text)
+            Text(stats?.let { formatPlayTime(it.weekMillis) } ?: "…", style = MaterialTheme.typography.headlineSmall,
+                color = AWColors.Text)
+            Text("Эта неделя", style = MaterialTheme.typography.bodySmall, color = AWColors.TextMuted)
+            if (stats != null) {
+                val week = remember(stats) { stats.today.with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY)) }
+                val values = remember(stats, week) { (0L..6L).map { stats.days[week.plusDays(it)] ?: 0L } }
+                val maximum = values.maxOrNull()?.coerceAtLeast(1L) ?: 1L
+                Row(Modifier.fillMaxWidth().height(30.dp), horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.Bottom) {
+                    values.forEach { value ->
+                        Box(Modifier.weight(1f).fillMaxHeight(if (value == 0L) 0.12f else (value.toFloat() / maximum).coerceIn(0.12f, 1f))
+                            .background(if (value == 0L) AWColors.Outline else AWColors.Accent, RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp)))
+                    }
+                }
+            }
+        }
+    }
+}
 
 @Composable
 @OptIn(ExperimentalLayoutApi::class)

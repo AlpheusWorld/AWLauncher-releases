@@ -6,16 +6,19 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asSkiaBitmap
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.awaitCancellation
 import org.jetbrains.skia.EncodedImageFormat
 import ru.aw.launcher.activity.PlayHistory
 import ru.aw.launcher.activity.PlaySession
@@ -35,6 +38,10 @@ import ru.aw.launcher.ui.ModIcons
 import ru.aw.launcher.ui.components.ProjectDescription
 import ru.aw.launcher.ui.screens.ProjectPageData
 import ru.aw.launcher.ui.screens.ProjectScreen
+import ru.aw.launcher.ui.screens.LauncherUpdateProgress
+import ru.aw.launcher.net.DownloadProgress
+import ru.aw.launcher.update.UpdateManifest
+import ru.aw.launcher.update.UpdateState
 import ru.aw.launcher.logs.LogSource
 import ru.aw.launcher.instance.LocalBuild
 import ru.aw.launcher.meta.LoaderKind
@@ -380,6 +387,25 @@ fun main(args: Array<String>) {
     val localBuild = LocalBuild("72a4ca77-3aae-4c19-b237-652bf6a4fd12", "Better Vanilla+", "26.2", LoaderKind.FABRIC)
     val withBuilds = LauncherState(CoroutineScope(Dispatchers.Unconfined), preloaded.copy(packs = listOf(pack), builds = listOf(localBuild)))
     withBuilds.selectEntry(withBuilds.entryFor(localBuild))
+    withBuilds.screen = Screen.HOME
+    render("launch-home", 1280, 780) { AWTheme(ThemeMode.DARK) { App(withBuilds, onGameStarted = {}) } }
+    render("launch-home-medium", 815, 630) { AWTheme(ThemeMode.DARK) { App(withBuilds, onGameStarted = {}) } }
+    render("launch-home-minimum", 600, 420) { AWTheme(ThemeMode.DARK) { App(withBuilds, onGameStarted = {}) } }
+    withBuilds.downloads.enqueue("preview-update", "Sodium", withBuilds.entryFor(localBuild).key) { reporter ->
+        reporter.stage("Загрузка файлов")
+        reporter.progress(DownloadProgress(2, 12, 42L * 1024 * 1024, 247L * 1024 * 1024, 9L * 1024 * 1024, "Sodium.jar"))
+        awaitCancellation()
+    }
+    render("launch-home-download", 1280, 780) { AWTheme(ThemeMode.DARK) { App(withBuilds, onGameStarted = {}) } }
+    render("launch-home-download-medium", 815, 630) { AWTheme(ThemeMode.DARK) { App(withBuilds, onGameStarted = {}) } }
+    render("launch-home-download-minimum", 600, 420) { AWTheme(ThemeMode.DARK) { App(withBuilds, onGameStarted = {}) } }
+    withBuilds.downloads.active?.let { withBuilds.downloads.cancel(it.id) }
+    val updateProgress = UpdateState.Downloading(UpdateManifest("1.0.36", "https://example.invalid/update", "0".repeat(64)), 0.17f, 9L * 1024 * 1024)
+    render("launcher-update-progress", 480, 250) { AWTheme(ThemeMode.DARK) {
+        Box(Modifier.fillMaxSize().background(ru.aw.launcher.ui.theme.AWColors.Background).padding(16.dp)) {
+            LauncherUpdateProgress(updateProgress) {}
+        }
+    } }
     withBuilds.screen = Screen.PLAY
     render("play-local-builds", 1280, 780) { AWTheme { App(withBuilds, onGameStarted = {}) } }
     render("play-local-builds-compact", 1040, 660) { AWTheme(ThemeMode.OLED) { App(withBuilds, onGameStarted = {}) } }
@@ -502,6 +528,7 @@ fun main(args: Array<String>) {
         }
     }
     dashboard.loadLibraryMetadata()
+    dashboard.screen = Screen.PLAY
     render("dashboard-library", 1280, 780) { AWTheme(ThemeMode.OLED) { App(dashboard, onGameStarted = {}) } }
     render("dashboard-library-small", 1050, 660) { AWTheme(ThemeMode.LIGHT) { App(dashboard, onGameStarted = {}) } }
     render("dashboard-library-half", 960, 700) { AWTheme(ThemeMode.OLED) { App(dashboard, onGameStarted = {}) } }

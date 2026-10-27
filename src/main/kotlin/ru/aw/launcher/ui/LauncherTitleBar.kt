@@ -61,7 +61,7 @@ fun LauncherTitleBar(
         windowState?.placement = if (maximized) WindowPlacement.Floating else WindowPlacement.Maximized
     }
     val title = when (state.screen) {
-        Screen.HOME -> "Главная"
+        Screen.HOME -> "Играть"
         Screen.PLAY, Screen.BUILDS -> "Сборки"
         Screen.CATALOG -> state.catalogPageTitle ?: "Каталог"
         Screen.INSTANCE -> state.instanceEntry()?.title ?: "Сборка"
@@ -76,7 +76,7 @@ fun LauncherTitleBar(
     }
     BoxWithConstraints(Modifier.fillMaxWidth().background(AWColors.Sidebar)) {
         val compact = maxWidth < 900.dp
-        val brandingWidth = if (maxWidth >= 1160.dp) 188.dp else 176.dp
+        val brandingWidth = if (maxWidth >= 760.dp) 214.dp else 176.dp
         Column(Modifier.fillMaxWidth()) {
             Row(Modifier.fillMaxWidth().height(AWDimens.TitleBarHeight), verticalAlignment = Alignment.CenterVertically) {
                 DragArea(windowScope, Modifier.width(brandingWidth).fillMaxHeight(), nativeFrame, toggleMaximize) {

@@ -56,7 +56,8 @@ fun main(args: Array<String>) {
         return (System.nanoTime() - started) / 1_000_000.0
     }
     val actions = linkedMapOf<String, () -> Unit>(
-        "library" to { state.screen = Screen.HOME },
+        "home" to { state.screen = Screen.HOME },
+        "library" to { state.screen = Screen.PLAY },
         "builds" to { state.screen = Screen.BUILDS },
         "activity" to { state.screen = Screen.ACTIVITY },
         "settings-game" to { state.screen = Screen.HOME; state.openSettings(section = 2) },

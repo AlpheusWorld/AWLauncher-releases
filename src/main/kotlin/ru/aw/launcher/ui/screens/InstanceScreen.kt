@@ -51,7 +51,7 @@ fun InstanceScreen(state: LauncherState, initialTab: Int = 0) {
     val entry = state.instanceEntry()
     if (entry == null) {
         EmptyState(AWIcons.Layers, "Сборка больше не найдена", "Выбери другую сборку в библиотеке", Modifier.fillMaxSize()) {
-            AWButton("Библиотека", onClick = { state.screen = Screen.HOME })
+            AWButton("Библиотека", onClick = { state.screen = Screen.PLAY })
         }
         return
     }

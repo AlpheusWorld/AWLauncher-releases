@@ -190,8 +190,11 @@ fun StatusStrip(progress: DownloadProgress?, error: String?, message: String?) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text("${(progress.fraction * 100).toInt()}%", color = AWColors.Accent,
                         style = MaterialTheme.typography.labelLarge, translate = false)
-                    Text(if (progress.totalBytes > 0) "${formatBytes(progress.completedBytes)} / ${formatBytes(progress.totalBytes)}" else formatBytes(progress.completedBytes),
-                        color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall, translate = false)
+                    val bytes = if (progress.totalBytes > 0) "${formatBytes(progress.completedBytes)} / ${formatBytes(progress.totalBytes)}" else formatBytes(progress.completedBytes)
+                    val details = listOfNotNull(bytes, formatSpeed(progress.bytesPerSecond).takeIf { it.isNotEmpty() }).joinToString(" · ")
+                    Text(details, color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.weight(1f).padding(start = 12.dp), textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis, translate = false)
                 }
                 Spacer(Modifier.height(6.dp))
                 ThinProgress(progress.fraction, Modifier.fillMaxWidth())
