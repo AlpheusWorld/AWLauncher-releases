@@ -1122,5 +1122,10 @@
   "Достигнут предел списка друзей": "Daftar teman sudah lengkap",
   "Заявка больше не доступна": "Permintaan pertemanan tidak lagi tersedia",
   "Заявка не найдена": "Permintaan pertemanan tidak ditemukan",
-  "Не удалось подготовить мод друзей: {0}. Можно повторить запуск или выключить игру с друзьями в настройках": "Tidak dapat menyiapkan mod jaringan: {0}. Coba luncurkan lagi atau nonaktifkan bermain dengan teman di Pengaturan"
+  "Не удалось подготовить мод друзей: {0}. Можно повторить запуск или выключить игру с друзьями в настройках": "Tidak dapat menyiapkan mod jaringan: {0}. Coba luncurkan lagi atau nonaktifkan bermain dengan teman di Pengaturan",
+  "Оставь открытым один Minecraft, чтобы принять приглашение": "Biarkan hanya satu game Minecraft yang terbuka untuk menerima undangan",
+  "Запущена другая версия Minecraft или загрузчик. Закрой игру и выбери подходящую сборку": "Versi Minecraft atau mod loader yang berbeda sedang berjalan. Tutup game dan pilih instance yang kompatibel",
+  "Игра была запущена или закрыта. Нажми «Присоединиться» ещё раз": "Permainan dibuka atau ditutup. Tekan Gabung lagi",
+  "Адрес скопирован. В Minecraft выйди в главное меню → Сетевая игра → По адресу, вставь адрес и подключись": "Alamatnya disalin. Di Minecraft, kembali ke menu utama Multiplayer Multiplayer Connection",
+  "Игра уже запущена. Нажми «Присоединиться», чтобы скопировать адрес для входа через Minecraft": "Minecraft sudah berjalan. Tekan Gabung untuk menyalin alamat, lalu sambungkan di Minecraft"
 }

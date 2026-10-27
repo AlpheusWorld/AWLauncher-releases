@@ -1122,5 +1122,10 @@
   "Достигнут предел списка друзей": "Senarai rakan Penuh",
   "Заявка больше не доступна": "Permintaan rakan tidak lagi tersedia",
   "Заявка не найдена": "Permintaan rakan tidak dijumpai",
-  "Не удалось подготовить мод друзей: {0}. Можно повторить запуск или выключить игру с друзьями в настройках": "Tidak dapat menyediakan mod rangkaian: {0}. Cuba lancarkan lagi atau Lumpuhkan bermain dengan rakan dalam Tetapan"
+  "Не удалось подготовить мод друзей: {0}. Можно повторить запуск или выключить игру с друзьями в настройках": "Tidak dapat menyediakan mod rangkaian: {0}. Cuba lancarkan lagi atau Lumpuhkan bermain dengan rakan dalam Tetapan",
+  "Оставь открытым один Minecraft, чтобы принять приглашение": "Pastikan hanya satu permainan Minecraft terbuka untuk menerima jemputan",
+  "Запущена другая версия Minecraft или загрузчик. Закрой игру и выбери подходящую сборку": "Versi Minecraft atau mod loader yang berbeza sedang berjalan. Tutup permainan dan pilih contoh yang serasi",
+  "Игра была запущена или закрыта. Нажми «Присоединиться» ещё раз": "Permainan dibuka atau ditutup. Tekan Sertai lagi",
+  "Адрес скопирован. В Minecraft выйди в главное меню → Сетевая игра → По адресу, вставь адрес и подключись": "Alamat disalin. Di Minecraft, kembali ke menu utama sambungan langsung berbilang pemain, tampal alamat dan sertai",
+  "Игра уже запущена. Нажми «Присоединиться», чтобы скопировать адрес для входа через Minecraft": "Minecraft sudah berjalan. Tekan Sertai untuk menyalin alamat, kemudian sambungkan di Minecraft"
 }

@@ -1122,5 +1122,10 @@
   "Достигнут предел списка друзей": "Zoznam priateľov je plný",
   "Заявка больше не доступна": "Žiadosť o priateľstvo už nie je k dispozícii",
   "Заявка не найдена": "Žiadosť o priateľstvo nebola nájdená",
-  "Не удалось подготовить мод друзей: {0}. Можно повторить запуск или выключить игру с друзьями в настройках": "Nepodarilo sa pripraviť sieťový mod: {0}. Skúste spustiť znova alebo vypnite prehrávanie s priateľmi v nastaveniach"
+  "Не удалось подготовить мод друзей: {0}. Можно повторить запуск или выключить игру с друзьями в настройках": "Nepodarilo sa pripraviť sieťový mod: {0}. Skúste spustiť znova alebo vypnite prehrávanie s priateľmi v nastaveniach",
+  "Оставь открытым один Minecraft, чтобы принять приглашение": "Ak chcete prijať pozvanie, ponechajte otvorenú iba jednu hru Minecraft",
+  "Запущена другая версия Minecraft или загрузчик. Закрой игру и выбери подходящую сборку": "Je spustená iná verzia Minecraftu alebo zavádzač modov. Zatvorte hru a vyberte kompatibilnú inštanciu",
+  "Игра была запущена или закрыта. Нажми «Присоединиться» ещё раз": "Hra bola otvorená alebo zatvorená. Znova stlačte Pripojiť sa",
+  "Адрес скопирован. В Minecraft выйди в главное меню → Сетевая игра → По адресу, вставь адрес и подключись": "Adresa bola skopírovaná. V Minecraft sa vráťte do hlavnej ponuky → Multiplayer → priame pripojenie, vložte adresu a pripojte sa",
+  "Игра уже запущена. Нажми «Присоединиться», чтобы скопировать адрес для входа через Minecraft": "Minecraft už beží. Stlačením tlačidla Pripojiť skopírujte adresu a potom sa pripojte v Minecrafte"
 }

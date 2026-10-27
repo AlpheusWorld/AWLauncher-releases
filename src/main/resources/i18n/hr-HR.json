@@ -1122,5 +1122,10 @@
   "Достигнут предел списка друзей": "Popis prijatelja je pun",
   "Заявка больше не доступна": "Zahtjev za prijateljstvo više nije dostupan",
   "Заявка не найдена": "Zahtjev za prijateljstvo nije pronađen",
-  "Не удалось подготовить мод друзей: {0}. Можно повторить запуск или выключить игру с друзьями в настройках": "Nije moguće pripremiti Mrežni mod: {0}. Pokušajte ga ponovo pokrenuti ili isključite igru s prijateljima u postavkama"
+  "Не удалось подготовить мод друзей: {0}. Можно повторить запуск или выключить игру с друзьями в настройках": "Nije moguće pripremiti Mrežni mod: {0}. Pokušajte ga ponovo pokrenuti ili isključite igru s prijateljima u postavkama",
+  "Оставь открытым один Minecraft, чтобы принять приглашение": "Ostavite otvorenu samo jednu igru da biste prihvatili pozivnicu",
+  "Запущена другая версия Minecraft или загрузчик. Закрой игру и выбери подходящую сборку": "Pokrenuta je druga verzija Buck ili mod Loader. Zatvorite igru i odaberite kompatibilnu instancu",
+  "Игра была запущена или закрыта. Нажми «Присоединиться» ещё раз": "Igra je bila otvorena ili zatvorena. Dodirnite Pridruži se još jednom",
+  "Адрес скопирован. В Minecraft выйди в главное меню → Сетевая игра → По адресу, вставь адрес и подключись": "Adresa je kopirana. U Ba, vratite se na glavni izbornik ba više igrača ba izravna veza, unesite adresu i pridružite se",
+  "Игра уже запущена. Нажми «Присоединиться», чтобы скопировать адрес для входа через Minecraft": "Već je pokrenut. Kliknite Pridruži se da biste kopirali adresu, a zatim se povežite u"
 }

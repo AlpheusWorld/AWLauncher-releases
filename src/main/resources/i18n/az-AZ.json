@@ -1122,5 +1122,10 @@
   "Достигнут предел списка друзей": "Dostların siyahısı doludur",
   "Заявка больше не доступна": "Dost tələbi artıq mövcud deyil",
   "Заявка не найдена": "Dost sorğusu tapılmadı",
-  "Не удалось подготовить мод друзей: {0}. Можно повторить запуск или выключить игру с друзьями в настройках": "Şəbəkə modunu hazırlamaq mümkün olmadı: {0}. Yenidən başlamağa çalışın və ya parametrlərdə dostlarınızla oyunu söndürün"
+  "Не удалось подготовить мод друзей: {0}. Можно повторить запуск или выключить игру с друзьями в настройках": "Şəbəkə modunu hazırlamaq mümkün olmadı: {0}. Yenidən başlamağa çalışın və ya parametrlərdə dostlarınızla oyunu söndürün",
+  "Оставь открытым один Minecraft, чтобы принять приглашение": "Dəvəti qəbul etmək üçün yalnız bir Minecraft oyununu açıq buraxın",
+  "Запущена другая версия Minecraft или загрузчик. Закрой игру и выбери подходящую сборку": "Minecraft və ya mod yükləyicisinin başqa bir versiyası işləyir. Oyunu bağlayın və uyğun bir nümunə seçin",
+  "Игра была запущена или закрыта. Нажми «Присоединиться» ещё раз": "Oyun açıq və ya qapalı idi. Basın yenidən qoşulun",
+  "Адрес скопирован. В Minecraft выйди в главное меню → Сетевая игра → По адресу, вставь адрес и подключись": "Ünvan kopyalandı. Minecraft-da əsas menyuya qayıdın birbaşa əlaqə, ünvanı daxil edin və qoşulun",
+  "Игра уже запущена. Нажми «Присоединиться», чтобы скопировать адрес для входа через Minecraft": "Minecraft artıq başlamışdır. Ünvanı kopyalamaq üçün Qoşul düyməsini vurun, sonra Minecraft-a qoşulun"
 }

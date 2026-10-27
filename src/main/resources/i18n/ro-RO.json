@@ -1122,5 +1122,10 @@
   "Достигнут предел списка друзей": "Lista de prieteni este plină",
   "Заявка больше не доступна": "Cererea de prietenie nu mai este disponibilă",
   "Заявка не найдена": "Cererea de prietenie nu a fost găsită",
-  "Не удалось подготовить мод друзей: {0}. Можно повторить запуск или выключить игру с друзьями в настройках": "Nu s - a putut pregăti modul de rețea: {0}. Încercați să lansați din nou sau dezactivați jocul cu prietenii în Setări"
+  "Не удалось подготовить мод друзей: {0}. Можно повторить запуск или выключить игру с друзьями в настройках": "Nu s - a putut pregăti modul de rețea: {0}. Încercați să lansați din nou sau dezactivați jocul cu prietenii în Setări",
+  "Оставь открытым один Minecraft, чтобы принять приглашение": "Păstrați un singur joc Minecraft deschis pentru a accepta invitația",
+  "Запущена другая версия Minecraft или загрузчик. Закрой игру и выбери подходящую сборку": "O altă versiune Minecraft sau mod loader rulează. Închideți jocul și selectați o instanță compatibilă",
+  "Игра была запущена или закрыта. Нажми «Присоединиться» ещё раз": "Jocul a fost deschis sau închis. Apăsați din nou Alăturați-vă",
+  "Адрес скопирован. В Minecraft выйди в главное меню → Сетевая игра → По адресу, вставь адрес и подключись": "Adresa copiată. În Minecraft, reveniți la meniul principal multiplayer Multiplayer Conexiune directă, lipiți adresa și alăturați-vă",
+  "Игра уже запущена. Нажми «Присоединиться», чтобы скопировать адрес для входа через Minecraft": "Minecraft rulează deja. Apăsați Alăturați - vă pentru a copia adresa, apoi conectați-vă în Minecraft"
 }

@@ -1122,5 +1122,10 @@
   "Достигнут предел списка друзей": "Lista znajomych jest pełna",
   "Заявка больше не доступна": "Zaproszenie do znajomych nie jest już dostępne",
   "Заявка не найдена": "Nie znaleziono zapytania do znajomego",
-  "Не удалось подготовить мод друзей: {0}. Можно повторить запуск или выключить игру с друзьями в настройках": "Nie można przygotować Mod sieci: {0}. Spróbuj uruchomić ponownie lub wyłącz grę ze znajomymi w Ustawieniach"
+  "Не удалось подготовить мод друзей: {0}. Можно повторить запуск или выключить игру с друзьями в настройках": "Nie można przygotować Mod sieci: {0}. Spróbuj uruchomić ponownie lub wyłącz grę ze znajomymi w Ustawieniach",
+  "Оставь открытым один Minecraft, чтобы принять приглашение": "Zachowaj tylko jedną grę Minecraft otwartą, aby zaakceptować zaproszenie",
+  "Запущена другая версия Minecraft или загрузчик. Закрой игру и выбери подходящую сборку": "Działa inna wersja Minecrafta lub Mod loader. Zamknij grę i wybierz zgodną instancję",
+  "Игра была запущена или закрыта. Нажми «Присоединиться» ещё раз": "Gra została otwarta lub zamknięta. Naciśnij Dołącz ponownie",
+  "Адрес скопирован. В Minecraft выйди в главное меню → Сетевая игра → По адресу, вставь адрес и подключись": "Adres skopiowany. W Minecrafcie wróć do menu głównego → Multiplayer → bezpośrednie połączenie, wklej adres i dołącz",
+  "Игра уже запущена. Нажми «Присоединиться», чтобы скопировать адрес для входа через Minecraft": "Minecraft już działa. Naciśnij Dołącz, aby skopiować adres, a następnie połącz się w Minecraft"
 }

@@ -1122,5 +1122,10 @@
   "Достигнут предел списка друзей": "Kaverilista on täynnä",
   "Заявка больше не доступна": "Kaveripyyntö ei ole enää saatavilla",
   "Заявка не найдена": "Kaveripyyntöä ei löytynyt",
-  "Не удалось подготовить мод друзей: {0}. Можно повторить запуск или выключить игру с друзьями в настройках": "Verkkomodia ei voitu valmistella: {0}. Yritä käynnistää uudelleen tai poista pelaaminen ystävien kanssa asetuksista"
+  "Не удалось подготовить мод друзей: {0}. Можно повторить запуск или выключить игру с друзьями в настройках": "Verkkomodia ei voitu valmistella: {0}. Yritä käynnistää uudelleen tai poista pelaaminen ystävien kanssa asetuksista",
+  "Оставь открытым один Minecraft, чтобы принять приглашение": "Pidä vain yksi Minecraft-peli avoinna hyväksyäksesi kutsun",
+  "Запущена другая версия Minecraft или загрузчик. Закрой игру и выбери подходящую сборку": "Toinen Minecraft-versio tai mod loader on käynnissä. Sulje peli ja valitse yhteensopiva instanssi",
+  "Игра была запущена или закрыта. Нажми «Присоединиться» ещё раз": "Peli avattiin tai suljettiin. Paina Liity uudelleen",
+  "Адрес скопирован. В Minecraft выйди в главное меню → Сетевая игра → По адресу, вставь адрес и подключись": "Osoite kopioitu. Palaa Minecraftissa päävalikkoon → moninpeli → suora yhteys, Liitä osoite ja liity",
+  "Игра уже запущена. Нажми «Присоединиться», чтобы скопировать адрес для входа через Minecraft": "Minecraft on jo käynnissä. Kopioi osoite painamalla Liity ja muodosta sitten yhteys Minecraftissa"
 }

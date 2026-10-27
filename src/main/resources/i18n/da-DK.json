@@ -1122,5 +1122,10 @@
   "Достигнут предел списка друзей": "Vennelisten er fuld",
   "Заявка больше не доступна": "Venneanmodningen er ikke længere tilgængelig",
   "Заявка не найдена": "Siden blev ikke fundet",
-  "Не удалось подготовить мод друзей: {0}. Можно повторить запуск или выключить игру с друзьями в настройках": "Kunne ikke forberede netværksmodet: {0}. Prøv at starte igen, eller deaktiver afspilning med venner i Indstillinger"
+  "Не удалось подготовить мод друзей: {0}. Можно повторить запуск или выключить игру с друзьями в настройках": "Kunne ikke forberede netværksmodet: {0}. Prøv at starte igen, eller deaktiver afspilning med venner i Indstillinger",
+  "Оставь открытым один Minecraft, чтобы принять приглашение": "Hold kun et Minecraft-spil åbent for at acceptere invitationen",
+  "Запущена другая версия Minecraft или загрузчик. Закрой игру и выбери подходящую сборку": "En anden Minecraft-version eller mod loader kører. Luk spillet, og vælg en kompatibel instans",
+  "Игра была запущена или закрыта. Нажми «Присоединиться» ещё раз": "Spillet blev åbnet eller lukket. Tryk på Deltag igen",
+  "Адрес скопирован. В Minecraft выйди в главное меню → Сетевая игра → По адресу, вставь адрес и подключись": "Adresse kopieret. I Minecraft skal du vende tilbage til hovedmenuen, der viser Multiplayer-direkte forbindelse, indsætte adressen og deltage",
+  "Игра уже запущена. Нажми «Присоединиться», чтобы скопировать адрес для входа через Minecraft": "Minecraft kører allerede. Tryk på Deltag for at kopiere adressen, og tilslut derefter i Minecraft"
 }

@@ -1122,5 +1122,10 @@
   "Достигнут предел списка друзей": "La llista d'amics està plena",
   "Заявка больше не доступна": "La petició d'amic ja no està disponible",
   "Заявка не найдена": "No s 'ha trobat la petició d' amic",
-  "Не удалось подготовить мод друзей: {0}. Можно повторить запуск или выключить игру с друзьями в настройках": "No s ' ha pogut preparar el mod de xarxa: {0}. Proveu de tornar a iniciar o desactiveu jugar amb els amics A La Configuració"
+  "Не удалось подготовить мод друзей: {0}. Можно повторить запуск или выключить игру с друзьями в настройках": "No s ' ha pogut preparar el mod de xarxa: {0}. Proveu de tornar a iniciar o desactiveu jugar amb els amics A La Configuració",
+  "Оставь открытым один Minecraft, чтобы принять приглашение": "Mantingueu obert només un joc De Minecraft per acceptar la invitació",
+  "Запущена другая версия Minecraft или загрузчик. Закрой игру и выбери подходящую сборку": "S'està executant una versió Diferent De Minecraft o un carregador de mods. Tanqueu el joc i seleccioneu una instància compatible",
+  "Игра была запущена или закрыта. Нажми «Присоединиться» ещё раз": "El joc es va obrir o tancar. Premeu Uneix-te de nou",
+  "Адрес скопирован. В Minecraft выйди в главное меню → Сетевая игра → По адресу, вставь адрес и подключись": "Adreça copiada. A Minecraft, torneu al menú principal → Multijugador → Connexió Directa, enganxeu l'adreça i uniu-vos",
+  "Игра уже запущена. Нажми «Присоединиться», чтобы скопировать адрес для входа через Minecraft": "Minecraft ja s'està executant. Premeu Join per copiar l'adreça i, a Continuació, connecteu-vos A Minecraft"
 }

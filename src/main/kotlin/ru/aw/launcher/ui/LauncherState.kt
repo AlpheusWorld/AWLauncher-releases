@@ -309,6 +309,7 @@ class LauncherState(
 
     var onGameStarted: (Process) -> Unit = {}
     private val runningGames = java.util.concurrent.ConcurrentHashMap.newKeySet<Process>()
+    private val runningGameEntries = java.util.concurrent.ConcurrentHashMap<Process, VersionEntry>()
 
     var onQuit: () -> Unit = {}
 
@@ -1001,10 +1002,15 @@ class LauncherState(
 
     fun hasRunningGame(): Boolean = runningGames.any { it.isAlive }
 
+    fun runningGameEntries(): List<VersionEntry> = runningGameEntries.entries
+        .filter { it.key.isAlive }.map { it.value }
+
     private fun watchGame(process: Process, logFile: Path, start: Presence.Playing, entry: VersionEntry, gameDir: Path) {
         runningGames.add(process)
+        runningGameEntries[process] = entry
         process.onExit().thenRun {
             runningGames.remove(process)
+            runningGameEntries.remove(process)
             ru.aw.launcher.friends.Friends.stopped(process.pid())
         }
         scope.launch(Dispatchers.IO) {

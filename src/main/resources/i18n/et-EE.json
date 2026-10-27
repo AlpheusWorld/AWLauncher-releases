@@ -1122,5 +1122,10 @@
   "Достигнут предел списка друзей": "Sõprade nimekiri on täis",
   "Заявка больше не доступна": "Sõbrakutse pole enam saadaval",
   "Заявка не найдена": "Sõbrakutset ei leitud",
-  "Не удалось подготовить мод друзей: {0}. Можно повторить запуск или выключить игру с друзьями в настройках": "Võrgumooduli ettevalmistamine nurjus: {0}. Proovige uuesti käivitada või keelake seadetes sõpradega mängimine"
+  "Не удалось подготовить мод друзей: {0}. Можно повторить запуск или выключить игру с друзьями в настройках": "Võrgumooduli ettevalmistamine nurjus: {0}. Proovige uuesti käivitada või keelake seadetes sõpradega mängimine",
+  "Оставь открытым один Minecraft, чтобы принять приглашение": "Kutse vastuvõtmiseks hoidke avatud ainult üks Minecrafti mäng",
+  "Запущена другая версия Minecraft или загрузчик. Закрой игру и выбери подходящую сборку": "Töötab erinev Minecrafti versioon või mod-Laadur. Sulgege mäng ja valige ühilduv eksemplar",
+  "Игра была запущена или закрыта. Нажми «Присоединиться» ещё раз": "Mäng avati või suleti. Vajutage liitu uuesti",
+  "Адрес скопирован. В Minecraft выйди в главное меню → Сетевая игра → По адресу, вставь адрес и подключись": "Aadress kopeeritud. Minecraftis naaske peamenüüsse Astra Multiplayer Astra Direct Connection, kleepige aadress ja liituge",
+  "Игра уже запущена. Нажми «Присоединиться», чтобы скопировать адрес для входа через Minecraft": "Minecraft juba töötab. Aadressi kopeerimiseks vajutage liitu, seejärel ühendage Minecraftis"
 }

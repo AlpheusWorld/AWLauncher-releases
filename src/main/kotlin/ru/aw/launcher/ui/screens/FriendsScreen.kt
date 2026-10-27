@@ -36,21 +36,41 @@ fun FriendsScreen(state: LauncherState) {
     var localError by remember { mutableStateOf<String?>(null) }
     var checking by remember { mutableStateOf(false) }
     var pendingJoin by remember { mutableStateOf<Pair<Friend,VersionEntry>?>(null) }
+    var copiedInvite by remember { mutableStateOf<String?>(null) }
+    var activeFriendId by remember { mutableStateOf<String?>(null) }
     fun action(name: String, id: String) { scope.launch { Friends.action(name,id) } }
     fun join(friend: Friend, entry: VersionEntry, confirmed: Boolean = false) {
+        activeFriendId = friend.id
         val invite = friend.invite ?: return
         if (Friends.state.value.snapshot.friends.none { it.id == friend.id && it.invite?.id == invite.id } || !Friends.state.value.connected) {
             localError = "Приглашение больше не доступно — дождись обновления списка"; return
         }
-        if (state.hasRunningGame()) { localError = "Сначала закрой запущенный Minecraft"; return }
+        val running = state.runningGameEntries()
+        if (running.size > 1) { localError = "Оставь открытым один Minecraft, чтобы принять приглашение"; return }
+        val target = running.singleOrNull() ?: entry
+        if (target.id != invite.version || target.loader != invite.loader) {
+            localError = "Запущена другая версия Minecraft или загрузчик. Закрой игру и выбери подходящую сборку"; return
+        }
         scope.launch {
             checking = true; localError = null
             try {
-                val signature = withContext(Dispatchers.IO) { FriendsMod.fingerprint(state.gameDirOf(entry)) }
-                if (!confirmed && signature != invite.fingerprint) { pendingJoin = friend to entry; return@launch }
+                val signature = withContext(Dispatchers.IO) { FriendsMod.fingerprint(state.gameDirOf(target)) }
+                if (!confirmed && signature != invite.fingerprint) { pendingJoin = friend to target; return@launch }
+                if (state.runningGameEntries().map { it.key } != running.map { it.key }) {
+                    localError = "Игра была запущена или закрыта. Нажми «Присоединиться» ещё раз"; return@launch
+                }
+                if (Friends.state.value.snapshot.friends.none { it.id == friend.id && it.invite?.id == invite.id } || !Friends.state.value.connected) {
+                    localError = "Приглашение больше не доступно — дождись обновления списка"; return@launch
+                }
                 pendingJoin = null
-                state.selectEntry(entry)
-                state.play(serverAddress = invite.address)
+                if (running.isNotEmpty()) {
+                    clipboard.setText(AnnotatedString(invite.address))
+                    copiedInvite = invite.id
+                } else {
+                    copiedInvite = null
+                    state.selectEntry(target)
+                    state.play(serverAddress = invite.address)
+                }
             } catch (e: kotlinx.coroutines.CancellationException) { throw e }
             catch (e: Exception) { localError = e.message ?: "Не удалось проверить сборку" }
             finally { checking = false }
@@ -122,18 +142,6 @@ fun FriendsScreen(state: LauncherState) {
                 }
             }
         }
-        pendingJoin?.let { (friend,entry) ->
-            Panel(Modifier.fillMaxWidth()) {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    SectionTitle("Моды в сборках отличаются")
-                    Text("Для модифицированного мира могут потребоваться такие же моды, как у хозяина. Используй одинаковую сборку или попробуй подключиться с текущей",color = AWColors.TextSoft)
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        AWButton("Всё равно подключиться",onClick = { join(friend,entry,true) },enabled = !checking,style = ButtonStyle.PRIMARY)
-                        AWButton("Отмена",onClick = { pendingJoin = null })
-                    }
-                }
-            }
-        }
         SectionTitle("Мои друзья")
         if (model.snapshot.friends.isEmpty()) Text("Добавь друга по коду — после подтверждения он появится здесь",color = AWColors.TextMuted)
         model.snapshot.friends.forEach { friend ->
@@ -144,7 +152,7 @@ fun FriendsScreen(state: LauncherState) {
                         Text(when { !model.connected -> "Статус недоступен"; !friend.online -> "Не в сети"; friend.hosting -> "Мир открыт · ${friend.version}"; else -> "В сети" },color = if (friend.online && model.connected) AWColors.Success else AWColors.TextMuted)
                         friend.invite?.let { invite ->
                             Text("Приглашает в мир: ${invite.title}",color = AWColors.Accent)
-                            val choices = (listOfNotNull(state.currentEntry()) + state.buildChoices() +
+                            val choices = (state.runningGameEntries() + listOfNotNull(state.currentEntry()) + state.buildChoices() +
                                 listOfNotNull(state.versions.firstOrNull { it.id == invite.version }?.let { state.entryFor(it.id,invite.loader) }))
                                 .filter { it.id == invite.version && it.loader == invite.loader }.distinctBy { it.key }
                             var selectedKey by remember(invite.id) { mutableStateOf(choices.firstOrNull()?.key) }
@@ -158,8 +166,22 @@ fun FriendsScreen(state: LauncherState) {
                                 }
                             }
                             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                AWButton("Присоединиться",onClick = { entry?.let { join(friend,it) } },enabled = entry != null && model.connected && !checking && !state.busy && !state.hasRunningGame(),style = ButtonStyle.PRIMARY)
+                                AWButton("Присоединиться",onClick = { entry?.let { join(friend,it) } },enabled = entry != null && model.connected && !checking && !state.busy,style = ButtonStyle.PRIMARY)
                                 AWButton("Отклонить приглашение",onClick = { action("decline",friend.id) },enabled = !model.busy)
+                            }
+                            if (copiedInvite == invite.id) {
+                                Text("Адрес скопирован. В Minecraft выйди в главное меню → Сетевая игра → По адресу, вставь адрес и подключись",color = AWColors.Success)
+                            } else if (state.hasRunningGame()) {
+                                Text("Игра уже запущена. Нажми «Присоединиться», чтобы скопировать адрес для входа через Minecraft",color = AWColors.TextMuted,style = MaterialTheme.typography.bodySmall)
+                            }
+                            if (activeFriendId == friend.id) localError?.let { Text(it,color = AWColors.Danger) }
+                            pendingJoin?.takeIf { it.first.id == friend.id && it.first.invite?.id == invite.id }?.let { (_, target) ->
+                                SectionTitle("Моды в сборках отличаются")
+                                Text("Для модифицированного мира могут потребоваться такие же моды, как у хозяина. Используй одинаковую сборку или попробуй подключиться с текущей",color = AWColors.TextSoft)
+                                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    AWButton("Всё равно подключиться",onClick = { join(friend,target,true) },enabled = !checking,style = ButtonStyle.PRIMARY)
+                                    AWButton("Отмена",onClick = { pendingJoin = null })
+                                }
                             }
                         }
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp),verticalArrangement = Arrangement.spacedBy(8.dp)) {

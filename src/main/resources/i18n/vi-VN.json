@@ -1122,5 +1122,10 @@
   "Достигнут предел списка друзей": "Danh sách bạn bè đã đầy",
   "Заявка больше не доступна": "Yêu cầu kết bạn không còn nữa",
   "Заявка не найдена": "Yêu cầu kết bạn không tìm thấy",
-  "Не удалось подготовить мод друзей: {0}. Можно повторить запуск или выключить игру с друзьями в настройках": "Không thể chuẩn bị mod mạng: {0}. Hãy thử khởi chạy lại hoặc tắt chơi với bạn bè Trong Cài đặt"
+  "Не удалось подготовить мод друзей: {0}. Можно повторить запуск или выключить игру с друзьями в настройках": "Không thể chuẩn bị mod mạng: {0}. Hãy thử khởi chạy lại hoặc tắt chơi với bạn bè Trong Cài đặt",
+  "Оставь открытым один Minecraft, чтобы принять приглашение": "Chỉ mở một trò Chơi Minecraft để chấp nhận lời mời",
+  "Запущена другая версия Minecraft или загрузчик. Закрой игру и выбери подходящую сборку": "Một phiên bản Minecraft hoặc mod loader khác đang chạy. Đóng trò chơi và chọn một phiên bản tương thích",
+  "Игра была запущена или закрыта. Нажми «Присоединиться» ещё раз": "Trò chơi đã được mở hoặc đóng. Nhấn Tham gia một lần Nữa",
+  "Адрес скопирован. В Minecraft выйди в главное меню → Сетевая игра → По адресу, вставь адрес и подключись": "Địa chỉ sao chép. Trong Minecraft, quay lại menu chính → Nhiều Người Chơi → Kết nối Trực tiếp, dán địa chỉ và tham gia",
+  "Игра уже запущена. Нажми «Присоединиться», чтобы скопировать адрес для входа через Minecraft": "Minecraft đã chạy. Nhấn Tham gia để sao chép địa chỉ, sau đó kết nối Trong Minecraft"
 }

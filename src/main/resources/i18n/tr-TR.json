@@ -1122,5 +1122,10 @@
   "Достигнут предел списка друзей": "Arkadaş listesi dolu",
   "Заявка больше не доступна": "Arkadaşlık isteği artık mevcut değil",
   "Заявка не найдена": "Arkadaşlık isteği bulunamadı",
-  "Не удалось подготовить мод друзей: {0}. Можно повторить запуск или выключить игру с друзьями в настройках": "Ağ modunu hazırlayamadı : {0}. Yeniden başlatmayı deneyin veya Ayarlar'da arkadaşlarınızla oynamayı devre dışı bırakın"
+  "Не удалось подготовить мод друзей: {0}. Можно повторить запуск или выключить игру с друзьями в настройках": "Ağ modunu hazırlayamadı : {0}. Yeniden başlatmayı deneyin veya Ayarlar'da arkadaşlarınızla oynamayı devre dışı bırakın",
+  "Оставь открытым один Minecraft, чтобы принять приглашение": "Daveti kabul etmek için yalnızca bir Minecraft oyununu açık tutun",
+  "Запущена другая версия Minecraft или загрузчик. Закрой игру и выбери подходящую сборку": "Farklı bir Minecraft sürümü veya mod yükleyici çalışıyor. Oyunu kapatın ve uyumlu bir örnek seçin",
+  "Игра была запущена или закрыта. Нажми «Присоединиться» ещё раз": "Oyun açıldı veya kapatıldı. Tekrar Katıl'a basın",
+  "Адрес скопирован. В Minecraft выйди в главное меню → Сетевая игра → По адресу, вставь адрес и подключись": "Adres kopyalandı. Minecraft'ta ana menüye dönün → Çok Oyunculu → Doğrudan Bağlantı, adresi yapıştırın ve katılın",
+  "Игра уже запущена. Нажми «Присоединиться», чтобы скопировать адрес для входа через Minecraft": "Minecraft zaten çalışıyor. Adresi kopyalamak için Katıl'a basın, ardından Minecraft'a bağlanın"
 }

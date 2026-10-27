@@ -1122,5 +1122,10 @@
   "Достигнут предел списка друзей": "A barátok listája tele van",
   "Заявка больше не доступна": "A barátkérés már nem érhető el",
   "Заявка не найдена": "A barátkérés nem található",
-  "Не удалось подготовить мод друзей: {0}. Можно повторить запуск или выключить игру с друзьями в настройках": "Nem sikerült előkészíteni a hálózati modot: {0}. Próbálja meg újra elindítani, vagy tiltsa le a barátokkal való játékot a beállításokban"
+  "Не удалось подготовить мод друзей: {0}. Можно повторить запуск или выключить игру с друзьями в настройках": "Nem sikerült előkészíteni a hálózati modot: {0}. Próbálja meg újra elindítani, vagy tiltsa le a barátokkal való játékot a beállításokban",
+  "Оставь открытым один Minecraft, чтобы принять приглашение": "Csak egy Minecraft játékot tartson nyitva a meghívás elfogadásához",
+  "Запущена другая версия Minecraft или загрузчик. Закрой игру и выбери подходящую сборку": "Egy másik Minecraft verzió vagy mod betöltő fut. Zárja be a játékot, és válasszon egy kompatibilis példányt",
+  "Игра была запущена или закрыта. Нажми «Присоединиться» ещё раз": "A játékot megnyitották vagy bezárták. Nyomja meg újra a Join gombot",
+  "Адрес скопирован. В Minecraft выйди в главное меню → Сетевая игра → По адресу, вставь адрес и подключись": "Cím másolva. A Minecraftban térjen vissza a főmenübe, a főmenübe, a főmenübe, a közvetlen kapcsolatba, illessze be a címet, majd csatlakozzon",
+  "Игра уже запущена. Нажми «Присоединиться», чтобы скопировать адрес для входа через Minecraft": "A Minecraft már fut. A cím másolásához nyomja meg a Join gombot, majd csatlakozzon a Minecrafthoz"
 }

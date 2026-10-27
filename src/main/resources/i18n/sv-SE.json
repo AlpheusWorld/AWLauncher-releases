@@ -1122,5 +1122,10 @@
   "Достигнут предел списка друзей": "Vänlistan är full",
   "Заявка больше не доступна": "Vänförfrågan är inte längre tillgänglig",
   "Заявка не найдена": "Vänförfrågan hittades inte",
-  "Не удалось подготовить мод друзей: {0}. Можно повторить запуск или выключить игру с друзьями в настройках": "Kunde inte förbereda nätverksmodden: {0}. Försök starta igen eller inaktivera spela med vänner i Inställningar"
+  "Не удалось подготовить мод друзей: {0}. Можно повторить запуск или выключить игру с друзьями в настройках": "Kunde inte förbereda nätverksmodden: {0}. Försök starta igen eller inaktivera spela med vänner i Inställningar",
+  "Оставь открытым один Minecraft, чтобы принять приглашение": "Håll bara ett Minecraft-spel öppet för att acceptera inbjudan",
+  "Запущена другая версия Minecraft или загрузчик. Закрой игру и выбери подходящую сборку": "En annan Minecraft-version eller modlastare körs. Stäng spelet och välj en kompatibel instans",
+  "Игра была запущена или закрыта. Нажми «Присоединиться» ещё раз": "Spelet öppnades eller stängdes. Tryck på Gå med igen",
+  "Адрес скопирован. В Minecraft выйди в главное меню → Сетевая игра → По адресу, вставь адрес и подключись": "Adress kopierad. I Minecraft, gå tillbaka till huvudmenyn xnumx Multiplayer xnumx Direktanslutning, klistra in adressen och gå med",
+  "Игра уже запущена. Нажми «Присоединиться», чтобы скопировать адрес для входа через Minecraft": "Minecraft är redan igång. Tryck på Gå med för att kopiera adressen och anslut sedan i Minecraft"
 }

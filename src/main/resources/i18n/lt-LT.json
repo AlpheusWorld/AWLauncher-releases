@@ -1122,5 +1122,10 @@
   "Достигнут предел списка друзей": "Draugų sąrašas yra pilnas",
   "Заявка больше не доступна": "Draugo prašymas nebėra prieinamas",
   "Заявка не найдена": "Draugo prašymas nerastas",
-  "Не удалось подготовить мод друзей: {0}. Можно повторить запуск или выключить игру с друзьями в настройках": "Nepavyko parengti tinklo mod: {0}. Pabandykite paleisti dar kartą arba išjunkite žaidimą su draugais nustatymuose"
+  "Не удалось подготовить мод друзей: {0}. Можно повторить запуск или выключить игру с друзьями в настройках": "Nepavyko parengti tinklo mod: {0}. Pabandykite paleisti dar kartą arba išjunkite žaidimą su draugais nustatymuose",
+  "Оставь открытым один Minecraft, чтобы принять приглашение": "Laikykite atvirą tik vieną Minecraft žaidimą, kad priimtumėte kvietimą",
+  "Запущена другая версия Minecraft или загрузчик. Закрой игру и выбери подходящую сборку": "Veikia kita Minecraft versija arba mod krautuvas. Uždarykite žaidimą ir pasirinkite suderinamą egzempliorių",
+  "Игра была запущена или закрыта. Нажми «Присоединиться» ещё раз": "Žaidimas buvo atidarytas arba uždarytas. Paspauskite Prisijungti dar kartą",
+  "Адрес скопирован. В Minecraft выйди в главное меню → Сетевая игра → По адресу, вставь адрес и подключись": "Adresas nukopijuotas. Minecraft 'e grįžkite į pagrindinį meniu umpt Multiplayer' I tiesioginiu ryšiu, įklijuokite adresą ir prisijunkite",
+  "Игра уже запущена. Нажми «Присоединиться», чтобы скопировать адрес для входа через Minecraft": "Minecraft jau veikia. Paspauskite Prisijungti, kad nukopijuotumėte adresą, tada prisijunkite Minecraft"
 }

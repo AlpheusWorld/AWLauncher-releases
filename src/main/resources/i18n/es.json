@@ -1122,5 +1122,10 @@
   "Достигнут предел списка друзей": "La lista de amigos está llena",
   "Заявка больше не доступна": "La solicitud de amistad ya no está disponible",
   "Заявка не найдена": "Solicitud de amistad no encontrada",
-  "Не удалось подготовить мод друзей: {0}. Можно повторить запуск или выключить игру с друзьями в настройках": "No se pudo preparar el mod de red: {0}. Intente iniciar nuevamente o desactive jugar con amigos en Configuración"
+  "Не удалось подготовить мод друзей: {0}. Можно повторить запуск или выключить игру с друзьями в настройках": "No se pudo preparar el mod de red: {0}. Intente iniciar nuevamente o desactive jugar con amigos en Configuración",
+  "Оставь открытым один Minecraft, чтобы принять приглашение": "Mantén abierto solo un juego de Minecraft para aceptar la invitación",
+  "Запущена другая версия Minecraft или загрузчик. Закрой игру и выбери подходящую сборку": "Se está ejecutando una versión diferente de Minecraft o un cargador de modificaciones. Cierra el juego y selecciona una instancia compatible",
+  "Игра была запущена или закрыта. Нажми «Присоединиться» ещё раз": "El juego fue abierto o cerrado. Presione Unirse de nuevo",
+  "Адрес скопирован. В Minecraft выйди в главное меню → Сетевая игра → По адресу, вставь адрес и подключись": "Dirección copiada. En Minecraft, regrese al menú principal → Multijugador → Conexión directa, pegue la dirección y únase",
+  "Игра уже запущена. Нажми «Присоединиться», чтобы скопировать адрес для входа через Minecraft": "Minecraft ya se está ejecutando. Presiona Unirse para copiar la dirección, luego conéctate en Minecraft"
 }

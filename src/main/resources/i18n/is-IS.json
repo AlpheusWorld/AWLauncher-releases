@@ -1122,5 +1122,10 @@
   "Достигнут предел списка друзей": "Vinalistinn er fullur",
   "Заявка больше не доступна": "Vinabeiðnin er ekki lengur í boði",
   "Заявка не найдена": "Vinabeiðni fannst ekki",
-  "Не удалось подготовить мод друзей: {0}. Можно повторить запуск или выключить игру с друзьями в настройках": "Gat ekki undirbúið net unga fólkið: {0}. Prófaðu að ræsa aftur eða slökkva á spilun með vinum í Stillingum"
+  "Не удалось подготовить мод друзей: {0}. Можно повторить запуск или выключить игру с друзьями в настройках": "Gat ekki undirbúið net unga fólkið: {0}. Prófaðu að ræsa aftur eða slökkva á spilun með vinum í Stillingum",
+  "Оставь открытым один Minecraft, чтобы принять приглашение": "Haltu aðeins einum Leik opinn til að samþykkja boðið",
+  "Запущена другая версия Minecraft или загрузчик. Закрой игру и выбери подходящую сборку": "Önnur Útgáfa Eða mod loader er í gangi. Lokaðu leiknum og veldu samhæft dæmi",
+  "Игра была запущена или закрыта. Нажми «Присоединиться» ещё раз": "Leikurinn var opnaður eða lokaður. Ýttu Á Join aftur",
+  "Адрес скопирован. В Minecraft выйди в главное меню → Сетевая игра → По адресу, вставь адрес и подключись": "Heimilisfang afritað. Fara aftur í aðalvalmyndina.",
+  "Игра уже запущена. Нажми «Присоединиться», чтобы скопировать адрес для входа через Minecraft": "Minkaveiði er þegar í gangi. Ýttu Á Join til að afrita heimilisfangið og tengdu síðan"
 }

@@ -1122,5 +1122,10 @@
   "Достигнут предел списка друзей": "The friend list is full",
   "Заявка больше не доступна": "The friend request is no longer available",
   "Заявка не найдена": "Friend request not found",
-  "Не удалось подготовить мод друзей: {0}. Можно повторить запуск или выключить игру с друзьями в настройках": "Could not prepare the networking mod: {0}. Try launching again or disable playing with friends in Settings"
+  "Не удалось подготовить мод друзей: {0}. Можно повторить запуск или выключить игру с друзьями в настройках": "Could not prepare the networking mod: {0}. Try launching again or disable playing with friends in Settings",
+  "Оставь открытым один Minecraft, чтобы принять приглашение": "Keep only one Minecraft game open to accept the invitation",
+  "Запущена другая версия Minecraft или загрузчик. Закрой игру и выбери подходящую сборку": "A different Minecraft version or mod loader is running. Close the game and select a compatible instance",
+  "Игра была запущена или закрыта. Нажми «Присоединиться» ещё раз": "The game was opened or closed. Press Join again",
+  "Адрес скопирован. В Minecraft выйди в главное меню → Сетевая игра → По адресу, вставь адрес и подключись": "Address copied. In Minecraft, return to the main menu → Multiplayer → Direct Connection, paste the address and join",
+  "Игра уже запущена. Нажми «Присоединиться», чтобы скопировать адрес для входа через Minecraft": "Minecraft is already running. Press Join to copy the address, then connect in Minecraft"
 }

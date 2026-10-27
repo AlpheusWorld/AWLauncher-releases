@@ -1122,5 +1122,10 @@
   "Достигнут предел списка друзей": "Draugu saraksts ir pilns",
   "Заявка больше не доступна": "Drauga pieprasījums vairs nav pieejams",
   "Заявка не найдена": "Drauga pieprasījums nav atrasts",
-  "Не удалось подготовить мод друзей: {0}. Можно повторить запуск или выключить игру с друзьями в настройках": "Nevarēja sagatavot tīkla mod: {0}. Mēģiniet sākt vēlreiz vai atspējojiet spēlēšanu ar draugiem iestatījumos"
+  "Не удалось подготовить мод друзей: {0}. Можно повторить запуск или выключить игру с друзьями в настройках": "Nevarēja sagatavot tīkla mod: {0}. Mēģiniet sākt vēlreiz vai atspējojiet spēlēšanu ar draugiem iestatījumos",
+  "Оставь открытым один Minecraft, чтобы принять приглашение": "Lai pieņemtu ielūgumu, turiet atvērtu tikai vienu Minecraft spēli",
+  "Запущена другая версия Minecraft или загрузчик. Закрой игру и выбери подходящую сборку": "Darbojas Cita Minecraft versija vai mod loader. Aizveriet spēli un izvēlieties saderīgu gadījumu",
+  "Игра была запущена или закрыта. Нажми «Присоединиться» ещё раз": "Spēle tika atvērta vai SLĒGTA. Nospiediet pievienoties vēlreiz",
+  "Адрес скопирован. В Minecraft выйди в главное меню → Сетевая игра → По адресу, вставь адрес и подключись": "Adrese nokopēta. Minecraft, atgriezieties galvenajā izvēlnē → Multiplayer → Tiešais savienojums, ielīmējiet adresi un pievienojieties",
+  "Игра уже запущена. Нажми «Присоединиться», чтобы скопировать адрес для входа через Minecraft": "Minecraft jau darbojas. Nospiediet pievienoties, lai kopētu adresi, pēc tam izveidojiet savienojumu Minecraft"
 }
