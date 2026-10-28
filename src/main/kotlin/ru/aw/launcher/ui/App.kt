@@ -33,7 +33,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PlayArrow
@@ -215,19 +214,9 @@ private fun CompactNavRail(state: LauncherState, expanded: Boolean) {
                     Text(if (account == null) "Не выбран" else if (account?.isOffline == true) "Офлайн" else "Microsoft",
                         color = AWColors.TextMuted, style = MaterialTheme.typography.labelSmall)
                 }
-                IconButton(onClick = { account?.takeIf { !it.isOffline }?.let(state::openSkinEditor) ?: run { state.screen = Screen.SKINS } }, modifier = Modifier.size(30.dp)) { Icon(Icons.Default.Edit, "Скин и плащ", tint = AWColors.TextMuted, modifier = Modifier.size(16.dp)) }
                 IconButton(onClick = { state.screen = Screen.SETTINGS }, modifier = Modifier.size(30.dp)) { Icon(Icons.Default.Settings, "Настройки", tint = AWColors.TextMuted, modifier = Modifier.size(18.dp)) }
             }
-        } else {
-            val account by state.selectedAccount.collectAsState()
-            Box(Modifier.fillMaxWidth().height(itemHeight)) {
-                NavItem("Аккаунты", Icons.Default.Person, state.accountMenuOpen, compact = true, itemHeight = itemHeight) { state.accountMenuOpen = true }
-                IconButton(onClick = { account?.takeIf { !it.isOffline }?.let(state::openSkinEditor) ?: run { state.screen = Screen.SKINS } },
-                    modifier = Modifier.align(Alignment.TopEnd).size(22.dp)) {
-                    Icon(Icons.Default.Edit, "Скин и плащ", tint = AWColors.TextMuted, modifier = Modifier.size(13.dp))
-                }
-            }
-        }
+        } else NavItem("Аккаунты", Icons.Default.Person, state.accountMenuOpen, compact = true, itemHeight = itemHeight) { state.accountMenuOpen = true }
         ru.aw.launcher.ui.screens.AccountMenu(state, menuHeight)
         }
     }

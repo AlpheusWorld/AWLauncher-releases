@@ -35,6 +35,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import ru.aw.launcher.ui.components.LocalizedText as Text
+import ru.aw.launcher.ui.components.LocalLanguage
+import ru.aw.launcher.core.I18n
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -45,6 +47,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -324,7 +327,8 @@ private fun CatalogGrid(search: CatalogSearch, modifier: Modifier = Modifier, ca
 private fun CatalogProjectCard(hit: Modrinth.SearchHit, onClick: () -> Unit, action: @Composable () -> Unit) {
     val shape = RoundedCornerShape(AWDimens.CornerMedium)
     Column(Modifier.fillMaxWidth().background(AWColors.Surface, shape).border(1.dp, AWColors.Outline, shape)
-        .clickable(onClick = onClick).padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        .padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(Modifier.fillMaxWidth().clip(shape).clickable(onClick = onClick), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             ModIcon(hit.iconUrl, 42.dp)
             Column(Modifier.weight(1f)) {
@@ -340,7 +344,8 @@ private fun CatalogProjectCard(hit: Modrinth.SearchHit, onClick: () -> Unit, act
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.height(24.dp)) {
             hit.categories.take(2).forEach { category -> Tag(category, AWColors.TextMuted) }
         }
-        Text("↓ ${formatCount(hit.downloads)}", color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall, translate = false)
+        Text("↓ ${formatCount(hit.downloads)}", color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall)
+        }
         androidx.compose.material3.HorizontalDivider(color = AWColors.Outline)
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { action() }
     }
@@ -366,7 +371,7 @@ private fun PackCard(state: LauncherState, model: PacksModel, hit: Modrinth.Sear
 private fun ColumnScope.ContentTab(state: LauncherState, target: VersionEntry, model: ContentModel, tab: CatalogTab, onProject: (Modrinth.SearchHit) -> Unit) {
     val kind = tab.kind
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Для ${target.label}", color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f), translate = false)
+        Text(I18n.format("Для {0}", LocalLanguage.current, target.label), color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f), translate = false)
         val updates = model.updates
         if (tab == CatalogTab.INSTALLED && updates.isNotEmpty()) {
             AWButton("Обновить все · ${updates.size}", icon = Icons.Default.Refresh, enabled = model.working.isEmpty(), onClick = model::updateAll)
@@ -436,7 +441,7 @@ private fun TargetPicker(state: LauncherState, target: VersionEntry) {
     var open by remember { mutableStateOf(false) }
     ReportOpen(open, state::trackMenu)
     Box {
-        AWButton("Для ${target.label}", icon = Icons.Default.KeyboardArrowDown, onClick = { open = true })
+        AWButton(I18n.format("Для {0}", LocalLanguage.current, target.label), icon = Icons.Default.KeyboardArrowDown, translate = false, onClick = { open = true })
         AWDropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             state.catalogTargets().forEach { entry ->
                 AWMenuItem(entry.label, onClick = {

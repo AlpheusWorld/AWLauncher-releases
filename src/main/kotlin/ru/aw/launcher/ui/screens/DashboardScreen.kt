@@ -214,8 +214,8 @@ private fun LaunchBuildCard(state: LauncherState, entry: VersionEntry?, modifier
                         Text("СОДЕРЖИМОЕ", color = AWColors.TextMuted, style = MaterialTheme.typography.labelSmall)
                         val model = state.contentModel(entry)
                         LaunchedEffect(model) { model.ensureScanned() }
-                        Text(if (model.scanned) "${model.installed.values.sumOf { it.size }} проектов" else "—", color = AWColors.Text,
-                            style = MaterialTheme.typography.bodyMedium, translate = false)
+                        Text(if (model.scanned) "Проектов: ${model.installed.values.sumOf { it.size }}" else "—", color = AWColors.Text,
+                            style = MaterialTheme.typography.bodyMedium)
                     }
                     IconButton(onClick = { state.openInstance(entry) }, modifier = Modifier.size(34.dp).background(AWColors.Surface, RoundedCornerShape(AWDimens.CornerSmall))) {
                         Icon(Icons.Default.KeyboardArrowDown, "Открыть сборку", tint = AWColors.TextMuted, modifier = Modifier.size(18.dp).rotate(-90f))
@@ -494,18 +494,21 @@ private fun LibraryCard(state: LauncherState, entry: VersionEntry, compact: Bool
     val shape = RoundedCornerShape(AWDimens.CornerMedium)
     val settings by Settings.state.collectAsState()
     val group = settings.libraryGroups.firstOrNull { it.id == state.libraryOptions(entry).groupId }?.name
-    Row(Modifier.fillMaxWidth().clip(shape).background(background)
-        .clickable(interactionSource = interaction, indication = null) { if (selectionMode) toggle() else state.openInstance(entry) }
+    Row(Modifier.fillMaxWidth().clip(shape).background(AWColors.Surface)
         .padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         if (selectionMode) Checkbox(checked, onCheckedChange = { toggle() })
-        BuildArtwork(entry, Modifier.size(if (compact) 44.dp else 52.dp).clip(shape), 32.dp, state)
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(entry.title, color = AWColors.Text, fontWeight = FontWeight.SemiBold, maxLines = 1,
-                overflow = TextOverflow.Ellipsis, translate = false)
-            Text(listOfNotNull("${entry.loader.label} ${entry.id}", group).joinToString(" · "),
-                color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall, maxLines = 1,
-                overflow = TextOverflow.Ellipsis, translate = false)
+        Row(Modifier.weight(1f).clip(shape).background(background)
+            .clickable(interactionSource = interaction, indication = null) { if (selectionMode) toggle() else state.openInstance(entry) }
+            .padding(4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            BuildArtwork(entry, Modifier.size(if (compact) 44.dp else 52.dp).clip(shape), 32.dp, state)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(entry.title, color = AWColors.Text, fontWeight = FontWeight.SemiBold, maxLines = 1,
+                    overflow = TextOverflow.Ellipsis, translate = false)
+                Text(listOfNotNull("${entry.loader.label} ${entry.id}", group).joinToString(" · "),
+                    color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall, maxLines = 1,
+                    overflow = TextOverflow.Ellipsis, translate = false)
+            }
         }
         IconButton(onClick = { state.toggleFavorite(entry) }, enabled = !state.libraryBusy && !state.libraryLoading,
             modifier = Modifier.size(32.dp)) {

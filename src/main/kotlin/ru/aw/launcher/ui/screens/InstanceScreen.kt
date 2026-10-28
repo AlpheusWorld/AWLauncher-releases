@@ -200,14 +200,14 @@ private fun InstanceContent(state: LauncherState, entry: VersionEntry, model: Co
                         LazyColumn(Modifier.fillMaxSize(), state = listState, contentPadding = PaddingValues(end = 12.dp, top = 2.dp, bottom = 2.dp)) {
                             items(rows, key = { it.rowKey }) { item ->
                                 val opacity = animateFloatAsState(if (item.enabled) 1f else 0.55f, AWMotion.Muted, label = "modRowOpacity")
-                                Row(Modifier.fillMaxWidth().clickable(enabled = item.projectId != null) {
-                                    item.projectId?.let { id -> state.openProject(entry, Modrinth.SearchHit(projectId = id, title = item.title,
-                                        iconUrl = item.iconUrl, projectType = item.kind.projectType)) }
-                                }.background(if (item.rowKey in selected) AWColors.AccentSoft else androidx.compose.ui.graphics.Color.Transparent).padding(horizontal = 10.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Row(Modifier.fillMaxWidth().background(if (item.rowKey in selected) AWColors.AccentSoft else androidx.compose.ui.graphics.Color.Transparent).padding(horizontal = 10.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                                     Checkbox(item.rowKey in selected, enabled = !busy, onCheckedChange = { checked ->
                                         selected = if (checked) selected + item.rowKey else selected - item.rowKey
                                     }, modifier = Modifier.size(40.dp))
-                                    Row(Modifier.weight(1.4f).graphicsLayer { alpha = opacity.value }, horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Row(Modifier.weight(1.4f).clip(RoundedCornerShape(AWDimens.CornerSmall)).clickable(enabled = item.projectId != null) {
+                                        item.projectId?.let { id -> state.openProject(entry, Modrinth.SearchHit(projectId = id, title = item.title,
+                                            iconUrl = item.iconUrl, projectType = item.kind.projectType)) }
+                                    }.graphicsLayer { alpha = opacity.value }, horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                                         ModIcon(item.iconUrl, 36.dp)
                                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                             Text(item.title, color = AWColors.Text, style = MaterialTheme.typography.titleSmall,

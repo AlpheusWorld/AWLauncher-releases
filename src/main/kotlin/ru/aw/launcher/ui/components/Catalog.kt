@@ -108,10 +108,11 @@ fun ContentRow(
     val iconAlpha = animateFloatAsState(if (dimmed) 0.45f else 1f, AWMotion.Muted, label = "contentIconOpacity")
     val textAlpha = animateFloatAsState(if (dimmed) 0.55f else 1f, AWMotion.Muted, label = "contentTextOpacity")
     Row(
-        Modifier.fillMaxWidth().then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-            .padding(start = 12.dp, end = 18.dp, top = 10.dp, bottom = 10.dp),
+        Modifier.fillMaxWidth().padding(start = 12.dp, end = 18.dp, top = 10.dp, bottom = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        Row(Modifier.weight(1f).clip(RoundedCornerShape(AWDimens.CornerSmall))
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.graphicsLayer { alpha = iconAlpha.value }) { ModIcon(icon) }
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f).graphicsLayer { alpha = textAlpha.value }) {
@@ -144,6 +145,7 @@ fun ContentRow(
                     translate = detailsAccent,
                 )
             }
+        }
         }
         Spacer(Modifier.width(12.dp))
         Row(verticalAlignment = Alignment.CenterVertically) { actions() }

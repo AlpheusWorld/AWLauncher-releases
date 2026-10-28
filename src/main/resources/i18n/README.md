@@ -1,6 +1,6 @@
 # UI languages
 
-New launcher behavior and cape strings were translated with Google Translate through the same development-only `translatepy` library when Yandex was unavailable. These additions are also machine translations pending native-speaker review. Existing translations are retained; font subsets are extended when a new string requires an additional character.
+Recent launcher, catalog, history and account strings were translated using Google Translate during development, using the reviewed English text as the source. These additions are machine translations pending native-speaker review. Existing translations are retained; font subsets are extended when a new string requires an additional character.
 
 Russian is the canonical source text; `en.json` is the reference dictionary. `Language` in `core/Settings.kt` declares 50 interface locales, with regional variants counted separately. English (United States) is the default for new preferences; existing serialized EN, ES and RU preferences remain compatible.
 

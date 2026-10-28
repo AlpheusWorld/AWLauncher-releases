@@ -30,6 +30,23 @@ class I18nTest {
     }
 
     @Test
+    fun `new launcher screens have translations in every language`() {
+        val phrases = listOf("Выбранная сборка", "Время по дням", "Предыдущая неделя", "Следующая неделя",
+            "По совпадению", "Экспортировать в .mrpack", "Моды, шейдеры и сборки — установка в один клик")
+        for (language in Language.entries.filter { it != Language.RU }) {
+            for (phrase in phrases) assertNotEquals(phrase, I18n.text(phrase, language), "${language.tag}: $phrase")
+        }
+        assertEquals("By relevance", I18n.text("По совпадению", Language.EN))
+        assertEquals("Selected instance", I18n.text("Выбранная сборка", Language.EN))
+    }
+
+    @Test
+    fun `formatted translations retain player supplied names`() {
+        assertEquals("For Настройки", I18n.format("Для {0}", Language.EN, "Настройки"))
+        assertEquals("Для Настройки", I18n.format("Для {0}", Language.RU, "Настройки"))
+    }
+
+    @Test
     fun `all 50 languages have complete dictionaries and preserve placeholders`() {
         fun dictionary(language: String) = Json.decodeFromString<Map<String, String>>(
             javaClass.getResourceAsStream("/i18n/$language.json")!!.bufferedReader().use { it.readText() },

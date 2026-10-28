@@ -397,6 +397,7 @@ fun AWDropdownMenu(
     onDismissRequest: () -> Unit,
     modifier: Modifier = Modifier,
     focusable: Boolean = true,
+    containerColor: Color = AWColors.SurfaceHigh,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     DropdownMenu(
@@ -404,7 +405,7 @@ fun AWDropdownMenu(
         onDismissRequest = onDismissRequest,
         modifier = modifier.widthIn(min = 200.dp),
         shape = RoundedCornerShape(AWDimens.CornerCard),
-        containerColor = AWColors.SurfaceHigh,
+        containerColor = containerColor,
         border = androidx.compose.foundation.BorderStroke(1.dp, AWColors.Outline.copy(alpha = 0.6f)),
         shadowElevation = 3.dp,
         properties = androidx.compose.ui.window.PopupProperties(focusable = focusable),

@@ -43,6 +43,13 @@ object I18n {
         return translate(value, language, 0).also { synchronized(cache) { cache[key] = it } }
     }
 
+    fun format(template: String, language: Language, vararg values: String): String {
+        val translated = text(template, language)
+        return Regex("\\{(\\d+)}").replace(translated) { match ->
+            values.getOrNull(match.groupValues[1].toInt()) ?: match.value
+        }
+    }
+
     private fun translate(value: String, language: Language, depth: Int): String {
         if (language == Language.RU || value.isBlank() || depth > 3) return value
         if ((language == Language.EN || language == Language.EN_GB) && value.matches(Regex("\\d+,\\d+"))) return value.replace(',', '.')

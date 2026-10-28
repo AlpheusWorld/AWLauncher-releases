@@ -12,6 +12,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -62,26 +63,16 @@ internal fun AccountMenu(state: LauncherState, maxHeight: androidx.compose.ui.un
     val open = state.accountMenuOpen
     ReportOpen(open, state::trackMenu)
     AWDropdownMenu(open, onDismissRequest = { state.accountMenuOpen = false; adding = false },
-        modifier = Modifier.width(300.dp).heightIn(max = maxHeight.coerceAtLeast(180.dp))) {
+        modifier = Modifier.width(300.dp).heightIn(max = maxHeight.coerceAtLeast(180.dp)), containerColor = AWColors.Sidebar) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
             Text("Аккаунты", style = MaterialTheme.typography.titleMedium, color = AWColors.Text)
         }
         MenuDivider()
         accounts.sortedByDescending { it.uuid == selected?.uuid }.forEach { account ->
-            Row(Modifier.fillMaxWidth().padding(start = 12.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                SkinHead(account, 32.dp)
-                Column(Modifier.weight(1f).clip(RoundedCornerShape(AWDimens.CornerMedium))
-                    .selectable(selected = account.uuid == selected?.uuid, role = Role.RadioButton,
-                        onClick = { state.selectAccount(account.uuid); state.accountMenuOpen = false })
-                    .padding(horizontal = 10.dp, vertical = 8.dp)) {
-                    Text(account.name, color = if (account.uuid == selected?.uuid) AWColors.Accent else AWColors.Text,
-                        style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis, translate = false)
-                    Text(if (account.isOffline) "Офлайн" else "Microsoft", color = AWColors.TextMuted, style = MaterialTheme.typography.labelSmall)
-                }
-                IconButton(onClick = { state.removeAccount(account.uuid) }, modifier = Modifier.size(36.dp)) {
-                    Icon(Icons.Default.Delete, "Удалить", tint = AWColors.TextMuted, modifier = Modifier.size(16.dp))
-                }
-            }
+            AccountMenuRow(account, account.uuid == selected?.uuid,
+                onSelect = { state.selectAccount(account.uuid); state.accountMenuOpen = false },
+                onEdit = { state.accountMenuOpen = false; state.openSkinEditor(account) },
+                onRemove = { state.removeAccount(account.uuid) })
         }
         MenuDivider()
         if (!adding) AWMenuItem("Добавить аккаунт", onClick = { adding = true })
@@ -111,6 +102,38 @@ internal fun AccountMenu(state: LauncherState, maxHeight: androidx.compose.ui.un
                     AWButton("Открыть Microsoft", onClick = state::openMicrosoftSignInPage)
                 }
                 if (state.signingIn) AWButton("Отменить", onClick = state::cancelMicrosoftSignIn)
+            }
+        }
+    }
+}
+
+@Composable
+internal fun AccountMenuRow(account: Account, isSelected: Boolean, onSelect: () -> Unit, onEdit: () -> Unit, onRemove: () -> Unit) {
+    val interaction = remember(account.uuid) { MutableInteractionSource() }
+    val hovered by interaction.collectIsHoveredAsState()
+    val background by animateColorAsState(
+        if (hovered || isSelected) AWColors.SurfaceHigh else Color.Transparent,
+        animationSpec = AWMotion.Hover, label = "accountMenuHover")
+    Row(Modifier.fillMaxWidth().padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.weight(1f).clip(RoundedCornerShape(AWDimens.CornerMedium)).background(background)
+            .selectable(selected = isSelected, role = Role.RadioButton, interactionSource = interaction, indication = null,
+                onClick = onSelect)
+            .padding(horizontal = 6.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            SkinHead(account, 32.dp)
+            Column(Modifier.weight(1f).padding(start = 10.dp)) {
+                Text(account.name, color = AWColors.Text, style = MaterialTheme.typography.titleSmall,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis, translate = false)
+                Text(if (account.isOffline) "Офлайн" else "Microsoft", color = AWColors.TextMuted, style = MaterialTheme.typography.labelSmall)
+            }
+        }
+        if (!account.isOffline) WithTooltip("Скин и плащ") {
+            IconButton(onClick = onEdit, modifier = Modifier.size(36.dp)) {
+                Icon(Icons.Default.Edit, "Скин и плащ", tint = AWColors.TextMuted, modifier = Modifier.size(16.dp))
+            }
+        }
+        WithTooltip("Удалить") {
+            IconButton(onClick = onRemove, modifier = Modifier.size(36.dp)) {
+                Icon(Icons.Default.Delete, "Удалить", tint = AWColors.TextMuted, modifier = Modifier.size(16.dp))
             }
         }
     }

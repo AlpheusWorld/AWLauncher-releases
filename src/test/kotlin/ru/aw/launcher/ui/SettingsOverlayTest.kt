@@ -40,6 +40,32 @@ class SettingsOverlayTest {
     }
 
     @Test
+    fun `account avatar selects the row and edit and delete stay independent`() {
+        val account = ru.aw.launcher.auth.Account("01234567890123456789012345678901", "Player", ru.aw.launcher.auth.AccountType.MICROSOFT)
+        var selected = 0
+        var edited = 0
+        var removed = 0
+        val scene = ImageComposeScene(300, 56, density = Density(1f)) {
+            AWTheme { ru.aw.launcher.ui.screens.AccountMenuRow(account, false, { selected++ }, { edited++ }, { removed++ }) }
+        }
+        fun click(x: Float) {
+            scene.sendPointerEvent(PointerEventType.Press, Offset(x, 22f))
+            scene.sendPointerEvent(PointerEventType.Release, Offset(x, 22f))
+        }
+        try {
+            repeat(20) { scene.render(it * 16_666_667L).close() }
+            click(24f)
+            assertEquals(1, selected)
+            click(240f)
+            assertEquals(1, edited)
+            assertEquals(1, selected)
+            click(275f)
+            assertEquals(1, removed)
+            assertEquals(1, selected)
+        } finally { scene.close() }
+    }
+
+    @Test
     fun `home download cancel action cancels active task`() {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
         val state = LauncherState(scope, PreloadResult(VersionManifest(), emptyMap(), emptySet()))
