@@ -128,7 +128,7 @@ internal fun SkinsScreen(state: LauncherState, preview: SkinImage? = null, initi
                 Text("Скины", style = MaterialTheme.typography.displaySmall, color = AWColors.Text, modifier = Modifier.weight(1f))
                 Box {
                     AWButton(account?.name ?: "Войти", icon = Icons.Default.Person, enabled = !working, onClick = {
-                        if (licensed.isEmpty()) state.screen = Screen.ACCOUNTS else accountsOpen = true
+                        if (licensed.isEmpty()) state.accountMenuOpen = true else accountsOpen = true
                     })
                     AWDropdownMenu(accountsOpen, onDismissRequest = { accountsOpen = false }) {
                         licensed.forEach { item -> AWMenuItem(item.name, translate = false, onClick = {

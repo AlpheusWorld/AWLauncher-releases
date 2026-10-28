@@ -9,8 +9,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.Image
@@ -88,18 +90,19 @@ import ru.aw.launcher.update.Updater
 
 @Composable
 fun SettingsScreen(state: LauncherState) {
-    val sections = listOf(0 to "Внешний вид", 2 to "Игра", 1 to "Язык", 3 to "Загрузки", 5 to "Discord", 4 to "О лаунчере")
+    val sections = listOf(0 to "Общие", 2 to "Игра", 6 to "Внешний вид", 1 to "Язык", 3 to "Загрузки", 5 to "Discord", 4 to "О лаунчере")
     var section by remember { mutableStateOf(0) }
     BoxWithConstraints(Modifier.fillMaxSize().padding(AWDimens.Gutter)) {
         val compact = maxWidth < 700.dp
-        Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(18.dp)) {
-            Text("Настройки", style = MaterialTheme.typography.displaySmall, color = AWColors.Text)
+        Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(18.dp)) {
+            Text("Настройки", style = MaterialTheme.typography.displaySmall, color = AWColors.Text,
+                modifier = Modifier.widthIn(max = 1100.dp).fillMaxWidth())
             if (compact) {
                 Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     sections.forEach { (index, label) -> ChoiceChip(label, selected = section == index, onClick = { section = index }) }
                 }
             }
-            Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+            Row(Modifier.widthIn(max = 1100.dp).fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
                 if (!compact) {
                     Column(Modifier.width(200.dp).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         sections.forEach { (index, label) ->
@@ -111,8 +114,11 @@ fun SettingsScreen(state: LauncherState) {
                         }
                     }
                 }
-                Box(Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(AWDimens.CornerLarge))
-                    .background(AWColors.Surface).padding(20.dp)) { SettingsContent(state, section) }
+                Column(Modifier.weight(1f).heightIn(max = if (section == 0 || section == 6) 330.dp else 650.dp).fillMaxHeight().clip(RoundedCornerShape(AWDimens.CornerLarge))
+                    .background(AWColors.Surface).padding(if (compact) 16.dp else 24.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+                    Text(sections.first { it.first == section }.second, color = AWColors.Text, style = MaterialTheme.typography.headlineSmall)
+                    Box(Modifier.weight(1f).fillMaxWidth()) { SettingsContent(state, section, separateAppearance = true) }
+                }
             }
         }
     }
@@ -120,7 +126,7 @@ fun SettingsScreen(state: LauncherState) {
 
 @Composable
 @OptIn(ExperimentalLayoutApi::class)
-internal fun SettingsContent(state: LauncherState, section: Int) {
+internal fun SettingsContent(state: LauncherState, section: Int, separateAppearance: Boolean = false) {
     val settings by Settings.state.collectAsState()
     if (section == 1) {
         LanguagePanel(settings)
@@ -133,7 +139,7 @@ internal fun SettingsContent(state: LauncherState, section: Int) {
         verticalArrangement = Arrangement.spacedBy(24.dp),
     ) {
         if (section == 0) {
-            AppearancePanel(settings)
+            if (!separateAppearance) AppearancePanel(settings)
             SettingsGroup(Modifier.fillMaxWidth()) {
                 Column {
                     SectionTitle("Поведение лаунчера")
@@ -142,18 +148,15 @@ internal fun SettingsContent(state: LauncherState, section: Int) {
                             Settings.update { it.copy(keepLauncherOpen = checked) }
                         }
                     }
-                    Text("Окно останется открытым — можно просматривать сборки и управлять контентом",
-                        color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall)
                     SettingsRow("Игра с друзьями", divider = false) {
                         AWSwitch(settings.friendsEnabled, outlined = true) { checked ->
                             Settings.update { it.copy(friendsEnabled = checked) }
                         }
                     }
-                    Text("Друзья, приглашения и подключение к мирам через интернет. На поддерживаемых сборках e4mc и его зависимости устанавливаются автоматически. Изменение мода применяется при следующем запуске Minecraft",
-                        color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall)
                 }
             }
         }
+        if (section == 6) AppearancePanel(settings)
         if (section == 2) {
             MemoryPanel(settings)
 
@@ -271,12 +274,6 @@ private fun DiscordPanel(settings: LauncherSettings) {
 private fun AppearancePanel(settings: LauncherSettings) {
     SettingsGroup(Modifier.fillMaxWidth()) {
         Column {
-            SectionTitle("Внешний вид")
-            Text(
-                "Подстроить цвета AWLauncher под себя или под тему системы",
-                style = MaterialTheme.typography.bodySmall,
-                color = AWColors.TextMuted,
-            )
             Spacer(Modifier.height(12.dp))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf(

@@ -78,7 +78,6 @@ fun FriendsScreen(state: LauncherState) {
     }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),verticalArrangement = Arrangement.spacedBy(18.dp)) {
         Text("Друзья",style = MaterialTheme.typography.displaySmall,color = AWColors.Text)
-        Text("Играйте в мирах друг друга — мир хранится и работает на компьютере хозяина",color = AWColors.TextMuted)
         if (!settings.friendsEnabled) {
             Panel(Modifier.fillMaxWidth()) {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -101,7 +100,6 @@ fun FriendsScreen(state: LauncherState) {
                     SelectionContainer { Text(model.code,color = AWColors.Accent,style = MaterialTheme.typography.headlineSmall,translate = false) }
                     AWButton("Скопировать код",onClick = { clipboard.setText(AnnotatedString(model.code)) },icon = AWIcons.Copy)
                 }
-                Text("Отправь код другу. Он добавит тебя, а ты подтвердишь заявку",color = AWColors.TextMuted,style = MaterialTheme.typography.bodySmall)
                 AWTextField(code,{ code = it.take(64) },"Код друга AWF-…",Modifier.fillMaxWidth())
                 AWButton("Добавить друга",onClick = { action("request",code) },enabled = model.connected && !model.busy && code.isNotBlank(),style = ButtonStyle.PRIMARY)
             }

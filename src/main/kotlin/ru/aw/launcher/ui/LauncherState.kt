@@ -143,6 +143,7 @@ class LauncherState(
             nextScreens = emptyList()
             visibleScreen = value
         }
+    var accountMenuOpen by mutableStateOf(false)
     var catalogPageTitle by mutableStateOf<String?>(null)
 
     fun openSettings(entry: VersionEntry? = null, section: Int = 0) {
@@ -881,7 +882,7 @@ class LauncherState(
         }
         val account = selectedAccount.value ?: run {
             fail("Добавьте аккаунт")
-            screen = Screen.ACCOUNTS
+            accountMenuOpen = true
             return
         }
         startJob(entry, "launch") { launch(entry, account, serverAddress, skipModCheck) }

@@ -305,6 +305,7 @@ fun DashboardScreen(state: LauncherState) {
     var selectionMode by remember { mutableStateOf(false) }
     var selected by remember { mutableStateOf<Set<String>>(emptySet()) }
     var groupsMenu by remember { mutableStateOf(false) }
+    var filtersExpanded by rememberSaveable { mutableStateOf(false) }
     val settings by Settings.state.collectAsState()
     LaunchedEffect(settings.libraryGroups) { if (groupFilter != null && settings.libraryGroups.none { it.id == groupFilter }) groupFilter = null }
     val choices = remember(state.builds, state.packs, state.versions) { state.buildChoices() }
@@ -331,12 +332,12 @@ fun DashboardScreen(state: LauncherState) {
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
     val compactHeight = maxHeight < 720.dp
-    val sidebarWidth = AWDimens.sidebarWidth(maxWidth)
     Column(Modifier.fillMaxSize().background(AWColors.Background)) {
         Row(Modifier.fillMaxSize()) {
             FileDropArea(Modifier.weight(1f).fillMaxHeight(), enabled = editable, label = "Отпусти папку или архив сборки", onFiles = state::receiveLibraryFiles) {
+            Box(Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 28.dp), contentAlignment = Alignment.TopCenter) {
             Column(
-                Modifier.fillMaxSize().padding(22.dp),
+                Modifier.widthIn(max = 1298.dp).fillMaxSize(),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -344,9 +345,12 @@ fun DashboardScreen(state: LauncherState) {
                     AWButton("Группы", icon = AWIcons.Folder, enabled = editable, onClick = { state.modal = Modal.Groups() })
                     AWButton("Новая сборка", style = ButtonStyle.PRIMARY, icon = Icons.Default.Add, enabled = !state.buildsBusy && !state.busy, onClick = { creating = true })
                 }
-                RecentLibrary(state, sessions, maxRows = if (compactHeight) 1 else 2)
-                SearchField(query, onValueChange = { query = it }, placeholder = "Поиск сборок…", modifier = Modifier.fillMaxWidth(), focusRequester = state.searchFocus)
-                FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SearchField(query, onValueChange = { query = it }, placeholder = "Поиск сборок…", modifier = Modifier.weight(1f), focusRequester = state.searchFocus)
+                    AWButton("Фильтры", onClick = { filtersExpanded = !filtersExpanded })
+                }
+                if (filtersExpanded) FlowRow(Modifier.fillMaxWidth().heightIn(max = if (compactHeight) 100.dp else 150.dp)
+                    .verticalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     LibraryChoice(if (recentFirst) "Недавно играли" else "Название", listOf("Название", "Недавно играли")) { recentFirst = it == "Недавно играли" }
                     LibraryChoice(loader?.label ?: "Все загрузчики", listOf("Все загрузчики") + LoaderKind.entries.map { it.label }) { label ->
                         loader = LoaderKind.entries.firstOrNull { it.label == label }
@@ -361,6 +365,11 @@ fun DashboardScreen(state: LauncherState) {
                         }
                     }
                     AWButton(if (selectionMode) "Готово" else "Выбрать", enabled = editable, onClick = { selectionMode = !selectionMode; selected = emptySet() })
+                }
+                if (!selectionMode && !filtersExpanded && sessions.isNotEmpty()) RecentLibrary(state, sessions, maxRows = if (compactHeight) 1 else 2)
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text("Все сборки", color = AWColors.Text, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                    Text(library.size.toString(), color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall, translate = false)
                 }
                 if (selectionMode) FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     AWButton(if (library.isNotEmpty() && library.all { it.key in selected }) "Снять выделение" else "Выбрать всё", enabled = editable,
@@ -403,7 +412,7 @@ fun DashboardScreen(state: LauncherState) {
                 }
             }
             }
-            if (sidebarWidth != null) DashboardSidebar(state, Modifier.width(sidebarWidth).fillMaxHeight())
+            }
         }
     }
     }
@@ -412,10 +421,10 @@ fun DashboardScreen(state: LauncherState) {
 
 @Composable
 private fun RecentLibrary(state: LauncherState, sessions: List<PlaySession>, maxRows: Int) {
-    var expanded by remember { mutableStateOf(true) }
+    var expanded by remember { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Недавнее", color = AWColors.Text, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            Text("Недавнее", color = AWColors.TextSoft, style = MaterialTheme.typography.titleSmall)
             IconButton(onClick = { expanded = !expanded }, modifier = Modifier.size(32.dp)) {
                 Icon(if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown, null, tint = AWColors.TextMuted)
             }
@@ -585,37 +594,16 @@ internal fun DashboardSidebar(state: LauncherState, modifier: Modifier) {
 
 @Composable
 private fun SidebarAccount(state: LauncherState) {
-    val accounts by state.accounts.collectAsState()
     val selected by state.selectedAccount.collectAsState()
-    var open by remember { mutableStateOf(false) }
-    ReportOpen(open, state::trackMenu)
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text("Аккаунт", color = AWColors.TextMuted, style = MaterialTheme.typography.titleSmall)
-        Box {
-            Row(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(AWDimens.CornerCard)).background(AWColors.SurfaceHigh)
-                    .clickable { if (accounts.isEmpty()) state.screen = Screen.ACCOUNTS else open = true }
-                    .padding(12.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically,
-            ) {
-                SkinHead(selected, 36.dp)
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(selected?.name ?: "Добавить аккаунт", translate = selected == null,
-                        color = AWColors.Text, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(if (selected == null) "Не выбран" else if (selected?.isOffline == true) "Офлайн" else "Microsoft",
-                        color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall)
-                }
-                Icon(Icons.Default.KeyboardArrowDown, "Выбрать аккаунт", tint = AWColors.TextSoft, modifier = Modifier.size(18.dp))
-            }
-            AWDropdownMenu(open, onDismissRequest = { open = false }) {
-                accounts.forEach { account ->
-                    AWMenuItem(account.name, translate = false, icon = Icons.Default.Check.takeIf { account.uuid == selected?.uuid },
-                        onClick = { state.selectAccount(account.uuid); open = false })
-                }
-                MenuDivider()
-                AWMenuItem("Аккаунты", icon = Icons.Default.Person, onClick = { open = false; state.screen = Screen.ACCOUNTS })
-            }
+    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(AWDimens.CornerCard)).background(AWColors.SurfaceHigh)
+        .clickable { state.accountMenuOpen = true }.padding(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+        SkinHead(selected, 36.dp)
+        Column(Modifier.weight(1f)) {
+            Text(selected?.name ?: "Добавить аккаунт", translate = selected == null, color = AWColors.Text,
+                style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(if (selected == null) "Не выбран" else if (selected?.isOffline == true) "Офлайн" else "Microsoft",
+                color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall)
         }
     }
 }

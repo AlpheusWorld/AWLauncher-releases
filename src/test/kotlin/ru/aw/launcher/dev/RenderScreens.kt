@@ -158,6 +158,11 @@ fun main(args: Array<String>) {
             render("redesign-$name", 1280, 780) { AWTheme(ThemeMode.DARK) { App(state, onGameStarted = {}) } }
             render("redesign-$name-small", 600, 420) { AWTheme(ThemeMode.DARK) { App(state, onGameStarted = {}) } }
         }
+        state.screen = Screen.HOME
+        state.accountMenuOpen = true
+        render("redesign-account-menu", 1280, 780) { AWTheme(ThemeMode.DARK) { App(state, onGameStarted = {}) } }
+        render("redesign-account-menu-small", 600, 420) { AWTheme(ThemeMode.DARK) { App(state, onGameStarted = {}) } }
+        state.accountMenuOpen = false
         exitProcess(0)
     }
 

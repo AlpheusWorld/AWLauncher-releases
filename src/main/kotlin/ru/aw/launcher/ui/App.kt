@@ -181,6 +181,7 @@ private fun CompactNavRail(state: LauncherState, expanded: Boolean) {
     val unread = notices.filter { it.id > seen }
     val railWidth = if (expanded) 214.dp else AWDimens.RailWidth
     BoxWithConstraints(Modifier.width(railWidth).fillMaxHeight()) {
+    val menuHeight = maxHeight - 24.dp
     val veryShort = maxHeight < 470.dp
     val short = maxHeight < 640.dp
     val itemHeight = if (veryShort) 28.dp else if (short) 36.dp else 44.dp
@@ -201,9 +202,10 @@ private fun CompactNavRail(state: LauncherState, expanded: Boolean) {
         NavItem("Скриншоты", AWIcons.Image, state.screen == Screen.SCREENSHOTS, compact = !expanded, itemHeight = itemHeight) { state.screen = Screen.SCREENSHOTS }
         NavItem("Активность", AWIcons.Activity, state.screen == Screen.ACTIVITY, compact = !expanded, itemHeight = itemHeight) { state.screen = Screen.ACTIVITY }
         NavItem("Уведомления", Icons.Default.Notifications, state.screen == Screen.NOTICES, badge = unread.size, badgeAlert = unread.any { it.level == NoticeLevel.ERROR }, compact = !expanded, itemHeight = itemHeight) { state.openNotices() }
+        Box {
         if (expanded && !short) {
             val account by state.selectedAccount.collectAsState()
-            Row(Modifier.fillMaxWidth().clickable { state.screen = Screen.ACCOUNTS }.padding(horizontal = 10.dp, vertical = 8.dp),
+            Row(Modifier.fillMaxWidth().clickable { state.accountMenuOpen = true }.padding(horizontal = 10.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 SkinHead(account, 36.dp)
                 Column(Modifier.weight(1f)) {
@@ -213,7 +215,9 @@ private fun CompactNavRail(state: LauncherState, expanded: Boolean) {
                         color = AWColors.TextMuted, style = MaterialTheme.typography.labelSmall)
                 }
             }
-        } else NavItem("Аккаунты", Icons.Default.Person, state.screen == Screen.ACCOUNTS, compact = !expanded, itemHeight = itemHeight) { state.screen = Screen.ACCOUNTS }
+        } else NavItem("Аккаунты", Icons.Default.Person, state.accountMenuOpen, compact = !expanded, itemHeight = itemHeight) { state.accountMenuOpen = true }
+        ru.aw.launcher.ui.screens.AccountMenu(state, menuHeight)
+        }
     }
     }
 }

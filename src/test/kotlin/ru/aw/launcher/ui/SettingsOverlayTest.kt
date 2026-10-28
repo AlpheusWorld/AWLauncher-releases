@@ -26,6 +26,20 @@ import ru.aw.launcher.update.UpdateState
 @OptIn(ExperimentalComposeUiApi::class, InternalComposeUiApi::class)
 class SettingsOverlayTest {
     @Test
+    fun `account control opens a menu without changing the current page`() {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        val state = LauncherState(scope, PreloadResult(VersionManifest(), emptyMap(), emptySet()))
+        val scene = ImageComposeScene(600, 420, density = Density(1f)) { AWTheme { App(state, onGameStarted = {}) } }
+        try {
+            repeat(20) { scene.render(it * 16_666_667L).close() }
+            scene.sendPointerEvent(PointerEventType.Press, Offset(32f, 392f))
+            scene.sendPointerEvent(PointerEventType.Release, Offset(32f, 392f))
+            assertTrue(state.accountMenuOpen)
+            assertEquals(Screen.HOME, state.screen)
+        } finally { scene.close(); scope.cancel() }
+    }
+
+    @Test
     fun `home download cancel action cancels active task`() {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
         val state = LauncherState(scope, PreloadResult(VersionManifest(), emptyMap(), emptySet()))
