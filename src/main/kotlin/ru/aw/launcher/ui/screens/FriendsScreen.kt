@@ -77,7 +77,7 @@ fun FriendsScreen(state: LauncherState) {
         }
     }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),verticalArrangement = Arrangement.spacedBy(18.dp)) {
-        Text("Друзья",style = MaterialTheme.typography.headlineMedium,color = AWColors.Text)
+        Text("Друзья",style = MaterialTheme.typography.displaySmall,color = AWColors.Text)
         Text("Играйте в мирах друг друга — мир хранится и работает на компьютере хозяина",color = AWColors.TextMuted)
         if (!settings.friendsEnabled) {
             Panel(Modifier.fillMaxWidth()) {
@@ -89,12 +89,16 @@ fun FriendsScreen(state: LauncherState) {
             }
             return@Column
         }
+        (localError ?: model.error)?.let { Text(it,color = AWColors.Danger) }
+        model.message?.let { Text(it,color = AWColors.Success) }
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            val codePanel: @Composable () -> Unit = {
         Panel(Modifier.fillMaxWidth()) {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 SectionTitle("Мой код друга")
                 Text(if (model.connected) "Подключено" else "Подключаемся к сервису друзей…",color = if (model.connected) AWColors.Success else AWColors.TextMuted)
                 if (model.code.isNotEmpty()) {
-                    SelectionContainer { Text(model.code,color = AWColors.Accent,translate = false) }
+                    SelectionContainer { Text(model.code,color = AWColors.Accent,style = MaterialTheme.typography.headlineSmall,translate = false) }
                     AWButton("Скопировать код",onClick = { clipboard.setText(AnnotatedString(model.code)) },icon = AWIcons.Copy)
                 }
                 Text("Отправь код другу. Он добавит тебя, а ты подтвердишь заявку",color = AWColors.TextMuted,style = MaterialTheme.typography.bodySmall)
@@ -102,32 +106,9 @@ fun FriendsScreen(state: LauncherState) {
                 AWButton("Добавить друга",onClick = { action("request",code) },enabled = model.connected && !model.busy && code.isNotBlank(),style = ButtonStyle.PRIMARY)
             }
         }
-        (localError ?: model.error)?.let { Text(it,color = AWColors.Danger) }
-        model.message?.let { Text(it,color = AWColors.Success) }
-        Panel(Modifier.fillMaxWidth()) {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                SectionTitle("Мой мир")
-                val hosted = model.world
-                if (hosted == null) {
-                    Text("Запусти сборку с Fabric, Quilt, Forge или NeoForge. Затем в своём мире нажми Esc → Открыть для сети",color = AWColors.TextSoft)
-                    Text("На поддерживаемых версиях e4mc и необходимые библиотеки устанавливаются автоматически. Порты на роутере открывать не нужно",color = AWColors.TextMuted,style = MaterialTheme.typography.bodySmall)
-                    Text("Выбрана сборка: ${state.currentEntry()?.label ?: "не выбрана"}",color = AWColors.TextSoft)
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp),verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        AWButton("Выбрать сборку",onClick = { state.screen = Screen.PLAY })
-                        AWButton("Играть",onClick = { state.play() },enabled = !state.busy && !state.hasRunningGame() && state.currentEntry()?.loader != LoaderKind.VANILLA,style = ButtonStyle.PRIMARY)
-                    }
-                } else {
-                    Text(hosted.info.title,color = AWColors.Text,translate = false)
-                    Text("${hosted.info.version} · ${hosted.info.loader.label}",color = AWColors.TextMuted,translate = false)
-                    if (hosted.info.address.isEmpty()) Text(hosted.error ?: "Зайди в свой мир и нажми Esc → Открыть для сети. После подключения появятся кнопки приглашения",color = if (hosted.error == null) AWColors.TextSoft else AWColors.Danger)
-                    else {
-                        Text("Мир доступен — пригласи друга из списка ниже",color = AWColors.Success)
-                        Text("Доступ работает, пока открыт мир. Для остановки введи /e4mc stop в игре или выйди из мира",color = AWColors.TextMuted,style = MaterialTheme.typography.bodySmall)
-                        Text("Приглашённый получает адрес подключения — передавай доступ только тем, кому доверяешь",color = AWColors.TextMuted,style = MaterialTheme.typography.bodySmall)
-                    }
-                }
             }
-        }
+            val details: @Composable () -> Unit = {
+                Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
         if (model.snapshot.requests.isNotEmpty()) {
             SectionTitle("Заявки в друзья")
             model.snapshot.requests.forEach { friend ->
@@ -192,6 +173,30 @@ fun FriendsScreen(state: LauncherState) {
                 }
             }
         }
+        Panel(Modifier.fillMaxWidth()) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                SectionTitle("Мой мир")
+                val hosted = model.world
+                if (hosted == null) {
+                    Text("Запусти сборку с Fabric, Quilt, Forge или NeoForge. Затем в своём мире нажми Esc → Открыть для сети",color = AWColors.TextSoft)
+                    Text("На поддерживаемых версиях e4mc и необходимые библиотеки устанавливаются автоматически. Порты на роутере открывать не нужно",color = AWColors.TextMuted,style = MaterialTheme.typography.bodySmall)
+                    Text("Выбрана сборка: ${state.currentEntry()?.label ?: "не выбрана"}",color = AWColors.TextSoft)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp),verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        AWButton("Выбрать сборку",onClick = { state.screen = Screen.PLAY })
+                        AWButton("Играть",onClick = { state.play() },enabled = !state.busy && !state.hasRunningGame() && state.currentEntry()?.loader != LoaderKind.VANILLA,style = ButtonStyle.PRIMARY)
+                    }
+                } else {
+                    Text(hosted.info.title,color = AWColors.Text,translate = false)
+                    Text("${hosted.info.version} · ${hosted.info.loader.label}",color = AWColors.TextMuted,translate = false)
+                    if (hosted.info.address.isEmpty()) Text(hosted.error ?: "Зайди в свой мир и нажми Esc → Открыть для сети. После подключения появятся кнопки приглашения",color = if (hosted.error == null) AWColors.TextSoft else AWColors.Danger)
+                    else {
+                        Text("Мир доступен — пригласи друга из списка ниже",color = AWColors.Success)
+                        Text("Доступ работает, пока открыт мир. Для остановки введи /e4mc stop в игре или выйди из мира",color = AWColors.TextMuted,style = MaterialTheme.typography.bodySmall)
+                        Text("Приглашённый получает адрес подключения — передавай доступ только тем, кому доверяешь",color = AWColors.TextMuted,style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+        }
         if (model.snapshot.outgoing.isNotEmpty()) {
             SectionTitle("Ожидают подтверждения")
             model.snapshot.outgoing.forEach { friend ->
@@ -199,6 +204,17 @@ fun FriendsScreen(state: LauncherState) {
                     Text(friend.name,color = AWColors.TextMuted,translate = false)
                     AWButton("Отменить заявку",onClick = { action("remove",friend.id) },enabled = !model.busy)
                 }
+            }
+        }
+                }
+            }
+            if (maxWidth >= 760.dp) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Column(Modifier.weight(1.6f)) { details() }
+                    Column(Modifier.weight(1f)) { codePanel() }
+                }
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) { codePanel(); details() }
             }
         }
     }

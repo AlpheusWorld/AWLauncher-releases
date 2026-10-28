@@ -293,12 +293,12 @@ fun DashboardScreen(state: LauncherState) {
                 Modifier.fillMaxSize().padding(22.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                RecentLibrary(state, sessions, maxRows = if (compactHeight) 1 else 2)
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("Библиотека", color = AWColors.Text, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.weight(1f))
+                    Text("Мои сборки", color = AWColors.Text, style = MaterialTheme.typography.displaySmall, modifier = Modifier.weight(1f))
                     AWButton("Группы", icon = AWIcons.Folder, enabled = editable, onClick = { state.modal = Modal.Groups() })
                     AWButton("Новая сборка", style = ButtonStyle.PRIMARY, icon = Icons.Default.Add, enabled = !state.buildsBusy && !state.busy, onClick = { creating = true })
                 }
+                RecentLibrary(state, sessions, maxRows = if (compactHeight) 1 else 2)
                 SearchField(query, onValueChange = { query = it }, placeholder = "Поиск сборок…", modifier = Modifier.fillMaxWidth(), focusRequester = state.searchFocus)
                 FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     LibraryChoice(if (recentFirst) "Недавно играли" else "Название", listOf("Название", "Недавно играли")) { recentFirst = it == "Недавно играли" }

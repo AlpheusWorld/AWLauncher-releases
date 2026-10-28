@@ -125,7 +125,7 @@ internal fun SkinsScreen(state: LauncherState, preview: SkinImage? = null, initi
     FileDropArea(Modifier.fillMaxSize(), !working, "Отпусти PNG, чтобы добавить скин", { files -> files.firstOrNull()?.let(::add) }) {
         Column(Modifier.fillMaxSize().padding(AWDimens.Gutter), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text("Выбор скина", style = MaterialTheme.typography.headlineSmall, color = AWColors.Text, modifier = Modifier.weight(1f))
+                Text("Скины", style = MaterialTheme.typography.displaySmall, color = AWColors.Text, modifier = Modifier.weight(1f))
                 Box {
                     AWButton(account?.name ?: "Войти", icon = Icons.Default.Person, enabled = !working, onClick = {
                         if (licensed.isEmpty()) state.screen = Screen.ACCOUNTS else accountsOpen = true
@@ -294,8 +294,10 @@ internal fun SkinsScreen(state: LauncherState, preview: SkinImage? = null, initi
                 }
                 if (compact) gallery(Modifier.fillMaxSize())
                 else Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(32.dp)) {
-                    previewContent(Modifier.weight(1f).fillMaxHeight())
-                    gallery(Modifier.weight(2.5f).fillMaxHeight())
+                    previewContent(Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(AWDimens.CornerLarge))
+                        .background(AWColors.SurfaceHigh).padding(18.dp))
+                    gallery(Modifier.weight(2.5f).fillMaxHeight().clip(RoundedCornerShape(AWDimens.CornerLarge))
+                        .background(AWColors.Surface).padding(18.dp))
                 }
             }
             (error ?: state.skinError)?.let { message -> Row(verticalAlignment = Alignment.CenterVertically) {
@@ -351,7 +353,7 @@ private fun SkinCard(name: String, model: SkinModel, chosen: Boolean, enabled: B
         } } } catch (failure: CancellationException) { throw failure } catch (_: Exception) { value = null }
     }
     var open by remember { mutableStateOf(false) }
-    val shape = RoundedCornerShape(20.dp)
+    val shape = RoundedCornerShape(AWDimens.CornerCard)
     Column(modifier.fillMaxWidth().aspectRatio(31f / 40f).clip(shape).background(if (chosen) AWColors.SurfaceHigh else AWColors.Surface)
         .border(2.dp, if (chosen) AWColors.Accent else Color.Transparent, shape)
         .clickable(enabled = enabled, onClick = onSelect).padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {

@@ -13,7 +13,14 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
@@ -37,6 +44,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import java.nio.file.Path
 import kotlin.io.path.createDirectories
@@ -62,6 +71,7 @@ import ru.aw.launcher.ui.CatalogSearch
 import ru.aw.launcher.ui.ContentModel
 import ru.aw.launcher.ui.CatalogTab
 import ru.aw.launcher.ui.LauncherState
+import ru.aw.launcher.ui.ModIcon
 import ru.aw.launcher.ui.VersionEntry
 import ru.aw.launcher.ui.components.ButtonStyle
 import ru.aw.launcher.ui.components.ChoiceChip
@@ -75,6 +85,7 @@ import ru.aw.launcher.ui.components.AWSwitch
 import ru.aw.launcher.ui.components.ListBox
 import ru.aw.launcher.ui.components.ListHint
 import ru.aw.launcher.ui.components.Panel
+import ru.aw.launcher.ui.components.PageTab
 import ru.aw.launcher.ui.components.ReportOpen
 import ru.aw.launcher.ui.components.SearchField
 import ru.aw.launcher.ui.components.SearchResults
@@ -218,14 +229,16 @@ fun CatalogScreen(state: LauncherState) {
     }
 
     Column(Modifier.fillMaxSize().padding(AWDimens.Gutter)) {
-        Panel(Modifier.fillMaxWidth().weight(1f)) {
+        Text("Каталог", style = MaterialTheme.typography.displaySmall, color = AWColors.Text, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(18.dp))
+        Box(Modifier.fillMaxWidth().weight(1f)) {
             Column {
                 Row(
                     Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    tabs.forEach { ChoiceChip(it.title, selected = tab == it, onClick = { state.catalogTab = it }) }
+                    tabs.forEach { PageTab(it.title, selected = tab == it, onClick = { state.catalogTab = it }) }
                 }
                 if (tab != CatalogTab.INSTALLED) {
                     Spacer(Modifier.height(10.dp))
@@ -268,45 +281,73 @@ private fun ColumnScope.PacksTab(state: LauncherState, model: PacksModel, onProj
         modifier = Modifier.fillMaxWidth(),
     )
     Spacer(Modifier.height(10.dp))
-    ListBox(Modifier.weight(1f)) { listState ->
-        SearchResults(model.search, listState) { hit -> PackRow(state, model, hit) { install -> onProject(hit, install) } }
-    }
+    CatalogGrid(model.search, Modifier.weight(1f)) { hit -> PackCard(state, model, hit) { install -> onProject(hit, install) } }
     StatusStrip(state.progress.takeIf { state.installingPack != null }, model.error, null)
 }
 
 @Composable
-private fun PackRow(state: LauncherState, model: PacksModel, hit: Modrinth.SearchHit, onProject: (Boolean) -> Unit) {
-    val pack = state.packs.firstOrNull { it.projectId == hit.projectId }
-    val busy = model.resolving == hit.projectId || state.downloads.contains("pack:${hit.projectId}")
-    ContentRow(
-        icon = hit.iconUrl,
-        title = hit.title,
-        byline = listOfNotNull(
-            hit.author.takeIf { it.isNotBlank() }?.let { "от $it" },
-            "${formatCount(hit.downloads)} скачиваний",
-            listOfNotNull(loaderOf(hit)?.label, hit.versions.lastOrNull()).joinToString(" ").ifBlank { null },
-        ).joinToString(" · "),
-        details = hit.description,
-        onOpen = { Shell.browse(ContentCatalog.page(hit.projectId, hit.projectType, hit.slug)) },
-        onClick = { onProject(false) },
-    ) {
-        when {
-            busy -> Text(if (state.installingPack == hit.projectId) "Ставлю…" else "В очереди", style = MaterialTheme.typography.labelLarge, color = AWColors.TextMuted)
-            pack != null && pack.id in state.packUpdates ->
-                AWButton("Обновить", icon = Icons.Default.Refresh, enabled = !state.downloads.contains("pack:${hit.projectId}"), onClick = { state.updatePack(pack) })
-            pack != null -> AWButton("Играть", icon = Icons.Default.PlayArrow, style = ButtonStyle.PRIMARY, enabled = !state.busy, onClick = {
-                state.selectEntry(state.entryFor(pack))
-                state.play()
-            })
-            else -> AWButton("Установить", icon = AWIcons.Download, enabled = model.resolving == null, onClick = {
-                onProject(true)
-            })
+private fun CatalogGrid(search: CatalogSearch, modifier: Modifier = Modifier, card: @Composable (Modrinth.SearchHit) -> Unit) {
+    val hits = search.hits
+    when {
+        hits.isEmpty() && search.searching -> Box(modifier.fillMaxWidth()) { ListHint("Ищу в каталоге…") }
+        hits.isEmpty() && search.failed -> Box(modifier.fillMaxWidth()) { ListHint(search.error ?: "Не удалось загрузить каталог", "Повторить") { search.run() } }
+        hits.isEmpty() -> Box(modifier.fillMaxWidth()) { ListHint("Ничего не нашлось. Попробуй другое название.") }
+        else -> LazyVerticalGrid(
+            columns = GridCells.Adaptive(240.dp), modifier = modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            items(hits, key = { it.projectId }) { card(it) }
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                Box(Modifier.fillMaxWidth().padding(12.dp), contentAlignment = Alignment.Center) {
+                    when {
+                        search.searching -> Text("Загружаю…", style = MaterialTheme.typography.bodySmall, color = AWColors.TextMuted)
+                        search.failed -> AWButton("Повторить", onClick = { search.run(more = true) })
+                        search.hasMore -> AWButton("Показать ещё", onClick = { search.run(more = true) })
+                    }
+                }
+            }
         }
     }
 }
 
-private fun loaderOf(hit: Modrinth.SearchHit): LoaderKind? =
-    LoaderKind.entries.firstOrNull { it.isModded && it.name.lowercase() in hit.categories }
+@Composable
+private fun CatalogProjectCard(hit: Modrinth.SearchHit, onClick: () -> Unit, action: @Composable () -> Unit) {
+    Column(Modifier.fillMaxWidth().background(AWColors.Surface, RoundedCornerShape(AWDimens.CornerLarge))
+        .clickable(onClick = onClick).padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            ModIcon(hit.iconUrl, 54.dp)
+            Column(Modifier.weight(1f)) {
+                Text(hit.title, color = AWColors.Text, style = MaterialTheme.typography.titleMedium,
+                    maxLines = 2, overflow = TextOverflow.Ellipsis, translate = false)
+                Text(hit.author, color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis, translate = false)
+            }
+        }
+        Text(hit.description.ifBlank { "Описание отсутствует" }, color = AWColors.TextSoft,
+            style = MaterialTheme.typography.bodySmall, maxLines = 2, minLines = 2, overflow = TextOverflow.Ellipsis,
+            translate = hit.description.isBlank())
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(formatCount(hit.downloads), color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall, translate = false)
+            action()
+        }
+    }
+}
+
+@Composable
+private fun PackCard(state: LauncherState, model: PacksModel, hit: Modrinth.SearchHit, onProject: (Boolean) -> Unit) {
+    val pack = state.packs.firstOrNull { it.projectId == hit.projectId }
+    val busy = model.resolving == hit.projectId || state.downloads.contains("pack:${hit.projectId}")
+    CatalogProjectCard(hit, onClick = { onProject(false) }) {
+        when {
+            busy -> Text("В очереди", style = MaterialTheme.typography.bodySmall, color = AWColors.TextMuted)
+            pack != null && pack.id in state.packUpdates -> AWButton("Обновить", enabled = !busy, onClick = { state.updatePack(pack) })
+            pack != null -> AWButton("Играть", style = ButtonStyle.PRIMARY, enabled = !state.busy, onClick = {
+                state.selectEntry(state.entryFor(pack)); state.play()
+            })
+            else -> AWButton("Установить", enabled = model.resolving == null, onClick = { onProject(true) })
+        }
+    }
+}
 
 @Composable
 private fun ColumnScope.ContentTab(state: LauncherState, target: VersionEntry, model: ContentModel, tab: CatalogTab, onProject: (Modrinth.SearchHit) -> Unit) {
@@ -343,8 +384,15 @@ private fun ColumnScope.ContentTab(state: LauncherState, target: VersionEntry, m
                 modifier = Modifier.fillMaxWidth(),
             )
             Spacer(Modifier.height(10.dp))
-            ListBox(Modifier.weight(1f)) { listState ->
-                SearchResults(search, listState) { hit -> ContentHitRow(model, kind, hit) { onProject(hit.copy(projectType = kind.projectType)) } }
+            CatalogGrid(search, Modifier.weight(1f)) { hit ->
+                val project = { onProject(hit.copy(projectType = kind.projectType)) }
+                CatalogProjectCard(hit, project) {
+                    when {
+                        hit.projectId in model.installedProjects && kind != ContentKind.DATA_PACK -> Tag("Установлен", AWColors.Success)
+                        hit.projectId in model.working -> Text("В очереди", color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall)
+                        else -> AWButton("Установить", enabled = ContentModel.ALL !in model.working, onClick = { model.install(kind, hit) })
+                    }
+                }
             }
         }
     }
@@ -372,32 +420,6 @@ private fun TargetPicker(state: LauncherState, target: VersionEntry) {
                     state.catalogTarget = entry
                 })
             }
-        }
-    }
-}
-
-@Composable
-private fun ContentHitRow(model: ContentModel, kind: ContentKind, hit: Modrinth.SearchHit, onProject: () -> Unit) {
-    val installed = hit.projectId in model.installedProjects
-    val busy = hit.projectId in model.working
-    ContentRow(
-        icon = hit.iconUrl,
-        title = hit.title,
-        byline = hit.author.takeIf { it.isNotBlank() }?.let { "от $it · ${formatCount(hit.downloads)} скачиваний" }
-            ?: "${formatCount(hit.downloads)} скачиваний",
-        details = hit.description,
-        onOpen = { Shell.browse(ContentCatalog.page(hit.projectId, kind.projectType, hit.slug)) },
-        onClick = onProject,
-    ) {
-        when {
-            installed && kind != ContentKind.DATA_PACK -> Tag("Установлен", AWColors.Success)
-            busy -> Text(if (model.waiting(hit.projectId)) "В очереди" else "Ставлю…", style = MaterialTheme.typography.labelLarge, color = AWColors.TextMuted)
-            else -> AWButton(
-                "Установить",
-                icon = AWIcons.Download,
-                enabled = ContentModel.ALL !in model.working,
-                onClick = { model.install(kind, hit) },
-            )
         }
     }
 }

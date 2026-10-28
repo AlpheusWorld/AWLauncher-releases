@@ -117,7 +117,7 @@ fun main(args: Array<String>) {
     PlayHistory.historyFile = File(out, "activity-preview.json").toPath().also { copy ->
         runCatching { Files.copy(Paths.root.resolve("activity.json"), copy, StandardCopyOption.REPLACE_EXISTING) }
     }
-    val preloaded = if (selectedScreens?.all { it.startsWith("skin-editor") || it.startsWith("skin-selector") || it.startsWith("skin-events") || it.startsWith("downloads") || it.startsWith("migration") || it.startsWith("settings-redesign") || it.startsWith("accounts-redesign") } == true)
+    val preloaded = if (selectedScreens?.all { it.startsWith("skin-editor") || it.startsWith("skin-selector") || it.startsWith("skin-events") || it.startsWith("downloads") || it.startsWith("migration") || it.startsWith("settings-redesign") || it.startsWith("accounts-redesign") || it.startsWith("redesign-") } == true)
         ru.aw.launcher.core.PreloadResult(ru.aw.launcher.meta.VersionManifest(versions = listOf(
             ru.aw.launcher.meta.ManifestVersion(id = "1.21.11", url = ""))), emptyMap(), emptySet())
     else runBlocking { Preloader.run { _, _ -> } }.copy(manifestStale = false, loaderSupportStale = false)
@@ -149,6 +149,16 @@ fun main(args: Array<String>) {
             scene.close()
         }
         println("rendered ${File(out, "$name.png")}")
+    }
+
+    if (selectedScreens?.all { it.startsWith("redesign-") } == true) {
+        for ((name, screen) in listOf("settings" to Screen.SETTINGS, "friends" to Screen.FRIENDS,
+            "catalog" to Screen.CATALOG, "downloads" to Screen.DOWNLOADS, "skins" to Screen.SKINS)) {
+            state.screen = screen
+            render("redesign-$name", 1280, 780) { AWTheme(ThemeMode.DARK) { App(state, onGameStarted = {}) } }
+            render("redesign-$name-small", 600, 420) { AWTheme(ThemeMode.DARK) { App(state, onGameStarted = {}) } }
+        }
+        exitProcess(0)
     }
 
     if (selectedScreens?.all { it.startsWith("downloads") } == true) {

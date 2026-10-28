@@ -47,7 +47,7 @@ class LauncherStateTest {
     }
 
     @Test
-    fun `settings open as overlays without replacing the current page or its history`() {
+    fun `settings page keeps history and instance settings can open as an overlay`() {
         val state = LauncherState(scope, preload(emptySet()))
         state.screen = Screen.ACTIVITY
         state.openSettings()
@@ -57,8 +57,10 @@ class LauncherStateTest {
         state.navigateBack()
         assertEquals(Screen.HOME, state.screen)
         state.screen = Screen.SETTINGS
+        assertEquals(Screen.SETTINGS, state.screen)
+        assertNull(state.modal)
+        state.navigateBack()
         assertEquals(Screen.HOME, state.screen)
-        assertTrue(state.modal is Modal.Settings)
     }
 
     @Test

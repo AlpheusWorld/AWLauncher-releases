@@ -247,6 +247,21 @@ fun ChoiceChip(
 enum class ButtonStyle { PRIMARY, SECONDARY, DANGER }
 
 @Composable
+fun PageTab(label: String, selected: Boolean, onClick: () -> Unit) {
+    val interaction = remember { MutableInteractionSource() }
+    val hovered by interaction.collectIsHoveredAsState()
+    Column(Modifier.height(44.dp).clickable(interactionSource = interaction, indication = null, onClick = onClick),
+        horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(Modifier.weight(1f).padding(horizontal = 14.dp), contentAlignment = Alignment.Center) {
+            Text(label, style = MaterialTheme.typography.labelLarge,
+                color = if (selected) AWColors.Text else if (hovered) AWColors.TextSoft else AWColors.TextMuted,
+                maxLines = 1)
+        }
+        Box(Modifier.fillMaxWidth().height(2.dp).background(if (selected) AWColors.Accent else Color.Transparent))
+    }
+}
+
+@Composable
 fun AWButton(
     text: String,
     onClick: () -> Unit,

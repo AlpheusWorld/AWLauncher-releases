@@ -32,7 +32,7 @@ fun DownloadsScreen(state: LauncherState) {
     val ordered = queue.items.filter { it.status != DownloadStatus.WAITING && it.pending } +
         queue.items.filter { it.status == DownloadStatus.WAITING } + queue.items.filterNot { it.pending }.asReversed()
     Column(Modifier.fillMaxSize().padding(AWDimens.Gutter), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Text("Загрузки", style = MaterialTheme.typography.headlineSmall, color = AWColors.Text, fontWeight = FontWeight.Bold)
+        Text("Загрузки", style = MaterialTheme.typography.displaySmall, color = AWColors.Text, fontWeight = FontWeight.Bold)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             AWButton(if (queue.paused) "Продолжить очередь" else "Приостановить очередь",
                 onClick = { queue.pauseQueue(!queue.paused) }, icon = if (queue.paused) Icons.Default.PlayArrow else AWIcons.Pause,
@@ -41,11 +41,15 @@ fun DownloadsScreen(state: LauncherState) {
         }
         if (queue.paused) Text("Текущая задача завершится. Остальные ждут продолжения очереди", color = AWColors.TextSoft,
             style = MaterialTheme.typography.bodySmall)
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("Очередь", style = MaterialTheme.typography.titleLarge, color = AWColors.Text)
+            Text("${queue.pendingCount} активных", style = MaterialTheme.typography.bodySmall, color = AWColors.TextMuted)
+        }
         if (ordered.isEmpty()) {
             EmptyState(AWIcons.Download, "Загрузок пока нет", "Добавляй моды и сборки из каталога — они загрузятся по очереди",
                 Modifier.fillMaxWidth().weight(1f))
         } else {
-            LazyColumn(Modifier.fillMaxWidth().weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp),
+            LazyColumn(Modifier.fillMaxWidth().weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp),
                 contentPadding = PaddingValues(bottom = 12.dp)) {
                 itemsIndexed(ordered, key = { _, item -> item.id }) { _, item ->
                     val position = queue.items.filter { it.status == DownloadStatus.WAITING }.indexOfFirst { it.id == item.id } + 1
@@ -65,7 +69,7 @@ private fun DownloadCard(item: QueuedDownload, position: Int, state: LauncherSta
         else -> AWColors.TextMuted
     }
     val shape = RoundedCornerShape(AWDimens.CornerCard)
-    Column(Modifier.fillMaxWidth().background(AWColors.Surface, shape)
+    Column(Modifier.fillMaxWidth().background(if (item.status == DownloadStatus.RUNNING) AWColors.SurfaceHigh else AWColors.Surface, shape)
         .padding(horizontal = 18.dp, vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(item.title, color = AWColors.Text, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleSmall,
             maxLines = 2, overflow = TextOverflow.Ellipsis, translate = false)

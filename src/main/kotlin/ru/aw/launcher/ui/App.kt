@@ -145,7 +145,7 @@ private fun ScreenHost(state: LauncherState) {
                         Screen.FRIENDS -> ru.aw.launcher.ui.screens.FriendsScreen(state)
                         Screen.PLAY -> DashboardScreen(state)
                         Screen.BUILDS -> PrimaryScreenLayout(state) { BuildsScreen(state) }
-                        Screen.CATALOG -> PrimaryScreenLayout(state) { CatalogScreen(state) }
+                        Screen.CATALOG -> CatalogScreen(state)
                         Screen.SCREENSHOTS -> ScreenshotsScreen(state)
                         Screen.SKINS -> ru.aw.launcher.ui.screens.SkinsScreen(state)
                         Screen.DOWNLOADS -> ru.aw.launcher.ui.screens.DownloadsScreen(state)
@@ -190,15 +190,15 @@ private fun CompactNavRail(state: LauncherState, expanded: Boolean) {
         NavItem("Играть", Icons.Default.PlayArrow, state.screen == Screen.HOME, compact = !expanded, itemHeight = itemHeight) { state.screen = Screen.HOME }
         NavItem("Мои сборки", AWIcons.Layers, state.screen in setOf(Screen.PLAY, Screen.BUILDS, Screen.INSTANCE), compact = !expanded, itemHeight = itemHeight) { state.screen = Screen.PLAY }
         NavItem("Каталог", Icons.Default.Search, state.screen == Screen.CATALOG, compact = !expanded, itemHeight = itemHeight) { state.openCatalog() }
+        NavItem("Загрузки", AWIcons.Download, state.screen == Screen.DOWNLOADS, badge = state.downloads.pendingCount, compact = !expanded, itemHeight = itemHeight) { state.screen = Screen.DOWNLOADS }
+        NavItem("Скины", AWIcons.Layers, state.screen == Screen.SKINS, compact = !expanded, itemHeight = itemHeight) { state.screen = Screen.SKINS }
         NavItem("Друзья", AWIcons.Friends, state.screen == Screen.FRIENDS, badge = friends.snapshot.requests.size + friends.snapshot.friends.count { it.invite != null }, compact = !expanded, itemHeight = itemHeight) { state.screen = Screen.FRIENDS }
         NavItem("Скриншоты", AWIcons.Image, state.screen == Screen.SCREENSHOTS, compact = !expanded, itemHeight = itemHeight) { state.screen = Screen.SCREENSHOTS }
-        NavItem("Скины", AWIcons.Layers, state.screen == Screen.SKINS, compact = !expanded, itemHeight = itemHeight) { state.screen = Screen.SKINS }
-        NavItem("Загрузки", AWIcons.Download, state.screen == Screen.DOWNLOADS, badge = state.downloads.pendingCount, compact = !expanded, itemHeight = itemHeight) { state.screen = Screen.DOWNLOADS }
         Spacer(Modifier.weight(1f))
         NavItem("Активность", AWIcons.Activity, state.screen == Screen.ACTIVITY, compact = !expanded, itemHeight = itemHeight) { state.screen = Screen.ACTIVITY }
         NavItem("Уведомления", Icons.Default.Notifications, state.screen == Screen.NOTICES, badge = unread.size, badgeAlert = unread.any { it.level == NoticeLevel.ERROR }, compact = !expanded, itemHeight = itemHeight) { state.openNotices() }
         NavItem("Аккаунты", Icons.Default.Person, state.screen == Screen.ACCOUNTS, compact = !expanded, itemHeight = itemHeight) { state.screen = Screen.ACCOUNTS }
-        NavItem("Настройки", Icons.Default.Settings, state.modal is Modal.Settings, compact = !expanded, itemHeight = itemHeight) { state.openSettings() }
+        NavItem("Настройки", Icons.Default.Settings, state.screen == Screen.SETTINGS || state.modal is Modal.Settings, compact = !expanded, itemHeight = itemHeight) { state.screen = Screen.SETTINGS }
     }
     }
 }

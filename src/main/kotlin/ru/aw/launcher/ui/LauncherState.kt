@@ -138,7 +138,6 @@ class LauncherState(
     var screen: Screen
         get() = visibleScreen
         set(value) {
-            if (value == Screen.SETTINGS) { openSettings(); return }
             if (value == visibleScreen) return
             previousScreens = (previousScreens + visibleScreen).takeLast(32)
             nextScreens = emptyList()

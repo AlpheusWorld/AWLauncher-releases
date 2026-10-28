@@ -22,6 +22,8 @@ import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -86,7 +88,34 @@ import ru.aw.launcher.update.Updater
 
 @Composable
 fun SettingsScreen(state: LauncherState) {
-    SettingsContent(state, 0)
+    val sections = listOf(0 to "Внешний вид", 2 to "Игра", 1 to "Язык", 3 to "Загрузки", 5 to "Discord", 4 to "О лаунчере")
+    var section by remember { mutableStateOf(0) }
+    BoxWithConstraints(Modifier.fillMaxSize().padding(AWDimens.Gutter)) {
+        val compact = maxWidth < 700.dp
+        Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+            Text("Настройки", style = MaterialTheme.typography.displaySmall, color = AWColors.Text)
+            if (compact) {
+                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    sections.forEach { (index, label) -> ChoiceChip(label, selected = section == index, onClick = { section = index }) }
+                }
+            }
+            Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+                if (!compact) {
+                    Column(Modifier.width(200.dp).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        sections.forEach { (index, label) ->
+                            Text(label, color = if (section == index) AWColors.Accent else AWColors.TextSoft,
+                                style = MaterialTheme.typography.titleSmall,
+                                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(AWDimens.CornerMedium))
+                                    .background(if (section == index) AWColors.SurfaceHigh else Color.Transparent)
+                                    .clickable { section = index }.padding(horizontal = 14.dp, vertical = 14.dp))
+                        }
+                    }
+                }
+                Box(Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(AWDimens.CornerLarge))
+                    .background(AWColors.Surface).padding(20.dp)) { SettingsContent(state, section) }
+            }
+        }
+    }
 }
 
 @Composable

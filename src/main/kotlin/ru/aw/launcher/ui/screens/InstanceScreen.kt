@@ -85,9 +85,9 @@ fun InstanceScreen(state: LauncherState, initialTab: Int = 0) {
                     }
                 }
                 HorizontalDivider(color = AWColors.Outline)
-                Row(Modifier.horizontalScroll(rememberScrollState()).clip(PillShape).background(AWColors.Surface).padding(4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     listOf("Контент", "Файлы", "Миры", "Журнал", "Статистика", "Скриншоты", "История").forEachIndexed { index, title ->
-                        ChoiceChip(title, selected = tab == index, onClick = { tab = index })
+                        PageTab(title, selected = tab == index, onClick = { tab = index })
                     }
                 }
                 Box(Modifier.weight(1f).fillMaxWidth()) {
