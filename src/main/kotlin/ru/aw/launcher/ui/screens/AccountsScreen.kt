@@ -110,12 +110,8 @@ internal fun AccountMenu(state: LauncherState, maxHeight: androidx.compose.ui.un
 @Composable
 internal fun AccountMenuRow(account: Account, isSelected: Boolean, onSelect: () -> Unit, onEdit: () -> Unit, onRemove: () -> Unit) {
     val interaction = remember(account.uuid) { MutableInteractionSource() }
-    val hovered by interaction.collectIsHoveredAsState()
-    val background by animateColorAsState(
-        if (hovered || isSelected) AWColors.SurfaceHigh else Color.Transparent,
-        animationSpec = AWMotion.Hover, label = "accountMenuHover")
     Row(Modifier.fillMaxWidth().padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-        Row(Modifier.weight(1f).clip(RoundedCornerShape(AWDimens.CornerMedium)).background(background)
+        Row(Modifier.weight(1f).clip(RoundedCornerShape(AWDimens.CornerMedium))
             .selectable(selected = isSelected, role = Role.RadioButton, interactionSource = interaction, indication = null,
                 onClick = onSelect)
             .padding(horizontal = 6.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {

@@ -488,9 +488,6 @@ private fun RecentCard(state: LauncherState, session: PlaySession, modifier: Mod
 private fun LibraryCard(state: LauncherState, entry: VersionEntry, compact: Boolean, selectionMode: Boolean, checked: Boolean, toggle: () -> Unit) {
     val selected = state.isSelected(entry)
     val interaction = remember { MutableInteractionSource() }
-    val hovered by interaction.collectIsHoveredAsState()
-    val background by animateColorAsState(if (hovered || selected) AWColors.SurfaceHigh else AWColors.Surface,
-        AWMotion.Hover, label = "libraryRowHover")
     val shape = RoundedCornerShape(AWDimens.CornerMedium)
     val settings by Settings.state.collectAsState()
     val group = settings.libraryGroups.firstOrNull { it.id == state.libraryOptions(entry).groupId }?.name
@@ -498,7 +495,7 @@ private fun LibraryCard(state: LauncherState, entry: VersionEntry, compact: Bool
         .padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         if (selectionMode) Checkbox(checked, onCheckedChange = { toggle() })
-        Row(Modifier.weight(1f).clip(shape).background(background)
+        Row(Modifier.weight(1f).clip(shape)
             .clickable(interactionSource = interaction, indication = null) { if (selectionMode) toggle() else state.openInstance(entry) }
             .padding(4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             BuildArtwork(entry, Modifier.size(if (compact) 44.dp else 52.dp).clip(shape), 32.dp, state)

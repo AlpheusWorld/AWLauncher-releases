@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.Image
@@ -96,13 +95,13 @@ fun SettingsScreen(state: LauncherState) {
         val compact = maxWidth < 700.dp
         Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(18.dp)) {
             Text("Настройки", style = MaterialTheme.typography.displaySmall, color = AWColors.Text,
-                modifier = Modifier.widthIn(max = 1100.dp).fillMaxWidth())
+                modifier = Modifier.fillMaxWidth())
             if (compact) {
                 Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     sections.forEach { (index, label) -> ChoiceChip(label, selected = section == index, onClick = { section = index }) }
                 }
             }
-            Row(Modifier.widthIn(max = 1100.dp).fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+            Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
                 if (!compact) {
                     Column(Modifier.width(200.dp).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         sections.forEach { (index, label) ->
@@ -114,7 +113,7 @@ fun SettingsScreen(state: LauncherState) {
                         }
                     }
                 }
-                Column(Modifier.weight(1f).heightIn(max = if (section == 0 || section == 6) 330.dp else 650.dp).fillMaxHeight().clip(RoundedCornerShape(AWDimens.CornerLarge))
+                Column(Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(AWDimens.CornerLarge))
                     .background(AWColors.Surface).padding(if (compact) 16.dp else 24.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
                     Text(sections.first { it.first == section }.second, color = AWColors.Text, style = MaterialTheme.typography.headlineSmall)
                     Box(Modifier.weight(1f).fillMaxWidth()) { SettingsContent(state, section, separateAppearance = true) }
@@ -136,12 +135,12 @@ internal fun SettingsContent(state: LauncherState, section: Int, separateAppeara
 
     Column(
         Modifier.fillMaxSize().verticalScroll(scroll),
-        verticalArrangement = Arrangement.spacedBy(24.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         if (section == 0) {
             if (!separateAppearance) AppearancePanel(settings)
             SettingsGroup(Modifier.fillMaxWidth()) {
-                Column {
+                Column(Modifier.fillMaxWidth()) {
                     SectionTitle("Поведение лаунчера")
                     SettingsRow("Не закрывать лаунчер при запуске игры", divider = false) {
                         AWSwitch(settings.keepLauncherOpen, outlined = true) { checked ->
@@ -161,7 +160,7 @@ internal fun SettingsContent(state: LauncherState, section: Int, separateAppeara
             MemoryPanel(settings)
 
             SettingsGroup(Modifier.fillMaxWidth()) {
-                Column {
+                Column(Modifier.fillMaxWidth()) {
                     SectionTitle("Список версий")
                     SettingsRow("Показывать снапшоты") {
                         AWSwitch(settings.showSnapshots, outlined = true) { checked ->
@@ -229,7 +228,7 @@ private fun DiscordPanel(settings: LauncherSettings) {
     SectionTitle("Discord Rich Presence")
     Text("Покажи друзьям, во что играешь", style = MaterialTheme.typography.bodyMedium, color = AWColors.TextMuted)
     SettingsGroup(Modifier.fillMaxWidth()) {
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                 Image(Brand.icon, "AWLauncher", Modifier.size(64.dp))
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
@@ -245,7 +244,7 @@ private fun DiscordPanel(settings: LauncherSettings) {
         }
     }
     SettingsGroup(Modifier.fillMaxWidth()) {
-        Column {
+        Column(Modifier.fillMaxWidth()) {
             SettingsRow("Показывать активность в Discord", "Сборка, версия Minecraft и время игры") {
                 AWSwitch(settings.discordPresence, outlined = true) { value -> Settings.update { it.copy(discordPresence = value) } }
             }
@@ -273,8 +272,7 @@ private fun DiscordPanel(settings: LauncherSettings) {
 @Composable
 private fun AppearancePanel(settings: LauncherSettings) {
     SettingsGroup(Modifier.fillMaxWidth()) {
-        Column {
-            Spacer(Modifier.height(12.dp))
+        Column(Modifier.fillMaxWidth()) {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf(
                     ThemeMode.SYSTEM to "Как в системе",
@@ -303,7 +301,7 @@ private fun MemoryPanel(settings: LauncherSettings) {
     val validMemory = customMemory != null && customMemory in 512..limit
 
     SettingsGroup(Modifier.fillMaxWidth()) {
-        Column {
+        Column(Modifier.fillMaxWidth()) {
             SectionTitle("Память")
             Text(
                 "${formatMemory(settings.memoryMb)} для игры · в компьютере ${formatTotalMemory(total)}",
@@ -407,7 +405,7 @@ private fun LanguagePanel(settings: LauncherSettings) {
 @Composable
 private fun JvmArgumentsPanel(settings: LauncherSettings) {
     SettingsGroup(Modifier.fillMaxWidth()) {
-        Column {
+        Column(Modifier.fillMaxWidth()) {
             SectionTitle("Аргументы JVM")
             OutlinedTextField(
                 value = settings.jvmArgs,
@@ -434,7 +432,7 @@ private fun JvmArgumentsPanel(settings: LauncherSettings) {
 @Composable
 private fun DownloadsPanel(state: LauncherState, settings: LauncherSettings) {
     SettingsGroup(Modifier.fillMaxWidth()) {
-        Column {
+        Column(Modifier.fillMaxWidth()) {
             SectionTitle("Загрузка и целостность")
             val threads = settings.downloadConcurrency.takeIf { it > 0 } ?: Downloader.DEFAULT_CONCURRENCY
             Text("Потоков загрузки: $threads", style = MaterialTheme.typography.bodyMedium, color = AWColors.Text)
