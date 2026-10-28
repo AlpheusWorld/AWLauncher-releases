@@ -81,7 +81,7 @@ object Http {
         try { return block() } finally { freshMetadata.set(previous) }
     }
 
-    const val USER_AGENT = "AlpheusWorld/AWLauncher/${ArgumentBuilder.LAUNCHER_VERSION}"
+    val USER_AGENT = "AlpheusWorld/AWLauncher/${ArgumentBuilder.LAUNCHER_VERSION}"
 
     val client: OkHttpClient by lazy {
         val dispatcher = Dispatcher().apply {

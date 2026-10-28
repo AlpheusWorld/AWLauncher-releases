@@ -24,6 +24,13 @@ class UpdaterTest {
     private val sha = "a".repeat(64)
 
     @Test
+    fun `installed version matches the package version`() {
+        val expected = requireNotNull(System.getProperty("aw.test.expectedVersion"))
+        assertEquals(expected, Updater.currentVersion)
+        assertFalse(Updater.isNewer(expected, Updater.currentVersion))
+    }
+
+    @Test
     fun `Linux update feeds select the package family without changing custom URLs`() {
         val base = "https://example.com/releases/latest/download/update.json"
         assertEquals("https://example.com/releases/latest/download/update-linux-deb-x64.json", UpdateConfig.linuxFeed(base, "deb", "amd64"))

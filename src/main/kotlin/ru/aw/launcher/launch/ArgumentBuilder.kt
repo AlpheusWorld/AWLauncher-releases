@@ -147,7 +147,8 @@ class ArgumentBuilder(
 
     companion object {
         const val LAUNCHER_NAME = "AWLauncher"
-        const val LAUNCHER_VERSION = "1.0.41"
+        val LAUNCHER_VERSION: String = requireNotNull(ArgumentBuilder::class.java.getResourceAsStream("/launcher-version.txt")) { "Launcher version resource is missing" }
+            .bufferedReader(Charsets.UTF_8).use { it.readText().trim() }.also { require(it.isNotEmpty()) { "Launcher version resource is empty" } }
 
         fun parseJvmArguments(value: String): List<String> {
             val result = ArrayList<String>()

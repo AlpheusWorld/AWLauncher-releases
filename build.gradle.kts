@@ -13,7 +13,7 @@ plugins {
 }
 
 group = "ru.aw"
-version = "1.0.43"
+version = "1.0.44"
 
 kotlin {
     jvmToolchain(21)
@@ -42,6 +42,7 @@ dependencies {
 tasks.test {
     useJUnitPlatform()
     systemProperty("user.home", temporaryDir.absolutePath)
+    systemProperty("aw.test.expectedVersion", project.version.toString())
 }
 
 val microsoftClientId = providers.environmentVariable("AW_MS_CLIENT_ID")
@@ -60,6 +61,7 @@ val discordAppId = providers.environmentVariable("AW_DISCORD_APP_ID")
     .map { it.trim().ifBlank { "1555994295134326945" } }.orElse("1555994295134326945")
 
 val generateLauncherConfig = tasks.register("generateLauncherConfig") {
+    inputs.property("launcherVersion", project.version.toString())
     inputs.property("microsoftClientId", microsoftClientId)
     inputs.property("signerThumbprint", signerThumbprint)
     inputs.property("updateFeedUrl", updateFeedUrl)
@@ -68,6 +70,7 @@ val generateLauncherConfig = tasks.register("generateLauncherConfig") {
     outputs.dir(generatedLauncherConfig)
     doLast {
         val dir = generatedLauncherConfig.get().asFile.apply { mkdirs() }
+        dir.resolve("launcher-version.txt").writeText(project.version.toString())
         dir.resolve("auth-client-id.txt").writeText(microsoftClientId.get().trim())
         dir.resolve("signer-thumbprint.txt").writeText(signerThumbprint.get().replace(" ", "").uppercase())
         dir.resolve("update-url.txt").writeText(updateFeedUrl.get().trim())
