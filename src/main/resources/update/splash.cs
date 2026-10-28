@@ -62,7 +62,10 @@ public static class AwUpdateSplash
             {
                 Installation job = new Installation(launcher, installer, arguments);
                 using (SplashLook look = new SplashLook(assets, version))
-                using (SplashForm form = new SplashForm(look, job, app, ready)) { Trace(ready,"window constructed"); Application.Run(form); }
+                {
+                    Trace(ready,"assets loaded");
+                    using (SplashForm form = new SplashForm(look, job, app, ready)) { Trace(ready,"window constructed"); Application.Run(form); }
+                }
                 return job.ExitCode;
             }
             finally { owner.ReleaseMutex(); }

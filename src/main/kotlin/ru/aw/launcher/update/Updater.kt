@@ -3,6 +3,7 @@ package ru.aw.launcher.update
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Mutex
@@ -373,27 +374,55 @@ object Updater {
         }
         val dir = Paths.cache.resolve("update").resolve(version + "-" + java.util.UUID.randomUUID())
         val ready = dir.resolve("ready")
-        val process = withContext(Dispatchers.IO) {
-            val executable = UpdateSplash.prepare(dir)
-            val msi = installer.toString().endsWith(".msi")
-            val command = UpdateSplash.command(
-                executable = executable,
-                launcher = ProcessHandle.current().pid(),
-                installer = if (msi) Path.of(System.getenv("SystemRoot") ?: "C:/Windows", "System32", "msiexec.exe").toString() else installer.toString(),
-                arguments = if (msi) msiArguments(installer, Shortcuts.appOnDesktop(app).exists(), dir.resolve("install.log"), app.parent) else "",
-                app = app, assets = dir, version = version, ready = ready,
-            )
-            ProcessBuilder(command).directory(dir.toFile()).redirectOutput(dir.resolve("helper-output.log").toFile())
-                .redirectErrorStream(true).start()
-        }
-        withTimeoutOrNull(WINDOWS_READY_MILLIS) {
-            while (!ready.exists()) {
-                if (!process.isAlive) throw IOException(if (process.exitValue() == 79) "Другое обновление лаунчера уже выполняется" else "Не удалось открыть окно обновления. Журнал: " + dir)
-                delay(50)
+        var started: Process? = null
+        try {
+            val process = withContext(Dispatchers.IO) {
+                val executable = UpdateSplash.prepare(dir)
+                val msi = installer.toString().endsWith(".msi")
+                val command = UpdateSplash.command(
+                    executable = executable,
+                    launcher = ProcessHandle.current().pid(),
+                    installer = if (msi) Path.of(System.getenv("SystemRoot") ?: "C:/Windows", "System32", "msiexec.exe").toString() else installer.toString(),
+                    arguments = if (msi) msiArguments(installer, Shortcuts.appOnDesktop(app).exists(), dir.resolve("install.log"), app.parent) else "",
+                    app = app, assets = dir, version = version, ready = ready,
+                )
+                ProcessBuilder(command).directory(dir.toFile()).redirectOutput(dir.resolve("helper-output.log").toFile())
+                    .redirectErrorStream(true).start().also { started = it }
             }
-            true
-        } ?: throw IOException("Окно обновления не ответило. Журнал: " + dir)
-        Log.info("update installer handed over: " + installer + "; helper pid=" + process.pid() + "; log=" + dir)
+            awaitWindowsHelper(process, ready, WINDOWS_READY_MILLIS)
+            Log.info("update installer handed over: " + installer + "; helper pid=" + process.pid() + "; log=" + dir)
+        } catch (cancelled: CancellationException) {
+            withContext(NonCancellable + Dispatchers.IO) { started?.let { stopWindowsHelper(it, dir) } }
+            throw cancelled
+        }
+    }
+
+    internal suspend fun awaitWindowsHelper(process: Process, ready: Path, timeoutMillis: Long) {
+        var handedOver = false
+        try {
+            withTimeoutOrNull(timeoutMillis) {
+                while (true) {
+                    if (!process.isAlive) throw IOException(if (process.exitValue() == 79)
+                        "Другое обновление лаунчера уже выполняется" else "Не удалось открыть окно обновления. Журнал: ${ready.parent}")
+                    if (ready.exists()) break
+                    delay(50)
+                }
+                true
+            } ?: throw IOException("Окно обновления не ответило. Журнал: ${ready.parent}")
+            handedOver = true
+        } finally {
+            if (!handedOver) withContext(NonCancellable + Dispatchers.IO) {
+                stopWindowsHelper(process, ready.parent)
+            }
+        }
+    }
+
+    private fun stopWindowsHelper(process: Process, dir: Path) {
+        if (process.isAlive) {
+            process.destroyForcibly()
+            if (!process.waitFor(5, java.util.concurrent.TimeUnit.SECONDS))
+                Log.warn("update helper did not terminate after handoff failure: $dir")
+        }
     }
 
     internal fun installerExtension(url: String): String {
@@ -449,7 +478,7 @@ object Updater {
         exit 1
     """.trimIndent()
 
-    private const val WINDOWS_READY_MILLIS = 30_000L
+    private const val WINDOWS_READY_MILLIS = 120_000L
     private const val READY_MILLIS = 10_000L
     private const val SAMPLE_NANOS = 250_000_000L
 }

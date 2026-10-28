@@ -10,9 +10,83 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.util.Base64
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.*
+import java.io.InputStream
+import java.io.OutputStream
+import java.io.IOException
 import kotlin.io.path.exists
 
 class UpdateSplashTest {
+    private class WaitingProcess(private val code: Int = 0, initiallyAlive: Boolean = true) : Process() {
+        @Volatile private var alive = initiallyAlive
+        override fun getOutputStream(): OutputStream = OutputStream.nullOutputStream()
+        override fun getInputStream(): InputStream = InputStream.nullInputStream()
+        override fun getErrorStream(): InputStream = InputStream.nullInputStream()
+        override fun waitFor(): Int { while (alive) Thread.sleep(1); return code }
+        override fun waitFor(timeout: Long, unit: TimeUnit): Boolean = !alive
+        override fun exitValue(): Int = if (alive) throw IllegalThreadStateException() else code
+        override fun destroy() { alive = false }
+        override fun destroyForcibly(): Process { destroy(); return this }
+        override fun isAlive(): Boolean = alive
+    }
+
+    @Test fun helperIsAllowedToStartSlowlyAndIsNotStoppedAfterHandoff(@TempDir dir: Path) = runBlocking {
+        val process = WaitingProcess()
+        val ready = dir.resolve("ready")
+        val signal = launch(Dispatchers.IO) { delay(120); Files.createFile(ready) }
+        Updater.awaitWindowsHelper(process, ready, 1000)
+        signal.join()
+        assertTrue(process.isAlive)
+    }
+
+    @Test fun failedOrCancelledHandoffStopsTheHelper(@TempDir dir: Path) = runBlocking {
+        val timedOut = WaitingProcess()
+        assertThrows(IOException::class.java) { runBlocking { Updater.awaitWindowsHelper(timedOut, dir.resolve("timeout"), 100) } }
+        assertFalse(timedOut.isAlive)
+        val cancelled = WaitingProcess()
+        val handoff = launch { Updater.awaitWindowsHelper(cancelled, dir.resolve("cancel"), 1000) }
+        yield()
+        handoff.cancelAndJoin()
+        assertFalse(cancelled.isAlive)
+        val busy = WaitingProcess(code = 79, initiallyAlive = false)
+        val error = assertThrows(IOException::class.java) { runBlocking { Updater.awaitWindowsHelper(busy, dir.resolve("busy"), 1000) } }
+        assertTrue(error.message.orEmpty().contains("уже выполняется"))
+    }
+
+    @Test fun realDelayedProcessIsStoppedOnTimeoutAndRetainedOnReady(@TempDir dir: Path) = runBlocking {
+        val source = dir.resolve("SlowHelper.java")
+        Files.writeString(source, """
+            import java.nio.file.*;
+            public class SlowHelper {
+                public static void main(String[] args) throws Exception {
+                    Thread.sleep(350);
+                    Files.writeString(Path.of(args[0]), "ready");
+                    Thread.sleep(30000);
+                }
+            }
+        """.trimIndent())
+        val java = Path.of(System.getProperty("java.home"), "bin", if (Shell.isWindows) "java.exe" else "java")
+        fun start(ready: Path): Process = ProcessBuilder(java.toString(), source.toString(), ready.toString())
+            .redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD).start()
+
+        val expiredReady = dir.resolve("expired")
+        val expired = start(expiredReady)
+        try {
+            assertThrows(IOException::class.java) { runBlocking { Updater.awaitWindowsHelper(expired, expiredReady, 100) } }
+            assertFalse(expired.isAlive)
+            assertFalse(Files.exists(expiredReady))
+        } finally { if (expired.isAlive) expired.destroyForcibly() }
+
+        val ready = dir.resolve("ready-real")
+        val delayed = start(ready)
+        try {
+            Updater.awaitWindowsHelper(delayed, ready, 20_000)
+            assertTrue(Files.exists(ready))
+            assertTrue(delayed.isAlive)
+        } finally { delayed.destroyForcibly(); delayed.waitFor(5, TimeUnit.SECONDS) }
+    }
+
     @Test fun nativeHandoffPreservesPathsAndArgumentsWithoutShellParsing() {
         val app=Path.of("C:/Users/O'Brien/Launcher/AWLauncher.exe")
         val assets=Path.of("C:/Users/O'Brien/Cache/update")
