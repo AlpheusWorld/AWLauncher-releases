@@ -117,7 +117,7 @@ fun main(args: Array<String>) {
     PlayHistory.historyFile = File(out, "activity-preview.json").toPath().also { copy ->
         runCatching { Files.copy(Paths.root.resolve("activity.json"), copy, StandardCopyOption.REPLACE_EXISTING) }
     }
-    val preloaded = if (selectedScreens?.all { it.startsWith("skin-editor") || it.startsWith("skin-selector") || it.startsWith("skin-events") || it.startsWith("downloads") || it.startsWith("migration") || it.startsWith("settings-redesign") || it.startsWith("accounts-redesign") || it.startsWith("redesign-") } == true)
+    val preloaded = if (selectedScreens?.all { it.startsWith("skin-editor") || it.startsWith("skin-selector") || it.startsWith("skin-events") || it.startsWith("downloads") || it.startsWith("migration") || it.startsWith("settings-redesign") || it.startsWith("accounts-redesign") || it.startsWith("redesign-") || it.startsWith("activity-design") } == true)
         ru.aw.launcher.core.PreloadResult(ru.aw.launcher.meta.VersionManifest(versions = listOf(
             ru.aw.launcher.meta.ManifestVersion(id = "1.21.11", url = ""))), emptyMap(), emptySet())
     else runBlocking { Preloader.run { _, _ -> } }.copy(manifestStale = false, loaderSupportStale = false)
@@ -149,6 +149,35 @@ fun main(args: Array<String>) {
             scene.close()
         }
         println("rendered ${File(out, "$name.png")}")
+    }
+
+    if (selectedScreens?.all { it.startsWith("activity-design") } == true) {
+        val now = System.currentTimeMillis()
+        val sessions = (0..100).filter { it % 4 != 1 }.map { offset ->
+            val start = now - offset * 86_400_000L - 4 * 3_600_000L
+            PlaySession("preview-$offset", "1.21.1", LoaderKind.FABRIC, start,
+                start + (20 + offset % 7 * 23) * 60_000L, server = if (offset % 3 == 0) "example.org" else null,
+                buildName = if (offset % 2 == 0) "Выживание" else "Приключения", launcherOwned = true)
+        }
+        PlayHistory.resetForTests()
+        PlayHistory.historyFile = File(out, "activity-design-history.json").toPath()
+        Files.writeString(PlayHistory.historyFile, Json.encodeToString(sessions))
+        runBlocking { state.loadActivity(force = true) }
+        state.screen = Screen.ACTIVITY
+        render("activity-design", 1280, 780) { AWTheme(ThemeMode.DARK) { App(state, onGameStarted = {}) } }
+        render("activity-design-wide", 1920, 1040) { AWTheme(ThemeMode.DARK) { App(state, onGameStarted = {}) } }
+        render("activity-design-small", 600, 540) { AWTheme(ThemeMode.DARK) { App(state, onGameStarted = {}) } }
+        render("activity-design-light", 1280, 780) { AWTheme(ThemeMode.LIGHT) { App(state, onGameStarted = {}) } }
+        if (selectedScreens?.contains("activity-design-empty") == true) {
+            PlayHistory.resetForTests()
+            PlayHistory.historyFile = File(out, "activity-design-empty.json").toPath()
+            Files.writeString(PlayHistory.historyFile, "[]")
+            val empty = LauncherState(CoroutineScope(Dispatchers.Unconfined), preloaded)
+            runBlocking { empty.loadActivity(force = true) }
+            empty.screen = Screen.ACTIVITY
+            render("activity-design-empty", 1280, 780) { AWTheme(ThemeMode.DARK) { App(empty, onGameStarted = {}) } }
+        }
+        exitProcess(0)
     }
 
     if (selectedScreens?.all { it.startsWith("redesign-") } == true) {

@@ -100,6 +100,8 @@ fun Tag(text: String, color: Color) {
         color = color,
         fontSize = 12.sp,
         fontWeight = FontWeight.Bold,
+        maxLines = 1,
+        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
         modifier = Modifier
             .background(color.copy(alpha = 0.14f), PillShape)
             .padding(horizontal = 10.dp, vertical = 4.dp),

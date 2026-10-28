@@ -18,6 +18,23 @@ import kotlin.io.path.writeText
 
 class ActivityTest {
     @Test
+    fun `weekly chart uses calendar week and excludes future days`() {
+        val today = LocalDate.of(2026, 10, 28)
+        val monday = today.minusDays(2)
+        val stats = ActivityStats.of(emptyList(), today, zone).copy(days = mapOf(
+            monday to 3_600_000L, today to 1_800_000L, today.plusDays(1) to 9_000_000L,
+        ))
+        val days = ru.aw.launcher.ui.screens.weekDays(stats, today)
+        assertEquals(monday, days.first().first)
+        assertEquals(listOf(3_600_000L, 0L, 1_800_000L, 0L, 0L, 0L, 0L), days.map { it.second })
+        assertEquals(7, ru.aw.launcher.ui.screens.weekDays(null, today).size)
+        assertEquals(0, ru.aw.launcher.ui.screens.weekDayAt(0f, 700f, false))
+        assertEquals(6, ru.aw.launcher.ui.screens.weekDayAt(0f, 700f, true))
+        assertEquals(3, ru.aw.launcher.ui.screens.weekDayAt(350f, 700f, false))
+        assertNull(ru.aw.launcher.ui.screens.weekDayAt(700f, 700f, false))
+        assertNull(ru.aw.launcher.ui.screens.weekDayAt(Float.NaN, 700f, false))
+    }
+    @Test
     fun `general activity excludes foreign launcher profiles and previously cached foreign sessions`(@TempDir root: Path) {
         val historyFile = PlayHistory.historyFile
         val cacheFile = PlayHistory.cacheFile

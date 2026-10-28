@@ -2,6 +2,9 @@ package ru.aw.launcher.ui.screens
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Canvas
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.foundation.TooltipArea
 import androidx.compose.foundation.TooltipPlacement
 import androidx.compose.foundation.background
@@ -20,6 +23,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.rememberScrollState
@@ -48,6 +52,7 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.onSizeChanged
@@ -100,40 +105,66 @@ fun ActivityScreen(state: LauncherState, entry: ru.aw.launcher.ui.VersionEntry? 
             delay(REFRESH_MILLIS)
         }
     }
-    val stats = remember(state.activity, entry, state.builds) { if (entry == null) state.activity else state.activityOf(entry) }
+    val stats = remember(state.activity, entry, state.builds) {
+        if (entry == null || state.activity == null) state.activity else state.activityOf(entry)
+    }
+    val reveal = remember { Animatable(0f) }
+    LaunchedEffect(stats != null) {
+        if (stats != null) reveal.animateTo(1f, tween(550, easing = LinearOutSlowInEasing))
+    }
 
-    Column(
-        Modifier.fillMaxSize().padding(if (entry == null) AWDimens.Gutter else 0.dp).verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        Text(
-            if (entry == null) "Активность" else "Статистика сборки",
-            style = MaterialTheme.typography.headlineSmall,
-            color = AWColors.Text,
-            modifier = Modifier.padding(horizontal = 6.dp),
-        )
-        StatRow(stats)
-        if ((stats?.importedMillis ?: 0) > 0) Text("Перенесённое время учтено в общем счётчике. Календарь показывает сессии, для которых сохранились логи",
-            color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 6.dp))
-        HeatmapCard(stats)
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val narrow = maxWidth < 760.dp
+        val sideBySideCharts = maxWidth >= 1440.dp
         val density = LocalDensity.current
         var leftHeight by remember { mutableStateOf(0.dp) }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.Top) {
-            Column(
-                Modifier.weight(1f).onSizeChanged { leftHeight = with(density) { it.height.toDp() } },
+        Box(Modifier.fillMaxSize().padding(if (entry == null) AWDimens.Gutter else 0.dp), contentAlignment = Alignment.TopCenter) {
+            androidx.compose.foundation.lazy.LazyColumn(
+                Modifier.widthIn(max = 1298.dp).fillMaxSize(),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                if (entry == null) VersionsCard(stats, Modifier.fillMaxWidth())
-                ServersCard(stats, Modifier.fillMaxWidth())
+                item(key = "heading") {
+                    Text(if (entry == null) "Активность" else "Статистика сборки",
+                        style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold,
+                        color = AWColors.Text, modifier = Modifier.padding(horizontal = 6.dp))
+                }
+                item(key = "summary") { StatRow(stats) }
+                if ((stats?.importedMillis ?: 0) > 0) item(key = "imported") {
+                    Text("Перенесённое время учтено в общем счётчике. Календарь показывает сессии, для которых сохранились логи",
+                        color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 6.dp))
+                }
+                if (sideBySideCharts) {
+                    item(key = "charts") {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                            WeekCard(stats, { reveal.value }, Modifier.weight(0.75f))
+                            HeatmapCard(stats, Modifier.weight(1.25f))
+                        }
+                    }
+                } else {
+                    item(key = "week") { WeekCard(stats, { reveal.value }, Modifier.fillMaxWidth()) }
+                    item(key = "calendar") { HeatmapCard(stats, Modifier.fillMaxWidth()) }
+                }
+                if (narrow) {
+                    if (entry == null) item(key = "versions") { VersionsCard(stats, Modifier.fillMaxWidth(), { reveal.value }) }
+                    item(key = "servers") { ServersCard(stats, Modifier.fillMaxWidth(), { reveal.value }) }
+                    item(key = "recent") { RecentCard(stats, ActivityStats.RECENT_MAX, SESSION_ROW, Modifier.fillMaxWidth()) }
+                } else {
+                    item(key = "details") {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.Top) {
+                            Column(Modifier.weight(1f).onSizeChanged { leftHeight = with(density) { it.height.toDp() } },
+                                verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                                if (entry == null) VersionsCard(stats, Modifier.fillMaxWidth(), { reveal.value })
+                                ServersCard(stats, Modifier.fillMaxWidth(), { reveal.value })
+                            }
+                            val fits = ((leftHeight - RECENT_OVERHEAD) / SESSION_ROW).toInt().coerceIn(RECENT_MIN, ActivityStats.RECENT_MAX)
+                            val shown = minOf(fits, stats?.recent?.size ?: 0)
+                            val rowHeight = if (shown == fits && leftHeight > 0.dp)
+                                ((leftHeight - RECENT_OVERHEAD) / fits).coerceIn(SESSION_ROW, SESSION_ROW_MAX) else SESSION_ROW
+                            RecentCard(stats, fits, rowHeight, Modifier.weight(1.25f))
+                        }
+                    }
+                }
             }
-            val fits = ((leftHeight - RECENT_OVERHEAD) / SESSION_ROW).toInt().coerceIn(RECENT_MIN, ActivityStats.RECENT_MAX)
-            val shown = minOf(fits, stats?.recent?.size ?: 0)
-            val rowHeight = if (shown == fits && leftHeight > 0.dp) {
-                ((leftHeight - RECENT_OVERHEAD) / fits).coerceIn(SESSION_ROW, SESSION_ROW_MAX)
-            } else {
-                SESSION_ROW
-            }
-            RecentCard(stats, fits, rowHeight, Modifier.weight(1.25f))
         }
     }
 }
@@ -143,13 +174,13 @@ private fun StatRow(stats: ActivityStats?) {
     val cards: List<@Composable RowScope.() -> Unit> = listOf(
         { StatCard(
             "Всего в игре",
-            stats?.let { formatPlayTime(it.totalMillis) } ?: "…",
+            stats?.let { if (it.totalMillis == 0L) "0 мин" else formatPlayTime(it.totalMillis) } ?: "…",
             AWIcons.Clock,
             AWColors.Accent,
         ) },
         { StatCard(
             "Эта неделя",
-            stats?.let { formatPlayTime(it.weekMillis) } ?: "…",
+            stats?.let { if (it.weekMillis == 0L) "0 мин" else formatPlayTime(it.weekMillis) } ?: "…",
             AWIcons.Calendar,
             AWColors.Info,
         ) },
@@ -225,10 +256,102 @@ private fun Card(modifier: Modifier = Modifier, content: @Composable () -> Unit)
     ) { content() }
 }
 
+internal fun weekDays(stats: ActivityStats?, today: LocalDate): List<Pair<LocalDate, Long>> {
+    val monday = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+    return (0L..6L).map { offset ->
+        val day = monday.plusDays(offset)
+        day to if (day.isAfter(today)) 0L else (stats?.days?.get(day) ?: 0L).coerceAtLeast(0L)
+    }
+}
+
+internal fun weekDayAt(x: Float, width: Float, rtl: Boolean): Int? {
+    if (!x.isFinite() || !width.isFinite() || width <= 0f || x < 0f || x >= width) return null
+    val column = (x / width * 7).toInt().coerceIn(0, 6)
+    return if (rtl) 6 - column else column
+}
+
+@OptIn(ExperimentalFoundationApi::class, ExperimentalComposeUiApi::class)
 @Composable
-private fun HeatmapCard(stats: ActivityStats?) {
-    Card(Modifier.fillMaxWidth()) {
+private fun WeekCard(stats: ActivityStats?, animation: () -> Float, modifier: Modifier = Modifier) {
+    val today = stats?.today ?: LocalDate.now()
+    val days = remember(stats, today) { weekDays(stats, today) }
+    val maximum = remember(days) { days.maxOfOrNull { it.second }?.coerceAtLeast(1L) ?: 1L }
+    val accent = AWColors.Accent
+    val baseline = AWColors.Outline
+    val surface = AWColors.SurfaceHigh
+    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+    var hovered by remember(days) { mutableStateOf<Int?>(null) }
+    Card(modifier) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Время по дням", color = AWColors.Text, style = MaterialTheme.typography.titleMedium)
+                    Text("Эта неделя", color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall)
+                }
+                Text(stats?.let { if (it.weekMillis == 0L) "0 мин" else formatPlayTime(it.weekMillis) } ?: "…", color = AWColors.Text,
+                    style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            }
+            TooltipArea(
+                tooltip = {
+                    hovered?.let { index ->
+                        val (day, millis) = days[index]
+                        Text("${day.dayOfMonth} ${MONTHS_OF[day.monthValue - 1]} · " +
+                            if (millis > 0) formatPlayTime(millis) else "без игры",
+                            style = MaterialTheme.typography.bodySmall, color = AWColors.Text,
+                            modifier = Modifier.background(AWColors.SurfaceHigh, RoundedCornerShape(AWDimens.CornerSmall))
+                                .padding(horizontal = 10.dp, vertical = 7.dp))
+                    }
+                }, delayMillis = 120, tooltipPlacement = TooltipPlacement.CursorPoint(offset = DpOffset(0.dp, 16.dp)),
+            ) {
+                Canvas(Modifier.fillMaxWidth().height(100.dp)
+                    .onPointerEvent(PointerEventType.Move) { event ->
+                        val x = event.changes.firstOrNull()?.position?.x
+                        val width = size.width.toFloat()
+                        hovered = x?.let { weekDayAt(it, width, rtl) }?.takeIf { !days[it].first.isAfter(today) }
+                    }.onPointerEvent(PointerEventType.Exit) { hovered = null }) {
+                    val step = size.width / 7f
+                    val barWidth = minOf(step * 0.38f, 32.dp.toPx())
+                    val radius = CornerRadius(4.dp.toPx())
+                    for (line in 0..3) {
+                        val y = size.height * line / 3f
+                        drawLine(baseline.copy(alpha = 0.45f), Offset(0f, y), Offset(size.width, y), 1.dp.toPx())
+                    }
+                    val progress = animation().coerceIn(0f, 1f)
+                    val barBrush = Brush.verticalGradient(listOf(accent, accent.copy(alpha = 0.55f)), endY = size.height)
+                    days.forEachIndexed { index, (day, millis) ->
+                        val column = if (rtl) 6 - index else index
+                        val x = column * step + (step - barWidth) / 2f
+                        val height = if (millis > 0L) (size.height * (millis.toFloat() / maximum) * progress).coerceAtLeast(3.dp.toPx()) else 3.dp.toPx()
+                        val color = when {
+                            day.isAfter(today) -> surface.copy(alpha = 0.35f)
+                            millis == 0L -> surface
+                            day == today -> accent
+                            else -> accent.copy(alpha = 0.66f)
+                        }
+                        if (millis > 0L && !day.isAfter(today)) {
+                            drawRoundRect(barBrush, Offset(x, size.height - height), Size(barWidth, height), radius,
+                                alpha = if (day == today) 1f else 0.7f)
+                        } else drawRoundRect(color, Offset(x, size.height - height), Size(barWidth, height), radius)
+                    }
+                }
+            }
+            Row(Modifier.fillMaxWidth()) {
+                listOf("пн", "вт", "ср", "чт", "пт", "сб", "вс").forEach { label ->
+                    Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                        Text(label, color = AWColors.TextMuted, style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HeatmapCard(stats: ActivityStats?, modifier: Modifier = Modifier) {
+    Card(modifier) {
         Column {
+            Text("Календарь активности", color = AWColors.Text, style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(14.dp))
             Heatmap(stats)
             Spacer(Modifier.height(12.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -250,7 +373,9 @@ private fun HeatmapCard(stats: ActivityStats?) {
 private fun Heatmap(stats: ActivityStats?) {
     val today = stats?.today ?: LocalDate.now()
     BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val weeks = ((maxWidth - DAY_LABELS) / (CELL + GAP)).toInt().coerceIn(8, 53)
+        val cell = if (maxWidth >= 720.dp && maxWidth < 927.dp) 10.dp else CELL
+        val gap = if (cell == CELL) GAP else 3.dp
+        val weeks = ((maxWidth - DAY_LABELS) / (cell + gap)).toInt().coerceIn(8, 53)
         val firstMonday = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).minusWeeks((weeks - 1).toLong())
         val columns = remember(firstMonday, weeks) { (0 until weeks).map { week -> (0..6).map { firstMonday.plusDays(week * 7L + it) } } }
         val levels = remember(columns, stats?.days) { columns.flatten().map { levelOf(stats?.days?.get(it) ?: 0L) } }
@@ -259,15 +384,15 @@ private fun Heatmap(stats: ActivityStats?) {
         val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
         var hovered by remember(firstMonday, weeks) { mutableStateOf<LocalDate?>(null) }
         val density = LocalDensity.current
-        val cellPx = with(density) { CELL.toPx() }
-        val stridePx = with(density) { (CELL + GAP).toPx() }
+        val cellPx = with(density) { cell.toPx() }
+        val stridePx = with(density) { (cell + gap).toPx() }
 
         Column {
             Row(Modifier.padding(start = DAY_LABELS).height(16.dp)) {
                 var previousMonth = -1
                 columns.forEach { days ->
                     val month = days.first().monthValue
-                    Box(Modifier.width(CELL + GAP)) {
+                    Box(Modifier.width(cell + gap)) {
                         if (month != previousMonth && days.first().dayOfMonth <= 7) {
                             Text(
                                 MONTHS_SHORT[month - 1],
@@ -285,9 +410,9 @@ private fun Heatmap(stats: ActivityStats?) {
             }
             Spacer(Modifier.height(4.dp))
             Row {
-                Column(Modifier.width(DAY_LABELS), verticalArrangement = Arrangement.spacedBy(GAP)) {
+                Column(Modifier.width(DAY_LABELS), verticalArrangement = Arrangement.spacedBy(gap)) {
                     listOf("пн", "", "ср", "", "пт", "", "").forEach { label ->
-                        Box(Modifier.height(CELL), contentAlignment = Alignment.CenterStart) {
+                        Box(Modifier.height(cell), contentAlignment = Alignment.CenterStart) {
                             if (label.isNotEmpty()) {
                                 Text(
                                     label,
@@ -318,7 +443,7 @@ private fun Heatmap(stats: ActivityStats?) {
                     delayMillis = 120,
                     tooltipPlacement = TooltipPlacement.CursorPoint(offset = DpOffset(0.dp, 16.dp)),
                 ) {
-                    Canvas(Modifier.width((CELL + GAP) * weeks - GAP).height(CELL * 7 + GAP * 6)
+                    Canvas(Modifier.width((cell + gap) * weeks - gap).height(cell * 7 + gap * 6)
                         .onPointerEvent(PointerEventType.Move) { event ->
                             val position = event.changes.firstOrNull()?.position
                             hovered = position?.let { heatmapDayAt(firstMonday, weeks, it.x, it.y, cellPx, stridePx, rtl) }
@@ -352,7 +477,7 @@ internal fun heatmapDayAt(firstMonday: LocalDate, weeks: Int, x: Float, y: Float
 }
 
 @Composable
-private fun VersionsCard(stats: ActivityStats?, modifier: Modifier) {
+private fun VersionsCard(stats: ActivityStats?, modifier: Modifier, animation: () -> Float) {
     Card(modifier) {
         Column {
             CardTitle("Любимые версии", AWIcons.Layers, AWColors.Info)
@@ -377,15 +502,7 @@ private fun VersionsCard(stats: ActivityStats?, modifier: Modifier) {
                             Text(formatPlayTime(version.millis), style = MaterialTheme.typography.bodySmall, color = AWColors.TextSoft)
                         }
                         Spacer(Modifier.height(6.dp))
-                        Box(Modifier.fillMaxWidth().height(8.dp).clip(PillShape).background(AWColors.SurfaceHigh)) {
-                            Box(
-                                Modifier
-                                    .fillMaxWidth((version.millis.toFloat() / max).coerceIn(0.04f, 1f))
-                                    .fillMaxHeight()
-                                    .clip(PillShape)
-                                    .background(loaderTone(version.loader)),
-                            )
-                        }
+                        ActivityBar((version.millis.toFloat() / max).coerceIn(0f, 1f), loaderTone(version.loader), animation)
                     }
                 }
             }
@@ -394,7 +511,7 @@ private fun VersionsCard(stats: ActivityStats?, modifier: Modifier) {
 }
 
 @Composable
-private fun ServersCard(stats: ActivityStats?, modifier: Modifier) {
+private fun ServersCard(stats: ActivityStats?, modifier: Modifier, animation: () -> Float) {
     Card(modifier) {
         Column {
             CardTitle("Любимые серверы", AWIcons.Server, AWColors.Success)
@@ -424,19 +541,22 @@ private fun ServersCard(stats: ActivityStats?, modifier: Modifier) {
                             Text(formatPlayTime(millis), style = MaterialTheme.typography.bodySmall, color = AWColors.TextSoft)
                         }
                         Spacer(Modifier.height(6.dp))
-                        Box(Modifier.fillMaxWidth().height(8.dp).clip(PillShape).background(AWColors.SurfaceHigh)) {
-                            Box(
-                                Modifier
-                                    .fillMaxWidth((millis.toFloat() / max).coerceIn(0.04f, 1f))
-                                    .fillMaxHeight()
-                                    .clip(PillShape)
-                                    .background(AWColors.Success),
-                            )
-                        }
+                        ActivityBar((millis.toFloat() / max).coerceIn(0f, 1f), AWColors.Success, animation)
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ActivityBar(fraction: Float, color: Color, animation: () -> Float) {
+    val track = AWColors.SurfaceHigh
+    Canvas(Modifier.fillMaxWidth().height(8.dp)) {
+        val radius = CornerRadius(size.height / 2f)
+        drawRoundRect(track, cornerRadius = radius)
+        val width = size.width * fraction * animation().coerceIn(0f, 1f)
+        if (width > 0f) drawRoundRect(color, size = Size(width, size.height), cornerRadius = CornerRadius(minOf(radius.x, width / 2f)))
     }
 }
 
@@ -481,7 +601,7 @@ private fun SessionRow(session: PlaySession, today: LocalDate, height: Dp) {
                 maxLines = 1,
             )
         }
-        Tag(session.label, loaderTone(session.loader))
+        Box(Modifier.widthIn(max = 140.dp)) { Tag(session.label, loaderTone(session.loader)) }
         Text(
             formatPlayTime(session.millis),
             style = MaterialTheme.typography.bodyMedium,

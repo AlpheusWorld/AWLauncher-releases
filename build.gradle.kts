@@ -13,7 +13,7 @@ plugins {
 }
 
 group = "ru.aw"
-version = "1.0.39"
+version = "1.0.40"
 
 kotlin {
     jvmToolchain(21)
@@ -192,7 +192,8 @@ tasks.register<JavaExec>("benchmarkUi") {
     classpath = sourceSets["test"].runtimeClasspath
     mainClass.set("ru.aw.launcher.dev.UiPerformanceKt")
     systemProperty("user.home", temporaryDir.absolutePath)
-    args(layout.buildDirectory.file((findProperty("benchmarkReport") as String?) ?: "ui-performance.tsv").get().asFile.absolutePath)
+    args(layout.buildDirectory.file((findProperty("benchmarkReport") as String?) ?: "ui-performance.tsv").get().asFile.absolutePath,
+        (findProperty("benchmarkCases") as String?).orEmpty())
 }
 
 tasks.register<JavaExec>("smokeLoaders") {

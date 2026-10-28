@@ -55,6 +55,7 @@ fun main(args: Array<String>) {
         scene.render(time).close()
         return (System.nanoTime() - started) / 1_000_000.0
     }
+    val selected = args.getOrNull(1)?.split(',')?.filter { it.isNotBlank() }?.toSet().orEmpty()
     val actions = linkedMapOf<String, () -> Unit>(
         "home" to { state.screen = Screen.HOME },
         "library" to { state.screen = Screen.PLAY },
@@ -62,7 +63,8 @@ fun main(args: Array<String>) {
         "activity" to { state.screen = Screen.ACTIVITY },
         "settings-game" to { state.screen = Screen.HOME; state.openSettings(section = 2) },
         "settings-language" to { state.screen = Screen.HOME; state.openSettings(section = 1) },
-    )
+    ).filterKeys { selected.isEmpty() || it in selected }
+    require(actions.isNotEmpty()) { "No matching benchmark cases" }
     val opens = actions.keys.associateWith { ArrayList<Double>() }
     val frames = actions.keys.associateWith { ArrayList<Double>() }
     fun percentile(values: List<Double>, percentile: Double): Double =
