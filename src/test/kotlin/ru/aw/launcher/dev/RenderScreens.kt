@@ -399,6 +399,7 @@ fun main(args: Array<String>) {
     withBuilds.selectEntry(withBuilds.entryFor(localBuild))
     withBuilds.screen = Screen.HOME
     render("launch-home", 1280, 780) { AWTheme(ThemeMode.DARK) { App(withBuilds, onGameStarted = {}) } }
+    render("launch-home-wide", 1920, 1040) { AWTheme(ThemeMode.DARK) { App(withBuilds, onGameStarted = {}) } }
     render("launch-home-medium", 815, 630) { AWTheme(ThemeMode.DARK) { App(withBuilds, onGameStarted = {}) } }
     render("launch-home-minimum", 600, 420) { AWTheme(ThemeMode.DARK) { App(withBuilds, onGameStarted = {}) } }
     withBuilds.downloads.enqueue("preview-update", "Sodium", withBuilds.entryFor(localBuild).key) { reporter ->
@@ -407,6 +408,7 @@ fun main(args: Array<String>) {
         awaitCancellation()
     }
     render("launch-home-download", 1280, 780) { AWTheme(ThemeMode.DARK) { App(withBuilds, onGameStarted = {}) } }
+    render("launch-home-download-wide", 1920, 1040) { AWTheme(ThemeMode.DARK) { App(withBuilds, onGameStarted = {}) } }
     render("launch-home-download-medium", 815, 630) { AWTheme(ThemeMode.DARK) { App(withBuilds, onGameStarted = {}) } }
     render("launch-home-download-minimum", 600, 420) { AWTheme(ThemeMode.DARK) { App(withBuilds, onGameStarted = {}) } }
     withBuilds.downloads.active?.let { withBuilds.downloads.cancel(it.id) }

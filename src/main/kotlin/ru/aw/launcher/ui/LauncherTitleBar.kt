@@ -74,13 +74,13 @@ fun LauncherTitleBar(
         Screen.SETTINGS -> "Настройки"
         Screen.ACCOUNTS -> "Аккаунты"
     }
-    BoxWithConstraints(Modifier.fillMaxWidth().background(AWColors.Sidebar)) {
+    BoxWithConstraints(Modifier.fillMaxWidth().background(AWColors.Background)) {
         val compact = maxWidth < 900.dp
         val brandingWidth = if (maxWidth >= 760.dp) 214.dp else 176.dp
         Column(Modifier.fillMaxWidth()) {
             Row(Modifier.fillMaxWidth().height(AWDimens.TitleBarHeight), verticalAlignment = Alignment.CenterVertically) {
                 DragArea(windowScope, Modifier.width(brandingWidth).fillMaxHeight(), nativeFrame, toggleMaximize) {
-                    Box(Modifier.fillMaxSize().padding(horizontal = 12.dp), contentAlignment = Alignment.CenterStart) {
+                    Box(Modifier.fillMaxSize().background(AWColors.Sidebar).padding(horizontal = if (compact) 12.dp else 24.dp), contentAlignment = Alignment.CenterStart) {
                         Wordmark(148.dp)
                     }
                 }
@@ -98,6 +98,10 @@ fun LauncherTitleBar(
                 }
                 DragArea(windowScope, Modifier.weight(1f).fillMaxHeight(), nativeFrame, toggleMaximize) {
                     Row(Modifier.fillMaxSize().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        if (!compact) {
+                            Text("AWLauncher", style = MaterialTheme.typography.bodySmall, color = AWColors.TextMuted, translate = false)
+                            Text("  ›  ", style = MaterialTheme.typography.bodySmall, color = AWColors.TextMuted, translate = false)
+                        }
                         Text(title, style = MaterialTheme.typography.titleMedium, color = AWColors.Text,
                             fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis,
                             translate = state.screen != Screen.INSTANCE && (state.screen != Screen.CATALOG || state.catalogPageTitle == null))

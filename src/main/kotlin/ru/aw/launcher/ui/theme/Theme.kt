@@ -229,7 +229,7 @@ object AWDimens {
     val CornerSmall = 4.dp
     val Gutter = 24.dp
     val RailWidth = 64.dp
-    val TitleBarHeight = 44.dp
+    val TitleBarHeight = 58.dp
 }
 
 val PillShape = RoundedCornerShape(6.dp)

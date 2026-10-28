@@ -17,11 +17,32 @@ import ru.aw.launcher.meta.ManifestVersion
 import ru.aw.launcher.meta.VersionManifest
 import ru.aw.launcher.ui.theme.AWTheme
 import ru.aw.launcher.ui.screens.LauncherUpdateProgress
+import ru.aw.launcher.ui.screens.LaunchDownloads
+import ru.aw.launcher.net.DownloadProgress
+import androidx.compose.ui.Modifier
 import ru.aw.launcher.update.UpdateManifest
 import ru.aw.launcher.update.UpdateState
 
 @OptIn(ExperimentalComposeUiApi::class, InternalComposeUiApi::class)
 class SettingsOverlayTest {
+    @Test
+    fun `home download cancel action cancels active task`() {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        val state = LauncherState(scope, PreloadResult(VersionManifest(), emptyMap(), emptySet()))
+        state.downloads.enqueue("preview", "Sodium") { reporter ->
+            reporter.stage("Загрузка файлов")
+            reporter.progress(DownloadProgress(2, 12, 42, 247, 9, "Sodium.jar"))
+            awaitCancellation()
+        }
+        val scene = ImageComposeScene(290, 250, density = Density(1f)) { AWTheme { LaunchDownloads(state, Modifier, false) } }
+        try {
+            repeat(20) { scene.render(it * 16_666_667L).close() }
+            scene.sendPointerEvent(PointerEventType.Press, Offset(245f, 196f))
+            scene.sendPointerEvent(PointerEventType.Release, Offset(245f, 196f))
+            assertTrue(state.downloads.active == null || state.downloads.active?.status == DownloadStatus.CANCELLING)
+        } finally { scene.close(); scope.cancel() }
+    }
+
     @Test
     fun `play and library navigation remain reachable at the minimum size`() {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
@@ -29,12 +50,12 @@ class SettingsOverlayTest {
         val scene = ImageComposeScene(600, 420, density = Density(1f)) { AWTheme { App(state, onGameStarted = {}) } }
         try {
             repeat(20) { scene.render(it * 16_666_667L).close() }
-            scene.sendPointerEvent(PointerEventType.Press, Offset(32f, 100f))
-            scene.sendPointerEvent(PointerEventType.Release, Offset(32f, 100f))
+            scene.sendPointerEvent(PointerEventType.Press, Offset(32f, 114f))
+            scene.sendPointerEvent(PointerEventType.Release, Offset(32f, 114f))
             assertEquals(Screen.PLAY, state.screen)
             repeat(20) { scene.render((it + 20) * 16_666_667L).close() }
-            scene.sendPointerEvent(PointerEventType.Press, Offset(32f, 70f))
-            scene.sendPointerEvent(PointerEventType.Release, Offset(32f, 70f))
+            scene.sendPointerEvent(PointerEventType.Press, Offset(32f, 84f))
+            scene.sendPointerEvent(PointerEventType.Release, Offset(32f, 84f))
             assertEquals(Screen.HOME, state.screen)
         } finally { scene.close(); scope.cancel() }
     }
@@ -59,8 +80,8 @@ class SettingsOverlayTest {
         val scene = ImageComposeScene(600, 420, density = Density(1f)) { AWTheme { App(state, onGameStarted = {}) } }
         try {
             repeat(20) { scene.render(it * 16_666_667L).close() }
-            scene.sendPointerEvent(PointerEventType.Press, Offset(32f, 392f))
-            scene.sendPointerEvent(PointerEventType.Release, Offset(32f, 392f))
+            scene.sendPointerEvent(PointerEventType.Press, Offset(32f, 264f))
+            scene.sendPointerEvent(PointerEventType.Release, Offset(32f, 264f))
             assertTrue(state.screen == Screen.SETTINGS, "The bottom navigation button must be visible and clickable")
         } finally { scene.close(); scope.cancel() }
     }
@@ -72,8 +93,8 @@ class SettingsOverlayTest {
         val scene = ImageComposeScene(815, 503, density = Density(1f)) { AWTheme { App(state, onGameStarted = {}) } }
         try {
             repeat(20) { scene.render(it * 16_666_667L).close() }
-            scene.sendPointerEvent(PointerEventType.Press, Offset(32f, 477f))
-            scene.sendPointerEvent(PointerEventType.Release, Offset(32f, 477f))
+            scene.sendPointerEvent(PointerEventType.Press, Offset(32f, 264f))
+            scene.sendPointerEvent(PointerEventType.Release, Offset(32f, 264f))
             assertTrue(state.screen == Screen.SETTINGS, "The bottom navigation button must remain reachable")
         } finally { scene.close(); scope.cancel() }
     }

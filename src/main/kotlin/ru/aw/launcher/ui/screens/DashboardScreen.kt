@@ -72,30 +72,32 @@ internal fun LaunchDashboard(state: LauncherState) {
     LaunchedEffect(builds) { state.loadLibraryMetadata() }
     val entry = state.currentEntry() ?: builds.firstOrNull()
     BoxWithConstraints(Modifier.fillMaxSize()) {
-        val wide = maxWidth >= 920.dp
+        val wide = maxWidth >= 1050.dp
         val paired = maxWidth >= 520.dp
         val compactHeight = maxHeight < 700.dp
-        val padding = if (compactHeight) 12.dp else if (maxWidth < 620.dp) 16.dp else 24.dp
-        val spacing = if (compactHeight) 10.dp else 16.dp
+        val padding = if (compactHeight) 12.dp else if (maxWidth < 620.dp) 16.dp else 36.dp
+        val spacing = if (compactHeight) 10.dp else 22.dp
         Column(
-            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(padding),
+            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = padding, vertical = padding)
+                .wrapContentWidth(Alignment.CenterHorizontally),
             verticalArrangement = Arrangement.spacedBy(spacing),
         ) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text("Играть", style = MaterialTheme.typography.displaySmall, color = AWColors.Text, modifier = Modifier.weight(1f))
-                AWButton("Все сборки", onClick = { state.screen = Screen.PLAY })
+            Row(Modifier.widthIn(max = 1298.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("Играть", style = if (compactHeight) MaterialTheme.typography.displaySmall else MaterialTheme.typography.displayMedium,
+                    color = AWColors.Text, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                HomeLink("Все сборки") { state.screen = Screen.PLAY }
             }
             if (wide) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    LaunchBuildCard(state, entry, Modifier.weight(1f), compactHeight)
-                    Column(Modifier.width(260.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        LaunchDownloads(state, Modifier.fillMaxWidth(), compactHeight)
+                Row(Modifier.widthIn(max = 1298.dp).fillMaxWidth().height(if (compactHeight) 300.dp else 368.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    LaunchBuildCard(state, entry, Modifier.weight(1f).fillMaxHeight(), compactHeight)
+                    Column(Modifier.width(290.dp).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        LaunchDownloads(state, Modifier.fillMaxWidth().weight(1f), compactHeight)
                         LaunchActivity(state, Modifier.fillMaxWidth())
                     }
                 }
             } else {
-                LaunchBuildCard(state, entry, Modifier.fillMaxWidth(), compactHeight)
-                if (paired) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                LaunchBuildCard(state, entry, Modifier.widthIn(max = 1298.dp).fillMaxWidth(), compactHeight)
+                if (paired) Row(Modifier.widthIn(max = 1298.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     LaunchDownloads(state, Modifier.weight(1f), compactHeight)
                     LaunchActivity(state, Modifier.weight(1f))
                 } else {
@@ -103,9 +105,9 @@ internal fun LaunchDashboard(state: LauncherState) {
                     LaunchActivity(state, Modifier.fillMaxWidth())
                 }
             }
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.widthIn(max = 1298.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text("Мои сборки", style = MaterialTheme.typography.titleLarge, color = AWColors.Text, modifier = Modifier.weight(1f))
-                AWButton("Библиотека", onClick = { state.screen = Screen.PLAY })
+                HomeLink("Все сборки") { state.screen = Screen.PLAY }
             }
             if (builds.isEmpty()) {
                 Panel(Modifier.fillMaxWidth()) {
@@ -115,11 +117,12 @@ internal fun LaunchDashboard(state: LauncherState) {
                     }
                 }
             } else {
-                Column(Modifier.fillMaxWidth().background(AWColors.Surface, RoundedCornerShape(AWDimens.CornerLarge))) {
-                    builds.take(3).forEach { build ->
+                Column(Modifier.widthIn(max = 1298.dp).fillMaxWidth().background(AWColors.Surface, RoundedCornerShape(AWDimens.CornerLarge)).padding(horizontal = 16.dp)) {
+                    builds.take(3).forEachIndexed { index, build ->
+                        if (index > 0) HorizontalDivider(color = AWColors.Outline.copy(alpha = 0.65f))
                         Row(
                             Modifier.fillMaxWidth().clip(RoundedCornerShape(AWDimens.CornerMedium))
-                                .clickable { state.openInstance(build) }.padding(horizontal = 16.dp, vertical = 10.dp),
+                                .clickable { state.openInstance(build) }.padding(vertical = 14.dp),
                             horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically,
                         ) {
                             BuildArtwork(build, Modifier.size(46.dp), 26.dp, state)
@@ -139,18 +142,41 @@ internal fun LaunchDashboard(state: LauncherState) {
     }
 }
 
+@Composable
+private fun HomeLink(label: String, onClick: () -> Unit) {
+    Row(Modifier.clip(RoundedCornerShape(AWDimens.CornerSmall)).clickable(onClick = onClick).padding(vertical = 8.dp, horizontal = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(label, color = AWColors.Accent, style = MaterialTheme.typography.labelMedium)
+        Text("→", color = AWColors.Accent, style = MaterialTheme.typography.titleMedium, translate = false)
+    }
+}
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun LaunchBuildCard(state: LauncherState, entry: VersionEntry?, modifier: Modifier, compact: Boolean) {
     val busy = state.busy || state.buildsBusy || state.savingInstanceSettings
     BoxWithConstraints(modifier.background(AWColors.SurfaceHigh, RoundedCornerShape(AWDimens.CornerLarge))) {
         val showArtwork = maxWidth >= 390.dp
+        val showContent = maxWidth >= 500.dp
         val artworkSize = if (maxWidth >= 600.dp) 120.dp else 88.dp
-        Column(Modifier.fillMaxWidth().padding(if (compact) 14.dp else 20.dp), verticalArrangement = Arrangement.spacedBy(if (compact) 10.dp else 16.dp)) {
-            Text("Сборка", color = AWColors.TextMuted, style = MaterialTheme.typography.labelMedium)
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        val fixedHeight = constraints.hasBoundedHeight
+        Column(Modifier.fillMaxWidth().then(if (fixedHeight) Modifier.fillMaxHeight() else Modifier)
+            .padding(if (compact) 14.dp else 24.dp), verticalArrangement = Arrangement.spacedBy(if (compact) 10.dp else 16.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("Выбранная сборка", color = AWColors.TextMuted, style = MaterialTheme.typography.labelMedium, modifier = Modifier.weight(1f))
+                if (entry != null) Text(when {
+                    state.downloads.containsEntry(entry.key) -> "Идёт загрузка"
+                    busy -> "Подготовка"
+                    !state.isEntryInstalled(entry) -> "Не установлена"
+                    else -> "Готова к игре"
+                }, color = AWColors.TextSoft,
+                    style = MaterialTheme.typography.labelMedium, maxLines = 1)
+            }
+            Row(Modifier.fillMaxWidth().then(if (fixedHeight) Modifier.weight(1f) else Modifier), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(if (compact) 5.dp else 8.dp)) {
-                    Text(entry?.title ?: "Выбери сборку", color = AWColors.Text, style = MaterialTheme.typography.headlineLarge,
+                    Text(entry?.title ?: "Выбери сборку", color = AWColors.Text,
+                        style = if (fixedHeight && !compact) MaterialTheme.typography.displayMedium else MaterialTheme.typography.headlineLarge,
+                        fontWeight = FontWeight.Bold,
                         maxLines = 2, overflow = TextOverflow.Ellipsis, translate = entry == null)
                     if (entry != null) {
                         val lastPlayed = state.lastPlayedOf(entry)
@@ -163,22 +189,33 @@ private fun LaunchBuildCard(state: LauncherState, entry: VersionEntry?, modifier
                             icon = Icons.Default.PlayArrow, style = ButtonStyle.PRIMARY, enabled = entry != null && !busy,
                             modifier = if (busy || entry == null) Modifier.border(1.dp, AWColors.Outline, RoundedCornerShape(AWDimens.CornerMedium)) else Modifier,
                             onClick = { entry?.let { state.selectEntry(it); state.play() } })
-                        if (entry != null) AWButton("Открыть сборку", enabled = !state.buildsBusy && !state.savingInstanceSettings, onClick = { state.openInstance(entry) })
+                        if (entry != null) AWButton("Настроить", enabled = !state.buildsBusy && !state.savingInstanceSettings, onClick = { state.openInstance(entry) })
                         else AWButton("Создать сборку", onClick = { state.screen = Screen.BUILDS })
                     }
                 }
-                if (entry != null && showArtwork) BuildArtwork(entry, Modifier.size(artworkSize), 64.dp, state)
+                if (entry != null && showArtwork) Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    BuildArtwork(entry, Modifier.size(artworkSize).clickable(enabled = !busy) { state.editInstanceIcon(entry) }, 64.dp, state)
+                    Text("Изменить иконку", color = AWColors.TextMuted, style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier.clickable(enabled = !busy) { state.editInstanceIcon(entry) })
+                }
             }
             if (entry != null) {
                 HorizontalDivider(color = AWColors.Outline)
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text("Версия Minecraft", color = AWColors.TextMuted, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+                        Text("Версия", color = AWColors.TextMuted, style = MaterialTheme.typography.labelSmall, maxLines = 1)
                         Text(entry.id, color = AWColors.Text, style = MaterialTheme.typography.bodyMedium, translate = false)
                     }
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text("Загрузчик", color = AWColors.TextMuted, style = MaterialTheme.typography.labelSmall)
                         Text(entry.loader.label, color = AWColors.Text, style = MaterialTheme.typography.bodyMedium, translate = false)
+                    }
+                    if (showContent) Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("Содержимое", color = AWColors.TextMuted, style = MaterialTheme.typography.labelSmall)
+                        val model = state.contentModel(entry)
+                        LaunchedEffect(model) { model.ensureScanned() }
+                        Text(if (model.scanned) "${model.installed.values.sumOf { it.size }}" else "—", color = AWColors.Text,
+                            style = MaterialTheme.typography.bodyMedium, translate = false)
                     }
                 }
             }
@@ -187,11 +224,11 @@ private fun LaunchBuildCard(state: LauncherState, entry: VersionEntry?, modifier
 }
 
 @Composable
-private fun LaunchDownloads(state: LauncherState, modifier: Modifier, compact: Boolean) {
+internal fun LaunchDownloads(state: LauncherState, modifier: Modifier, compact: Boolean) {
     val queue = state.downloads
     val item = queue.active ?: queue.items.firstOrNull { it.status == DownloadStatus.WAITING }
     Column(modifier.background(AWColors.Surface, RoundedCornerShape(AWDimens.CornerLarge)).padding(if (compact) 14.dp else 20.dp),
-        verticalArrangement = Arrangement.spacedBy(if (compact) 6.dp else 10.dp)) {
+        verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text("Загрузки", style = MaterialTheme.typography.titleSmall, color = AWColors.Text, modifier = Modifier.weight(1f))
                 WithTooltip("Загрузки") { IconButton(onClick = { state.screen = Screen.DOWNLOADS }, modifier = Modifier.size(32.dp)) {
@@ -206,8 +243,9 @@ private fun LaunchDownloads(state: LauncherState, modifier: Modifier, compact: B
                     color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 item.progress?.let { progress ->
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text("${(progress.fraction * 100).toInt()}%", color = AWColors.Accent,
-                            style = MaterialTheme.typography.headlineMedium, modifier = Modifier.weight(1f), translate = false)
+                        Text("${(progress.fraction * 100).toInt()}%", color = AWColors.Text,
+                            style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold,
+                            modifier = Modifier.weight(1f), translate = false)
                         formatSpeed(progress.bytesPerSecond).takeIf { it.isNotBlank() }?.let { speed ->
                             Text(speed, color = AWColors.TextSoft, style = MaterialTheme.typography.bodySmall, translate = false)
                         }
@@ -217,7 +255,15 @@ private fun LaunchDownloads(state: LauncherState, modifier: Modifier, compact: B
                         color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall, translate = false)
                 }
                 if (item.status == DownloadStatus.WAITING && queue.paused) AWButton("Продолжить очередь", onClick = { queue.pauseQueue(false) })
-                else if (item.status == DownloadStatus.RUNNING) AWButton("Отменить", enabled = item.cancellable, onClick = { queue.cancel(item.id) })
+                else if (item.status == DownloadStatus.RUNNING) {
+                    Row(Modifier.fillMaxWidth().heightIn(min = 30.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(item.progress?.currentFile.orEmpty(), color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis, translate = false)
+                        Text("Отменить", color = if (item.cancellable) AWColors.Accent else AWColors.TextMuted,
+                            style = MaterialTheme.typography.labelMedium,
+                            modifier = Modifier.clickable(enabled = item.cancellable) { queue.cancel(item.id) }.padding(start = 8.dp, top = 6.dp, bottom = 6.dp))
+                    }
+                }
             }
     }
 }
@@ -227,7 +273,7 @@ private fun LaunchActivity(state: LauncherState, modifier: Modifier) {
     val stats = state.activity
     Panel(modifier.clickable { state.screen = Screen.ACTIVITY }) {
         Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
-            Text("Активность", style = MaterialTheme.typography.titleSmall, color = AWColors.Text)
+            Text("Время в игре", style = MaterialTheme.typography.labelMedium, color = AWColors.TextMuted)
             Text(stats?.let { formatPlayTime(it.weekMillis) } ?: "…", style = MaterialTheme.typography.headlineSmall,
                 color = AWColors.Text)
             Text("Эта неделя", style = MaterialTheme.typography.bodySmall, color = AWColors.TextMuted)
@@ -235,9 +281,9 @@ private fun LaunchActivity(state: LauncherState, modifier: Modifier) {
                 val week = remember(stats) { stats.today.with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY)) }
                 val values = remember(stats, week) { (0L..6L).map { stats.days[week.plusDays(it)] ?: 0L } }
                 val maximum = values.maxOrNull()?.coerceAtLeast(1L) ?: 1L
-                Row(Modifier.fillMaxWidth().height(30.dp), horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.Bottom) {
+                Row(Modifier.height(30.dp), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.Bottom) {
                     values.forEach { value ->
-                        Box(Modifier.weight(1f).fillMaxHeight(if (value == 0L) 0.12f else (value.toFloat() / maximum).coerceIn(0.12f, 1f))
+                        Box(Modifier.width(9.dp).fillMaxHeight(if (value == 0L) 0.12f else (value.toFloat() / maximum).coerceIn(0.12f, 1f))
                             .background(if (value == 0L) AWColors.Outline else AWColors.Accent, RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp)))
                     }
                 }

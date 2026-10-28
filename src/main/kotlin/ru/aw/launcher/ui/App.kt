@@ -52,6 +52,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -191,14 +192,28 @@ private fun CompactNavRail(state: LauncherState, expanded: Boolean) {
         NavItem("Мои сборки", AWIcons.Layers, state.screen in setOf(Screen.PLAY, Screen.BUILDS, Screen.INSTANCE), compact = !expanded, itemHeight = itemHeight) { state.screen = Screen.PLAY }
         NavItem("Каталог", Icons.Default.Search, state.screen == Screen.CATALOG, compact = !expanded, itemHeight = itemHeight) { state.openCatalog() }
         NavItem("Загрузки", AWIcons.Download, state.screen == Screen.DOWNLOADS, badge = state.downloads.pendingCount, compact = !expanded, itemHeight = itemHeight) { state.screen = Screen.DOWNLOADS }
+        if (expanded && !short) Text("ДРУГОЕ", color = AWColors.TextMuted, style = MaterialTheme.typography.labelSmall,
+            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, top = 14.dp, bottom = 4.dp))
         NavItem("Скины", AWIcons.Layers, state.screen == Screen.SKINS, compact = !expanded, itemHeight = itemHeight) { state.screen = Screen.SKINS }
         NavItem("Друзья", AWIcons.Friends, state.screen == Screen.FRIENDS, badge = friends.snapshot.requests.size + friends.snapshot.friends.count { it.invite != null }, compact = !expanded, itemHeight = itemHeight) { state.screen = Screen.FRIENDS }
-        NavItem("Скриншоты", AWIcons.Image, state.screen == Screen.SCREENSHOTS, compact = !expanded, itemHeight = itemHeight) { state.screen = Screen.SCREENSHOTS }
+        NavItem("Настройки", Icons.Default.Settings, state.screen == Screen.SETTINGS || state.modal is Modal.Settings, compact = !expanded, itemHeight = itemHeight) { state.screen = Screen.SETTINGS }
         Spacer(Modifier.weight(1f))
+        NavItem("Скриншоты", AWIcons.Image, state.screen == Screen.SCREENSHOTS, compact = !expanded, itemHeight = itemHeight) { state.screen = Screen.SCREENSHOTS }
         NavItem("Активность", AWIcons.Activity, state.screen == Screen.ACTIVITY, compact = !expanded, itemHeight = itemHeight) { state.screen = Screen.ACTIVITY }
         NavItem("Уведомления", Icons.Default.Notifications, state.screen == Screen.NOTICES, badge = unread.size, badgeAlert = unread.any { it.level == NoticeLevel.ERROR }, compact = !expanded, itemHeight = itemHeight) { state.openNotices() }
-        NavItem("Аккаунты", Icons.Default.Person, state.screen == Screen.ACCOUNTS, compact = !expanded, itemHeight = itemHeight) { state.screen = Screen.ACCOUNTS }
-        NavItem("Настройки", Icons.Default.Settings, state.screen == Screen.SETTINGS || state.modal is Modal.Settings, compact = !expanded, itemHeight = itemHeight) { state.screen = Screen.SETTINGS }
+        if (expanded && !short) {
+            val account by state.selectedAccount.collectAsState()
+            Row(Modifier.fillMaxWidth().clickable { state.screen = Screen.ACCOUNTS }.padding(horizontal = 10.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                SkinHead(account, 36.dp)
+                Column(Modifier.weight(1f)) {
+                    Text(account?.name ?: "Аккаунты", color = AWColors.Text, style = MaterialTheme.typography.titleSmall,
+                        maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, translate = account == null)
+                    Text(if (account == null) "Не выбран" else if (account?.isOffline == true) "Офлайн" else "Microsoft",
+                        color = AWColors.TextMuted, style = MaterialTheme.typography.labelSmall)
+                }
+            }
+        } else NavItem("Аккаунты", Icons.Default.Person, state.screen == Screen.ACCOUNTS, compact = !expanded, itemHeight = itemHeight) { state.screen = Screen.ACCOUNTS }
     }
     }
 }
@@ -235,6 +250,7 @@ private fun NavItem(
         animationSpec = AWMotion.Hover,
         label = "navContent",
     )
+    val accent = AWColors.Accent
 
     WithTooltip(if (compact) label else null) {
     Row(
@@ -243,6 +259,10 @@ private fun NavItem(
             .height(itemHeight)
             .clip(PillShape)
             .background(background)
+            .drawBehind {
+                if (selected) drawRoundRect(accent, topLeft = androidx.compose.ui.geometry.Offset(0f, (size.height - 18.dp.toPx()) / 2f),
+                    size = androidx.compose.ui.geometry.Size(3.dp.toPx(), 18.dp.toPx()), cornerRadius = androidx.compose.ui.geometry.CornerRadius(2.dp.toPx()))
+            }
             .clickable(
                 interactionSource = interaction,
                 indication = null,
