@@ -189,7 +189,7 @@ private fun LaunchBuildCard(state: LauncherState, entry: VersionEntry?, modifier
                             icon = Icons.Default.PlayArrow, style = ButtonStyle.PRIMARY, enabled = entry != null && !busy,
                             modifier = if (busy || entry == null) Modifier.border(1.dp, AWColors.Outline, RoundedCornerShape(AWDimens.CornerMedium)) else Modifier,
                             onClick = { entry?.let { state.selectEntry(it); state.play() } })
-                        if (entry != null) AWButton("Настроить", enabled = !state.buildsBusy && !state.savingInstanceSettings, onClick = { state.openInstance(entry) })
+                        if (entry != null) AWButton("Настроить", modifier = Modifier.border(1.dp, AWColors.Outline, RoundedCornerShape(AWDimens.CornerMedium)), enabled = !state.buildsBusy && !state.savingInstanceSettings, onClick = { state.openInstance(entry) })
                         else AWButton("Создать сборку", onClick = { state.screen = Screen.BUILDS })
                     }
                 }
@@ -203,19 +203,22 @@ private fun LaunchBuildCard(state: LauncherState, entry: VersionEntry?, modifier
                 HorizontalDivider(color = AWColors.Outline)
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text("Версия", color = AWColors.TextMuted, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+                        Text("ВЕРСИЯ", color = AWColors.TextMuted, style = MaterialTheme.typography.labelSmall, maxLines = 1)
                         Text(entry.id, color = AWColors.Text, style = MaterialTheme.typography.bodyMedium, translate = false)
                     }
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text("Загрузчик", color = AWColors.TextMuted, style = MaterialTheme.typography.labelSmall)
+                        Text("ЗАГРУЗЧИК", color = AWColors.TextMuted, style = MaterialTheme.typography.labelSmall)
                         Text(entry.loader.label, color = AWColors.Text, style = MaterialTheme.typography.bodyMedium, translate = false)
                     }
                     if (showContent) Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text("Содержимое", color = AWColors.TextMuted, style = MaterialTheme.typography.labelSmall)
+                        Text("СОДЕРЖИМОЕ", color = AWColors.TextMuted, style = MaterialTheme.typography.labelSmall)
                         val model = state.contentModel(entry)
                         LaunchedEffect(model) { model.ensureScanned() }
-                        Text(if (model.scanned) "${model.installed.values.sumOf { it.size }}" else "—", color = AWColors.Text,
+                        Text(if (model.scanned) "${model.installed.values.sumOf { it.size }} проектов" else "—", color = AWColors.Text,
                             style = MaterialTheme.typography.bodyMedium, translate = false)
+                    }
+                    IconButton(onClick = { state.openInstance(entry) }, modifier = Modifier.size(34.dp).background(AWColors.Surface, RoundedCornerShape(AWDimens.CornerSmall))) {
+                        Icon(Icons.Default.KeyboardArrowDown, "Открыть сборку", tint = AWColors.TextMuted, modifier = Modifier.size(18.dp).rotate(-90f))
                     }
                 }
             }

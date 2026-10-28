@@ -118,10 +118,10 @@ object CurseForge {
         }
     }
 
-    fun search(type: String, query: String, loaders: List<String>, gameVersion: String?, offset: Int): Modrinth.SearchPage {
+    fun search(type: String, query: String, loaders: List<String>, gameVersion: String?, offset: Int, sort: String? = null): Modrinth.SearchPage {
         if (offset >= MAX_RESULTS) return Modrinth.SearchPage(offset = offset, totalHits = MAX_RESULTS)
         val params = linkedMapOf("gameId" to "$GAME", "classId" to classId(type).toString(), "searchFilter" to query.trim(),
-            "sortField" to if (query.isBlank()) "6" else "1", "sortOrder" to "desc", "index" to "$offset", "pageSize" to "${minOf(Modrinth.PAGE, MAX_RESULTS - offset)}")
+            "sortField" to when (sort) { "downloads" -> "6"; "updated" -> "3"; "relevance" -> "1"; else -> if (query.isBlank()) "6" else "1" }, "sortOrder" to "desc", "index" to "$offset", "pageSize" to "${minOf(Modrinth.PAGE, MAX_RESULTS - offset)}")
         if (gameVersion != null) params["gameVersion"] = gameVersion
         val ids = loaders.mapNotNull(LOADERS::get)
         if (ids.isNotEmpty() && gameVersion != null) params["modLoaderTypes"] = ids.joinToString(",", "[", "]")

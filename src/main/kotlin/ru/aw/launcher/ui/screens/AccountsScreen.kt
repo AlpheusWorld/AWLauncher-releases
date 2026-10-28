@@ -83,9 +83,6 @@ internal fun AccountMenu(state: LauncherState, maxHeight: androidx.compose.ui.un
                 }
             }
         }
-        selected?.takeIf { !it.isOffline }?.let { account ->
-            AWMenuItem("Скин и плащ", icon = AWIcons.Image, onClick = { state.accountMenuOpen = false; state.openSkinEditor(account) })
-        }
         MenuDivider()
         if (!adding) AWMenuItem("Добавить аккаунт", onClick = { adding = true })
         else Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -144,8 +141,7 @@ fun AccountsScreen(state: LauncherState) {
             verticalArrangement = Arrangement.spacedBy(2.dp)) {
             accounts.sortedByDescending { it.uuid == selected?.uuid }.forEach { account ->
                 AccountRow(account, account.uuid == selected?.uuid,
-                    onSelect = { state.selectAccount(account.uuid) }, onRemove = { state.removeAccount(account.uuid) },
-                    onSkin = { state.openSkinEditor(account) })
+                    onSelect = { state.selectAccount(account.uuid) }, onRemove = { state.removeAccount(account.uuid) })
             }
         }
         androidx.compose.material3.HorizontalDivider(color = AWColors.Outline)
@@ -185,7 +181,6 @@ private fun AccountRow(
     isSelected: Boolean,
     onSelect: () -> Unit,
     onRemove: () -> Unit,
-    onSkin: () -> Unit,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
@@ -234,11 +229,6 @@ private fun AccountRow(
             }
             if (!compact) {
                 if (account.isOffline) Tag("Офлайн", AWColors.Warning) else Tag("Лицензия", AWColors.Accent)
-            }
-            if (!account.isOffline) {
-                if (compact) WithTooltip("Скин и плащ") {
-                    IconButton(onClick = onSkin, modifier = Modifier.size(44.dp)) { Icon(AWIcons.Image, "Скин и плащ", tint = AWColors.TextMuted) }
-                } else AWButton("Скин и плащ", onClick = onSkin)
             }
             if (isSelected) {
                 Icon(Icons.Default.Check, null, tint = AWColors.Accent, modifier = Modifier.size(18.dp))

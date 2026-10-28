@@ -17,6 +17,8 @@ class CatalogSearch(
     private val fetch: (query: String, offset: Int) -> Modrinth.SearchPage,
 ) {
     var query by mutableStateOf("")
+    var sort by mutableStateOf("downloads")
+    var sortedFetch: ((String, Int, String) -> Modrinth.SearchPage)? = null
     var hits by mutableStateOf<List<Modrinth.SearchHit>>(emptyList())
         private set
     var total by mutableStateOf(0)
@@ -41,32 +43,35 @@ class CatalogSearch(
 
     fun run(more: Boolean = false, force: Boolean = false) {
         val requestedQuery = query.trim()
-        if (more && (searching || completedQuery != requestedQuery)) return
-        if (!more && !force && !searching && !failed && completedQuery == requestedQuery && System.currentTimeMillis() - completedAt < 300_000) return
+        val requestedSort = sort
+        val cacheKey = "$requestedSort\u0000$requestedQuery"
+        if (more && (searching || completedQuery != cacheKey)) return
+        if (!more && !force && !searching && !failed && completedQuery == cacheKey && System.currentTimeMillis() - completedAt < 300_000) return
         job?.cancel()
         val token = Any()
         requestToken = token
-        if (!more && !force) previous[requestedQuery]?.takeIf { System.currentTimeMillis() - it.time < 300_000 }?.let { cached ->
-            hits = cached.hits; total = cached.total; completedQuery = requestedQuery; completedAt = cached.time
+        if (!more && !force) previous[cacheKey]?.takeIf { System.currentTimeMillis() - it.time < 300_000 }?.let { cached ->
+            hits = cached.hits; total = cached.total; completedQuery = cacheKey; completedAt = cached.time
             searching = false; failed = false; error = null
             return
         }
         val offset = if (more) hits.size else 0
-        if (!more && completedQuery != requestedQuery) { hits = emptyList(); total = 0 }
+        if (!more && completedQuery != cacheKey) { hits = emptyList(); total = 0 }
         searching = true
         failed = false
         error = null
         job = scope.launch {
             try {
                 val page = withContext(Dispatchers.IO) {
-                    if (force) Http.withFreshMetadata { fetch(requestedQuery, offset) } else fetch(requestedQuery, offset)
+                    if (force) Http.withFreshMetadata { sortedFetch?.invoke(requestedQuery, offset, requestedSort) ?: fetch(requestedQuery, offset) }
+                    else sortedFetch?.invoke(requestedQuery, offset, requestedSort) ?: fetch(requestedQuery, offset)
                 }
                 if (requestToken !== token) return@launch
                 hits = if (more) hits + page.hits.filter { hit -> hits.none { it.projectId == hit.projectId } } else page.hits
                 total = page.totalHits
-                completedQuery = requestedQuery
+                completedQuery = cacheKey
                 completedAt = System.currentTimeMillis()
-                if (hits.size <= 400) previous[requestedQuery] = Snapshot(hits, total, completedAt)
+                if (hits.size <= 400) previous[cacheKey] = Snapshot(hits, total, completedAt)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

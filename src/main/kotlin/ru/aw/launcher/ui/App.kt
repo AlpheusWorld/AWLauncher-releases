@@ -33,6 +33,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PlayArrow
@@ -40,6 +41,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import ru.aw.launcher.ui.components.LocalizedText as Text
 import androidx.compose.runtime.Composable
@@ -195,27 +197,37 @@ private fun CompactNavRail(state: LauncherState, expanded: Boolean) {
         NavItem("Загрузки", AWIcons.Download, state.screen == Screen.DOWNLOADS, badge = state.downloads.pendingCount, compact = !expanded, itemHeight = itemHeight) { state.screen = Screen.DOWNLOADS }
         if (expanded && !short) Text("ДРУГОЕ", color = AWColors.TextMuted, style = MaterialTheme.typography.labelSmall,
             modifier = Modifier.fillMaxWidth().padding(start = 16.dp, top = 14.dp, bottom = 4.dp))
-        NavItem("Скины", AWIcons.Layers, state.screen == Screen.SKINS, compact = !expanded, itemHeight = itemHeight) { state.screen = Screen.SKINS }
         NavItem("Друзья", AWIcons.Friends, state.screen == Screen.FRIENDS, badge = friends.snapshot.requests.size + friends.snapshot.friends.count { it.invite != null }, compact = !expanded, itemHeight = itemHeight) { state.screen = Screen.FRIENDS }
-        NavItem("Настройки", Icons.Default.Settings, state.screen == Screen.SETTINGS || state.modal is Modal.Settings, compact = !expanded, itemHeight = itemHeight) { state.screen = Screen.SETTINGS }
         Spacer(Modifier.weight(1f))
         NavItem("Скриншоты", AWIcons.Image, state.screen == Screen.SCREENSHOTS, compact = !expanded, itemHeight = itemHeight) { state.screen = Screen.SCREENSHOTS }
         NavItem("Активность", AWIcons.Activity, state.screen == Screen.ACTIVITY, compact = !expanded, itemHeight = itemHeight) { state.screen = Screen.ACTIVITY }
         NavItem("Уведомления", Icons.Default.Notifications, state.screen == Screen.NOTICES, badge = unread.size, badgeAlert = unread.any { it.level == NoticeLevel.ERROR }, compact = !expanded, itemHeight = itemHeight) { state.openNotices() }
+        if (!expanded) NavItem("Настройки", Icons.Default.Settings, state.screen == Screen.SETTINGS, compact = true, itemHeight = itemHeight) { state.screen = Screen.SETTINGS }
         Box {
-        if (expanded && !short) {
+        if (expanded) {
             val account by state.selectedAccount.collectAsState()
-            Row(Modifier.fillMaxWidth().clickable { state.accountMenuOpen = true }.padding(horizontal = 10.dp, vertical = 8.dp),
+            Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 SkinHead(account, 36.dp)
-                Column(Modifier.weight(1f)) {
+                Column(Modifier.weight(1f).clickable { state.accountMenuOpen = true }) {
                     Text(account?.name ?: "Аккаунты", color = AWColors.Text, style = MaterialTheme.typography.titleSmall,
                         maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, translate = account == null)
                     Text(if (account == null) "Не выбран" else if (account?.isOffline == true) "Офлайн" else "Microsoft",
                         color = AWColors.TextMuted, style = MaterialTheme.typography.labelSmall)
                 }
+                IconButton(onClick = { account?.takeIf { !it.isOffline }?.let(state::openSkinEditor) ?: run { state.screen = Screen.SKINS } }, modifier = Modifier.size(30.dp)) { Icon(Icons.Default.Edit, "Скин и плащ", tint = AWColors.TextMuted, modifier = Modifier.size(16.dp)) }
+                IconButton(onClick = { state.screen = Screen.SETTINGS }, modifier = Modifier.size(30.dp)) { Icon(Icons.Default.Settings, "Настройки", tint = AWColors.TextMuted, modifier = Modifier.size(18.dp)) }
             }
-        } else NavItem("Аккаунты", Icons.Default.Person, state.accountMenuOpen, compact = !expanded, itemHeight = itemHeight) { state.accountMenuOpen = true }
+        } else {
+            val account by state.selectedAccount.collectAsState()
+            Box(Modifier.fillMaxWidth().height(itemHeight)) {
+                NavItem("Аккаунты", Icons.Default.Person, state.accountMenuOpen, compact = true, itemHeight = itemHeight) { state.accountMenuOpen = true }
+                IconButton(onClick = { account?.takeIf { !it.isOffline }?.let(state::openSkinEditor) ?: run { state.screen = Screen.SKINS } },
+                    modifier = Modifier.align(Alignment.TopEnd).size(22.dp)) {
+                    Icon(Icons.Default.Edit, "Скин и плащ", tint = AWColors.TextMuted, modifier = Modifier.size(13.dp))
+                }
+            }
+        }
         ru.aw.launcher.ui.screens.AccountMenu(state, menuHeight)
         }
     }

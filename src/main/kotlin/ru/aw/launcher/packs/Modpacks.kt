@@ -104,6 +104,85 @@ object Modpacks {
     )
     private val UNSAFE_ID = Regex("[^a-z0-9._-]+")
 
+    /** Export selected instance files, retaining unknown files as overrides. */
+    suspend fun export(gameDir: Path, target: Path, name: String, gameVersion: String, loader: LoaderKind, loaderVersion: String?, selected: Set<String>,
+        lookup: (Collection<String>) -> Map<String, Modrinth.Version> = Modrinth::versionsByHash) = withContext(Dispatchers.IO) {
+        require(Files.isDirectory(gameDir, java.nio.file.LinkOption.NOFOLLOW_LINKS)) { "Папка сборки не найдена" }
+        val dependencies = linkedMapOf("minecraft" to gameVersion)
+        if (loader.isModded) {
+            val version = loaderVersion?.takeIf { it.isNotBlank() }
+                ?: throw IOException("Не удалось определить версию загрузчика. Укажи её в настройках сборки")
+            val key = when (loader) {
+                LoaderKind.FABRIC -> "fabric-loader"
+                LoaderKind.QUILT -> "quilt-loader"
+                LoaderKind.FORGE -> "forge"
+                LoaderKind.NEOFORGE -> "neoforge"
+                LoaderKind.VANILLA -> error("Vanilla has no loader")
+            }
+            dependencies[key] = version
+        }
+        val root = gameDir.toAbsolutePath().normalize()
+        val destination = target.toAbsolutePath().normalize()
+        require(!destination.startsWith(root)) { "Сохрани архив вне папки сборки" }
+        val excluded = setOf(MANIFEST, ru.aw.launcher.instance.InstanceStore.FILE_NAME,
+            ru.aw.launcher.instance.BuildHistory.FOLDER, "aw-migration-backups")
+        val files = selected.sorted().flatMap { name ->
+            require(name !in excluded && safePath(name) == name && '/' !in name && '\\' !in name) { "Недопустимый путь: $name" }
+            val path = root.resolve(name)
+            if (Files.isSymbolicLink(path)) throw IOException("Символические ссылки нельзя экспортировать: $name")
+            if (Files.isRegularFile(path, java.nio.file.LinkOption.NOFOLLOW_LINKS)) listOf(path)
+            else if (Files.isDirectory(path, java.nio.file.LinkOption.NOFOLLOW_LINKS)) Files.walk(path).use { paths ->
+                paths.filter { file ->
+                    if (Files.isSymbolicLink(file)) throw IOException("Символические ссылки нельзя экспортировать: ${root.relativize(file)}")
+                    Files.isRegularFile(file, java.nio.file.LinkOption.NOFOLLOW_LINKS)
+                }.toList()
+            } else throw IOException("Файл сборки больше не найден: $name")
+        }
+        val candidates = files.filter { file ->
+            val relative = root.relativize(file)
+            relative.nameCount == 2 && relative.getName(0).toString() in setOf("mods", "resourcepacks", "shaderpacks") &&
+                !file.fileName.toString().endsWith(".disabled", true)
+        }
+        val hashes = candidates.associateWith { ru.aw.launcher.core.sha1Of(it) }
+        val versions = hashes.values.distinct().chunked(100).flatMap { batch ->
+            runCatching { lookup(batch).entries.toList() }.getOrDefault(emptyList())
+        }.associate { it.toPair() }
+        val indexed = mutableListOf<PackFile>()
+        val overrides = mutableListOf<Path>()
+        files.forEach { file ->
+            val hash = hashes[file]
+            val remote = hash?.let { versions[it] }?.files?.firstOrNull { it.sha1.equals(hash, true) && it.url.startsWith("https://cdn.modrinth.com/") }
+            val relative = root.relativize(file).toString().replace('\\', '/')
+            if (remote == null || hash == null) overrides.add(file) else {
+                val sha512 = java.security.MessageDigest.getInstance("SHA-512")
+                val sha1 = java.security.MessageDigest.getInstance("SHA-1")
+                var size = 0L
+                Files.newInputStream(file).use { input ->
+                    val buffer = ByteArray(65536)
+                    while (true) { val read = input.read(buffer); if (read < 0) break; sha512.update(buffer, 0, read); sha1.update(buffer, 0, read); size += read }
+                }
+                if (sha1.digest().joinToString("") { "%02x".format(it) } != hash) throw IOException("Файл изменился во время экспорта: $relative")
+                indexed += PackFile(relative, mapOf("sha1" to hash, "sha512" to sha512.digest().joinToString("") { "%02x".format(it) }),
+                    downloads = listOf(remote.url), fileSize = size)
+            }
+        }
+        val index = PackIndex(1, "minecraft", "1.0.0", name, indexed, dependencies)
+        val temporary = Files.createTempFile(destination.parent, ".aw-export-", ".tmp")
+        try {
+            java.util.zip.ZipOutputStream(Files.newOutputStream(temporary)).use { zip ->
+                zip.putNextEntry(java.util.zip.ZipEntry(INDEX))
+                zip.write(PrettyJson.encodeToString(index).toByteArray(Charsets.UTF_8))
+                zip.closeEntry()
+                overrides.forEach { file ->
+                    zip.putNextEntry(java.util.zip.ZipEntry("overrides/" + root.relativize(file).toString().replace('\\', '/')))
+                    Files.newInputStream(file).use { it.copyTo(zip) }
+                    zip.closeEntry()
+                }
+            }
+            Files.move(temporary, destination, StandardCopyOption.REPLACE_EXISTING)
+        } finally { Files.deleteIfExists(temporary) }
+    }
+
     fun dirOf(pack: Modpack): Path = Settings.packsDir().resolve(pack.id)
 
     fun list(): List<Modpack> = runCatching {

@@ -51,10 +51,10 @@ object ContentCatalog {
     }
     fun source(id: String) = if (CurseForge.owns(id)) CatalogSource.CURSEFORGE else CatalogSource.MODRINTH
 
-    fun search(source: CatalogSource, type: String, query: String, loaders: List<String>, gameVersion: String?, offset: Int): Modrinth.SearchPage =
+    fun search(source: CatalogSource, type: String, query: String, loaders: List<String>, gameVersion: String?, offset: Int, sort: String? = null): Modrinth.SearchPage =
         when (source) {
-            CatalogSource.MODRINTH -> Modrinth.search(type, query, loaders, gameVersion, offset)
-            CatalogSource.CURSEFORGE -> CurseForge.search(type, query, loaders, gameVersion, offset)
+            CatalogSource.MODRINTH -> Modrinth.search(type, query, loaders, gameVersion, offset, sort = sort)
+            CatalogSource.CURSEFORGE -> CurseForge.search(type, query, loaders, gameVersion, offset, sort)
         }
 
     fun project(id: String): Modrinth.Project = if (CurseForge.owns(id)) CurseForge.project(id) else Modrinth.project(id)

@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.horizontalScroll
@@ -133,6 +134,7 @@ private val ContentKind.searchHint: String
 
 internal class PacksModel(private val scope: CoroutineScope, source: CatalogSource) {
     val search = CatalogSearch(scope) { query, offset -> ContentCatalog.search(source, "modpack", query, emptyList(), null, offset) }
+        .apply { sortedFetch = { query, offset, sort -> ContentCatalog.search(source, "modpack", query, emptyList(), null, offset, sort) } }
     var resolving by mutableStateOf<String?>(null)
     var error by mutableStateOf<String?>(null)
 
@@ -229,7 +231,13 @@ fun CatalogScreen(state: LauncherState) {
     }
 
     Column(Modifier.fillMaxSize().padding(AWDimens.Gutter)) {
-        Text("Каталог", style = MaterialTheme.typography.displaySmall, color = AWColors.Text, fontWeight = FontWeight.Bold)
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Каталог", style = MaterialTheme.typography.displaySmall, color = AWColors.Text, fontWeight = FontWeight.Bold)
+                Text("Моды, шейдеры и сборки — установка в один клик", color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall)
+            }
+            if (target != null) TargetPicker(state, target)
+        }
         Spacer(Modifier.height(18.dp))
         Box(Modifier.fillMaxWidth().weight(1f)) {
             Column {
@@ -281,6 +289,8 @@ private fun ColumnScope.PacksTab(state: LauncherState, model: PacksModel, onProj
         modifier = Modifier.fillMaxWidth(),
     )
     Spacer(Modifier.height(10.dp))
+    CatalogSort(model.search, state.catalogSource)
+    Spacer(Modifier.height(10.dp))
     CatalogGrid(model.search, Modifier.weight(1f)) { hit -> PackCard(state, model, hit) { install -> onProject(hit, install) } }
     StatusStrip(state.progress.takeIf { state.installingPack != null }, model.error, null)
 }
@@ -312,24 +322,27 @@ private fun CatalogGrid(search: CatalogSearch, modifier: Modifier = Modifier, ca
 
 @Composable
 private fun CatalogProjectCard(hit: Modrinth.SearchHit, onClick: () -> Unit, action: @Composable () -> Unit) {
-    Column(Modifier.fillMaxWidth().background(AWColors.Surface, RoundedCornerShape(AWDimens.CornerLarge))
-        .clickable(onClick = onClick).padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            ModIcon(hit.iconUrl, 54.dp)
+    val shape = RoundedCornerShape(AWDimens.CornerMedium)
+    Column(Modifier.fillMaxWidth().background(AWColors.Surface, shape).border(1.dp, AWColors.Outline, shape)
+        .clickable(onClick = onClick).padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            ModIcon(hit.iconUrl, 42.dp)
             Column(Modifier.weight(1f)) {
-                Text(hit.title, color = AWColors.Text, style = MaterialTheme.typography.titleMedium,
-                    maxLines = 2, overflow = TextOverflow.Ellipsis, translate = false)
-                Text(hit.author, color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall,
+                Text(hit.title, color = AWColors.Text, style = MaterialTheme.typography.titleSmall,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis, translate = false)
+                Text("by ${hit.author}", color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall,
                     maxLines = 1, overflow = TextOverflow.Ellipsis, translate = false)
             }
         }
         Text(hit.description.ifBlank { "Описание отсутствует" }, color = AWColors.TextSoft,
             style = MaterialTheme.typography.bodySmall, maxLines = 2, minLines = 2, overflow = TextOverflow.Ellipsis,
             translate = hit.description.isBlank())
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(formatCount(hit.downloads), color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall, translate = false)
-            action()
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.height(24.dp)) {
+            hit.categories.take(2).forEach { category -> Tag(category, AWColors.TextMuted) }
         }
+        Text("↓ ${formatCount(hit.downloads)}", color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall, translate = false)
+        androidx.compose.material3.HorizontalDivider(color = AWColors.Outline)
+        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { action() }
     }
 }
 
@@ -344,7 +357,7 @@ private fun PackCard(state: LauncherState, model: PacksModel, hit: Modrinth.Sear
             pack != null -> AWButton("Играть", style = ButtonStyle.PRIMARY, enabled = !state.busy, onClick = {
                 state.selectEntry(state.entryFor(pack)); state.play()
             })
-            else -> AWButton("Установить", enabled = model.resolving == null, onClick = { onProject(true) })
+            else -> AWButton("Установить", style = ButtonStyle.PRIMARY, modifier = Modifier.fillMaxWidth(), enabled = model.resolving == null, onClick = { onProject(true) })
         }
     }
 }
@@ -353,8 +366,7 @@ private fun PackCard(state: LauncherState, model: PacksModel, hit: Modrinth.Sear
 private fun ColumnScope.ContentTab(state: LauncherState, target: VersionEntry, model: ContentModel, tab: CatalogTab, onProject: (Modrinth.SearchHit) -> Unit) {
     val kind = tab.kind
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        TargetPicker(state, target)
-        Spacer(Modifier.weight(1f))
+        Text("Для ${target.label}", color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f), translate = false)
         val updates = model.updates
         if (tab == CatalogTab.INSTALLED && updates.isNotEmpty()) {
             AWButton("Обновить все · ${updates.size}", icon = Icons.Default.Refresh, enabled = model.working.isEmpty(), onClick = model::updateAll)
@@ -384,13 +396,15 @@ private fun ColumnScope.ContentTab(state: LauncherState, target: VersionEntry, m
                 modifier = Modifier.fillMaxWidth(),
             )
             Spacer(Modifier.height(10.dp))
+            CatalogSort(search, state.catalogSource)
+            Spacer(Modifier.height(10.dp))
             CatalogGrid(search, Modifier.weight(1f)) { hit ->
                 val project = { onProject(hit.copy(projectType = kind.projectType)) }
                 CatalogProjectCard(hit, project) {
                     when {
                         hit.projectId in model.installedProjects && kind != ContentKind.DATA_PACK -> Tag("Установлен", AWColors.Success)
                         hit.projectId in model.working -> Text("В очереди", color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall)
-                        else -> AWButton("Установить", enabled = ContentModel.ALL !in model.working, onClick = { model.install(kind, hit) })
+                        else -> AWButton("Установить", style = ButtonStyle.PRIMARY, modifier = Modifier.fillMaxWidth(), enabled = ContentModel.ALL !in model.working, onClick = { model.install(kind, hit) })
                     }
                 }
             }
@@ -401,9 +415,19 @@ private fun ColumnScope.ContentTab(state: LauncherState, target: VersionEntry, m
 
 @Composable
 internal fun RunCatalogSearch(search: CatalogSearch) {
-    LaunchedEffect(search, search.query) {
+    LaunchedEffect(search, search.query, search.sort) {
         if (search.query.isNotBlank()) delay(350)
         search.run()
+    }
+}
+
+@Composable
+private fun CatalogSort(search: CatalogSearch, source: CatalogSource) {
+    val options = listOf("downloads" to "По загрузкам", "relevance" to "По совпадению") +
+        (if (source == CatalogSource.MODRINTH) listOf("follows" to "По подписчикам") else emptyList()) + listOf("updated" to "По обновлению")
+    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+        options.forEach { (value, label) -> ChoiceChip(label, selected = search.sort == value, onClick = { search.sort = value }) }
+        Text("Найдено: ${search.total}", color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall)
     }
 }
 

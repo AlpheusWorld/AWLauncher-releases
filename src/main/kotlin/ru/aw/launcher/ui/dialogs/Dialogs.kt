@@ -66,6 +66,7 @@ fun ModalHost(state: LauncherState) {
         is Modal.Icon -> IconEditorDialog(state, modal.entry)
         is Modal.Groups -> LibraryGroupsDialog(state, modal.entryKeys)
         is Modal.Duplicate -> DuplicateDialog(state, modal.entry)
+        is Modal.Export -> ExportDialog(state, modal.entry)
         is Modal.Migrate -> BuildMigrationDialog(state, modal.entry, modal.plan, modal.keepEnabled, modal.failure)
         is Modal.DeleteMany -> DeleteManyDialog(state, modal.entries)
         is Modal.ImportDirectory -> ru.aw.launcher.ui.screens.ImportDirectoryDialog(state, modal.directory, { state.modal = null }) {
@@ -345,6 +346,65 @@ private fun ShareStatus(share: ShareState, onConfirm: () -> Unit, onCancel: () -
                 color = AWColors.Danger,
             )
             ShareState.Idle -> Unit
+        }
+    }
+}
+
+@Composable
+private fun ExportDialog(state: LauncherState, entry: VersionEntry) {
+    var paths by remember(entry.key) { mutableStateOf<List<String>?>(null) }
+    var selected by remember(entry.key) { mutableStateOf<Set<String>>(emptySet()) }
+    var failure by remember(entry.key) { mutableStateOf<String?>(null) }
+    LaunchedEffect(entry.key) {
+        try {
+            val names = withContext(Dispatchers.IO) {
+                val excluded = setOf("aw-instance.json", "aw-pack.json", "aw-build-history", "aw-migration-backups")
+                java.nio.file.Files.list(state.gameDirOf(entry)).use { stream ->
+                    stream.filter { !java.nio.file.Files.isSymbolicLink(it) && it.fileName.toString() !in excluded }
+                        .map { it.fileName.toString() }.sorted().toList()
+                }
+            }
+            paths = names
+            selected = names.toSet()
+        } catch (e: Exception) { failure = e.message ?: "Не удалось прочитать файлы сборки" }
+    }
+    AWDialog("Экспорт сборки", onDismiss = { state.modal = null }, width = 560.dp, actions = {
+        AWButton("Отмена", onClick = { state.modal = null })
+        AWButton("Сохранить .mrpack", style = ButtonStyle.PRIMARY, enabled = paths != null && failure == null && !state.libraryBusy, onClick = {
+            val chooser = javax.swing.JFileChooser().apply {
+                dialogTitle = "Сохранить сборку"
+                fileFilter = javax.swing.filechooser.FileNameExtensionFilter("Сборка Modrinth (*.mrpack)", "mrpack")
+                selectedFile = java.io.File(entry.title.replace(Regex("[\\\\/:*?\"<>|]"), "_") + ".mrpack")
+            }
+            if (chooser.showSaveDialog(null) == javax.swing.JFileChooser.APPROVE_OPTION) {
+                val file = chooser.selectedFile.toPath()
+                val target = if (file.fileName.toString().endsWith(".mrpack", true)) file else file.resolveSibling(file.fileName.toString() + ".mrpack")
+                if (!java.nio.file.Files.exists(target) || javax.swing.JOptionPane.showConfirmDialog(null, "Заменить существующий файл?", "Экспорт сборки", javax.swing.JOptionPane.YES_NO_OPTION) == javax.swing.JOptionPane.YES_OPTION) {
+                    state.modal = null
+                    state.exportMrpack(entry, target, selected)
+                }
+            }
+        })
+    }) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Выбери файлы и папки для экспорта. Миры и другие личные данные также будут включены, если оставить их выбранными", color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall)
+            if (failure != null) Text(failure.orEmpty(), color = AWColors.Danger, translate = false)
+            else if (paths == null) Text("Читаю файлы…", color = AWColors.TextMuted)
+            else {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(checked = selected.size == paths!!.size, onCheckedChange = { selected = if (it) paths!!.toSet() else emptySet() })
+                    Text("Выбрать всё", color = AWColors.Text)
+                }
+                androidx.compose.foundation.lazy.LazyColumn(Modifier.fillMaxWidth().height(300.dp)) {
+                    items(paths!!.size) { index ->
+                        val name = paths!![index]
+                        Row(Modifier.fillMaxWidth().clickable { selected = if (name in selected) selected - name else selected + name }, verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(checked = name in selected, onCheckedChange = { checked -> selected = if (checked) selected + name else selected - name })
+                            Text(name, color = AWColors.Text, translate = false)
+                        }
+                    }
+                }
+            }
         }
     }
 }

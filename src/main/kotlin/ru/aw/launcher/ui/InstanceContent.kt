@@ -32,7 +32,7 @@ internal class ContentModel(
         val selected = provider
         ContentKind.entries.associateWith { kind -> CatalogSearch(scope) { query, offset ->
             ContentCatalog.search(selected, kind.projectType, query, ModManager.catalogLoaders(kind, loader), gameVersion, offset)
-        } }
+        }.apply { sortedFetch = { query, offset, sort -> ContentCatalog.search(selected, kind.projectType, query, ModManager.catalogLoaders(kind, loader), gameVersion, offset, sort) } } }
     }
     fun useSource(source: CatalogSource) { provider = source }
     var installed by mutableStateOf<Map<ContentKind, List<InstalledItem>>>(emptyMap())

@@ -61,7 +61,6 @@ fun InstanceScreen(state: LauncherState, initialTab: Int = 0) {
     var menu by remember { mutableStateOf(false) }
     LaunchedEffect(model) { model.ensureScanned() }
     BoxWithConstraints(Modifier.fillMaxSize()) {
-        val sidebarWidth = AWDimens.sidebarWidth(maxWidth)
         val compact = maxHeight < 520.dp
         Row(Modifier.fillMaxSize()) {
             Column(Modifier.weight(1f).fillMaxHeight().padding(if (compact) 12.dp else AWDimens.Gutter), verticalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 12.dp)) {
@@ -103,7 +102,6 @@ fun InstanceScreen(state: LauncherState, initialTab: Int = 0) {
                 }
                 if (state.busy && state.busyEntry?.key == entry.key) StatusStrip(state.progress, null, state.stage)
             }
-            if (sidebarWidth != null) DashboardSidebar(state, Modifier.width(sidebarWidth).fillMaxHeight())
         }
     }
 }

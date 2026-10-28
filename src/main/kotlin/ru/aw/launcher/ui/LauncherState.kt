@@ -112,6 +112,7 @@ sealed interface Modal {
     data class Icon(val entry: VersionEntry) : Modal
     data class Groups(val entryKeys: List<String> = emptyList()) : Modal
     data class Duplicate(val entry: VersionEntry) : Modal
+    data class Export(val entry: VersionEntry) : Modal
     data class Migrate(val entry: VersionEntry, val plan: ru.aw.launcher.instance.MigrationPlan? = null,
                        val keepEnabled: Set<String> = emptySet(),
                        val failure: ru.aw.launcher.instance.MigrationModFailure? = null) : Modal
@@ -597,6 +598,30 @@ class LauncherState(
     fun removeLibraryGroup(id: String) {
         Settings.update { it.copy(libraryGroups = it.libraryGroups.filterNot { group -> group.id == id }) }
         updateLibrary(buildChoices()) { if (it.groupId == id) it.copy(groupId = null) else it }
+    }
+
+    fun exportMrpack(entry: VersionEntry, destination: Path, selected: Set<String>) {
+        if (libraryBusy || libraryEntryBusy(entry)) return
+        libraryBusy = true
+        scope.launch {
+            try {
+                val version = withContext(Dispatchers.IO) { InstanceStore.get(gameDirOf(entry)).loaderVersion } ?: entry.build?.loaderVersion ?: entry.pack?.loaderVersion
+                    ?: (if (entry.loader.isModded) withContext(Dispatchers.IO) { runCatching { ru.aw.launcher.meta.LoaderRepository.latestBuild(entry.loader, entry.id) }.getOrNull() } else null)
+                    ?: profiles.singleOrNull { entry.loader.ownsProfile(it, entry.id) }?.let { profile ->
+                        when (entry.loader) {
+                            LoaderKind.FABRIC -> profile.removePrefix("fabric-loader-").removeSuffix("-${entry.id}")
+                            LoaderKind.QUILT -> profile.removePrefix("quilt-loader-").removeSuffix("-${entry.id}")
+                            LoaderKind.FORGE -> profile.substringAfter("-forge-", "")
+                            LoaderKind.NEOFORGE -> profile.removePrefix("neoforge-")
+                            LoaderKind.VANILLA -> null
+                        }
+                    }
+                Modpacks.export(gameDirOf(entry), destination, entry.title, entry.id, entry.loader, version, selected)
+                inform("Сборка экспортирована: ${destination.fileName}", entry)
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { fail(e.message, entry, "Не удалось экспортировать сборку") }
+            finally { libraryBusy = false }
+        }
     }
 
     fun saveInstanceIcon(entry: VersionEntry, preset: String?, background: String?, image: Path? = null, reset: Boolean = false) {

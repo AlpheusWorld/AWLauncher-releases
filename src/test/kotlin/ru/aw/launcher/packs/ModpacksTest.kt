@@ -36,6 +36,70 @@ class ModpacksTest {
         PackFile(path, listOfNotNull(sha1?.let { "sha1" to it }).toMap(), mapOf("client" to client), listOf(url), 10)
 
     @Test
+    fun `export preserves selected files and pins recognized downloads`() {
+        val game = temp.resolve("game").createDirectories()
+        game.resolve("mods").createDirectories()
+        game.resolve("mods/known.jar").writeText("known")
+        game.resolve("mods/unknown.jar").writeText("unknown")
+        game.resolve("mods/off.jar.disabled").writeText("disabled")
+        game.resolve("saves/world").createDirectories()
+        game.resolve("saves/world/level.dat").writeText("world")
+        game.resolve("options.txt").writeText("lang:ru_ru")
+        game.resolve("custom").createDirectories()
+        game.resolve("custom/value.txt").writeText("custom")
+        val knownHash = sha1Of(game.resolve("mods/known.jar"))
+        val remote = ru.aw.launcher.mods.Modrinth.Version("v", "p", files = listOf(
+            ru.aw.launcher.mods.Modrinth.VersionFile("https://cdn.modrinth.com/a.jar", "known.jar", hashes = mapOf("sha1" to knownHash))))
+        val archive = temp.resolve("export.mrpack")
+        runBlocking { Modpacks.export(game, archive, "Example", "1.21.1", LoaderKind.FABRIC, "0.16.14",
+            setOf("mods", "saves", "options.txt", "custom"), lookup = { mapOf(knownHash to remote) }) }
+        java.util.zip.ZipFile(archive.toFile()).use { zip ->
+            val index = Modpacks.readIndex(zip)
+            assertEquals("0.16.14", index.dependencies["fabric-loader"])
+            assertEquals(listOf("mods/known.jar"), index.files.map { it.path })
+            assertEquals(128, index.files.single().hashes.getValue("sha512").length)
+            assertEquals(listOf("https://cdn.modrinth.com/a.jar"), index.files.single().downloads)
+            listOf("mods/unknown.jar", "mods/off.jar.disabled", "saves/world/level.dat", "options.txt", "custom/value.txt")
+                .forEach { assertTrue(zip.getEntry("overrides/$it") != null, it) }
+            assertNull(zip.getEntry("overrides/mods/known.jar"))
+        }
+    }
+
+    @Test
+    fun `exported overrides import with worlds settings and unknown mods`() {
+        val original = LocalBuilds.buildsFile
+        LocalBuilds.buildsFile = temp.resolve("builds.json")
+        val game = temp.resolve("original").createDirectories()
+        game.resolve("mods").createDirectories()
+        game.resolve("mods/custom.jar").writeText("custom mod")
+        game.resolve("saves/world").createDirectories()
+        game.resolve("saves/world/level.dat").writeText("world")
+        game.resolve("options.txt").writeText("settings")
+        val archive = temp.resolve("roundtrip.mrpack")
+        try {
+            runBlocking { Modpacks.export(game, archive, "Roundtrip", "1.21.1", LoaderKind.FABRIC, "0.16.14", setOf("mods", "saves", "options.txt"), lookup = { emptyMap() }) }
+            val build = runBlocking { Modpacks.importMrpack(archive, "") }
+            val imported = LocalBuilds.dirOf(build)
+            assertEquals("0.16.14", build.loaderVersion)
+            assertEquals("custom mod", imported.resolve("mods/custom.jar").readText())
+            assertEquals("world", imported.resolve("saves/world/level.dat").readText())
+            assertEquals("settings", imported.resolve("options.txt").readText())
+        } finally {
+            LocalBuilds.list().forEach { Storage.deleteTree(LocalBuilds.dirOf(it)) }
+            LocalBuilds.buildsFile = original
+        }
+    }
+
+    @Test
+    fun `export rejects unknown loader version without replacing existing archive`() {
+        val game = temp.resolve("game").createDirectories()
+        val archive = temp.resolve("export.mrpack")
+        archive.writeText("old")
+        assertThrows<IOException> { runBlocking { Modpacks.export(game, archive, "Example", "1.21.1", LoaderKind.FABRIC, null, emptySet()) } }
+        assertEquals("old", archive.readText())
+    }
+
+    @Test
     fun `paths inside a pack cannot leave its folder`() {
         assertEquals("mods/sodium.jar", Modpacks.safePath("mods/sodium.jar"))
         assertEquals("config/iris/a.json", Modpacks.safePath("config\\iris\\a.json"))

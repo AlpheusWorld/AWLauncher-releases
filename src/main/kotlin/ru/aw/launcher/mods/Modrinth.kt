@@ -130,6 +130,7 @@ object Modrinth {
         gameVersion: String?,
         offset: Int,
         limit: Int = PAGE,
+        sort: String? = null,
     ): SearchPage {
         val facets = buildJsonArray {
             add(buildJsonArray { add("project_type:$projectType") })
@@ -140,7 +141,7 @@ object Modrinth {
         val url = "$API/search".toHttpUrl().newBuilder()
             .addQueryParameter("query", query.trim())
             .addQueryParameter("facets", facets.toString())
-            .addQueryParameter("index", if (query.isBlank()) "downloads" else "relevance")
+            .addQueryParameter("index", sort ?: if (query.isBlank()) "downloads" else "relevance")
             .addQueryParameter("offset", offset.toString())
             .addQueryParameter("limit", limit.toString())
             .build()

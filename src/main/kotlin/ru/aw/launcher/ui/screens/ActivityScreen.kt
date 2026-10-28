@@ -31,6 +31,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.MaterialTheme
 import ru.aw.launcher.ui.components.LocalizedText as Text
 import androidx.compose.runtime.Composable
@@ -274,7 +278,10 @@ internal fun weekDayAt(x: Float, width: Float, rtl: Boolean): Int? {
 @Composable
 private fun WeekCard(stats: ActivityStats?, animation: () -> Float, modifier: Modifier = Modifier) {
     val today = stats?.today ?: LocalDate.now()
-    val days = remember(stats, today) { weekDays(stats, today) }
+    var weekOffset by remember { mutableStateOf(0) }
+    val selectedDay = today.minusWeeks(weekOffset.toLong())
+    val days = remember(stats, today, weekOffset) { weekDays(stats, if (weekOffset == 0) today else selectedDay.with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY))) }
+    val total = days.sumOf { it.second }
     val maximum = remember(days) { days.maxOfOrNull { it.second }?.coerceAtLeast(1L) ?: 1L }
     val accent = AWColors.Accent
     val baseline = AWColors.Outline
@@ -286,9 +293,11 @@ private fun WeekCard(stats: ActivityStats?, animation: () -> Float, modifier: Mo
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("Время по дням", color = AWColors.Text, style = MaterialTheme.typography.titleMedium)
-                    Text("Эта неделя", color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall)
+                    Text(if (weekOffset == 0) "Эта неделя" else "${days.first().first.dayOfMonth} ${MONTHS_SHORT[days.first().first.monthValue - 1]} — ${days.last().first.dayOfMonth} ${MONTHS_SHORT[days.last().first.monthValue - 1]} ${days.last().first.year}", color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall)
                 }
-                Text(stats?.let { if (it.weekMillis == 0L) "0 мин" else formatPlayTime(it.weekMillis) } ?: "…", color = AWColors.Text,
+                IconButton(onClick = { weekOffset++ }, modifier = Modifier.size(32.dp)) { Icon(Icons.Default.KeyboardArrowLeft, "Предыдущая неделя", tint = AWColors.TextMuted) }
+                IconButton(onClick = { weekOffset-- }, enabled = weekOffset > 0, modifier = Modifier.size(32.dp)) { Icon(Icons.Default.KeyboardArrowRight, "Следующая неделя", tint = if (weekOffset > 0) AWColors.TextMuted else AWColors.Outline) }
+                Text(stats?.let { if (total == 0L) "0 мин" else formatPlayTime(total) } ?: "…", color = AWColors.Text,
                     style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             }
             TooltipArea(
