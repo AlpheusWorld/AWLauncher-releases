@@ -107,6 +107,13 @@ cd AWLauncher-releases
 ./gradlew.bat run -PnoDeploy
 ```
 
+В Linux после клонирования используй Gradle Wrapper без `.bat`:
+
+```sh
+./gradlew test -PnoDeploy
+./gradlew run -PnoDeploy
+```
+
 `-PnoDeploy` позволяет проверять проект без замены установленного лаунчера. Перед началом работы обнови `main` и создай отдельную ветку.
 
 ## Связь
