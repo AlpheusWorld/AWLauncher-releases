@@ -600,9 +600,13 @@ class LauncherState(
         updateLibrary(buildChoices()) { if (it.groupId == id) it.copy(groupId = null) else it }
     }
 
+    var exportProgress by mutableStateOf<Float?>(null)
+        private set
+
     fun exportMrpack(entry: VersionEntry, destination: Path, selected: Set<String>) {
         if (libraryBusy || libraryEntryBusy(entry)) return
         libraryBusy = true
+        exportProgress = 0f
         scope.launch {
             try {
                 val version = withContext(Dispatchers.IO) { InstanceStore.get(gameDirOf(entry)).loaderVersion } ?: entry.build?.loaderVersion ?: entry.pack?.loaderVersion
@@ -616,11 +620,11 @@ class LauncherState(
                             LoaderKind.VANILLA -> null
                         }
                     }
-                Modpacks.export(gameDirOf(entry), destination, entry.title, entry.id, entry.loader, version, selected)
+                Modpacks.export(gameDirOf(entry), destination, entry.title, entry.id, entry.loader, version, selected, onProgress = { exportProgress = it })
                 inform("Сборка экспортирована: ${destination.fileName}", entry)
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) { fail(e.message, entry, "Не удалось экспортировать сборку") }
-            finally { libraryBusy = false }
+            finally { libraryBusy = false; exportProgress = null }
         }
     }
 

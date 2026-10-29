@@ -2,6 +2,7 @@ package ru.aw.launcher.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -236,12 +237,11 @@ fun CatalogScreen(state: LauncherState) {
     Column(Modifier.fillMaxSize().padding(AWDimens.Gutter)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text("Каталог", style = MaterialTheme.typography.displaySmall, color = AWColors.Text, fontWeight = FontWeight.Bold)
-                Text("Моды, шейдеры и сборки — установка в один клик", color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall)
+                Text("Каталог", style = MaterialTheme.typography.titleLarge, color = AWColors.Text, fontWeight = FontWeight.Bold)
             }
             if (target != null) TargetPicker(state, target)
         }
-        Spacer(Modifier.height(18.dp))
+        Spacer(Modifier.height(6.dp))
         Box(Modifier.fillMaxWidth().weight(1f)) {
             Column {
                 Row(
@@ -250,18 +250,12 @@ fun CatalogScreen(state: LauncherState) {
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     tabs.forEach { PageTab(it.title, selected = tab == it, onClick = { state.catalogTab = it }) }
-                }
-                if (tab != CatalogTab.INSTALLED) {
-                    Spacer(Modifier.height(10.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        CatalogSource.entries.forEach { provider ->
-                            ChoiceChip(provider.label, selected = source == provider,
-                                enabled = packs.resolving == null,
-                                onClick = { state.catalogSource = provider })
-                        }
+                    if (tab != CatalogTab.INSTALLED) CatalogSource.entries.forEach { provider ->
+                        ChoiceChip(provider.label, modifier = Modifier.height(30.dp), selected = source == provider,
+                            enabled = packs.resolving == null, onClick = { state.catalogSource = provider })
                     }
                 }
-                Spacer(Modifier.height(14.dp))
+                Spacer(Modifier.height(6.dp))
                 when {
                     tab == CatalogTab.PACKS -> PacksTab(state, packs) { hit, install -> state.catalogProject = hit; state.catalogProjectTab = if (install) 1 else 0 }
                     target == null -> ListBox(Modifier.weight(1f)) {
@@ -289,11 +283,11 @@ private fun ColumnScope.PacksTab(state: LauncherState, model: PacksModel, onProj
         value = model.search.query,
         onValueChange = { model.search.query = it },
         placeholder = "Найти сборку: Fabulously Optimized, Cobblemon…",
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().height(34.dp),
     )
-    Spacer(Modifier.height(10.dp))
+    Spacer(Modifier.height(4.dp))
     CatalogSort(model.search, state.catalogSource)
-    Spacer(Modifier.height(10.dp))
+    Spacer(Modifier.height(4.dp))
     CatalogGrid(model.search, Modifier.weight(1f)) { hit -> PackCard(state, model, hit) { install -> onProject(hit, install) } }
     StatusStrip(state.progress.takeIf { state.installingPack != null }, model.error, null)
 }
@@ -301,24 +295,26 @@ private fun ColumnScope.PacksTab(state: LauncherState, model: PacksModel, onProj
 @Composable
 private fun CatalogGrid(search: CatalogSearch, modifier: Modifier = Modifier, card: @Composable (Modrinth.SearchHit) -> Unit) {
     val hits = search.hits
-    when {
-        hits.isEmpty() && search.searching -> Box(modifier.fillMaxWidth()) { ListHint("Ищу в каталоге…") }
-        hits.isEmpty() && search.failed -> Box(modifier.fillMaxWidth()) { ListHint(search.error ?: "Не удалось загрузить каталог", "Повторить") { search.run() } }
-        hits.isEmpty() -> Box(modifier.fillMaxWidth()) { ListHint("Ничего не нашлось. Попробуй другое название.") }
-        else -> LazyVerticalGrid(
-            columns = GridCells.Adaptive(240.dp), modifier = modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            items(hits, key = { it.projectId }) { card(it) }
-            item(span = { GridItemSpan(maxLineSpan) }) {
-                Box(Modifier.fillMaxWidth().padding(12.dp), contentAlignment = Alignment.Center) {
-                    when {
-                        search.searching -> Text("Загружаю…", style = MaterialTheme.typography.bodySmall, color = AWColors.TextMuted)
-                        search.failed -> AWButton("Повторить", onClick = { search.run(more = true) })
-                        search.hasMore -> AWButton("Показать ещё", onClick = { search.run(more = true) })
-                    }
-                }
+    Column(modifier.fillMaxWidth()) {
+        BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+            when {
+                search.searching -> ListHint("Ищу в каталоге…")
+                search.failed -> ListHint(search.error ?: "Не удалось загрузить каталог", "Повторить") { search.run(page = search.pageIndex, force = true) }
+                hits.isEmpty() -> ListHint("Ничего не нашлось. Попробуй другое название.")
+                else -> LazyVerticalGrid(
+                    columns = GridCells.Fixed(if (maxWidth >= 1000.dp) 4 else if (maxWidth >= 500.dp) 2 else 1),
+                    modifier = Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) { items(hits, key = { it.projectId }) { card(it) } }
             }
+        }
+        Row(Modifier.fillMaxWidth().padding(top = 8.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+            AWButton("←", enabled = !search.searching && search.pageIndex > 0, onClick = { search.goToPage(search.pageIndex - 1) })
+            val first = (search.pageIndex - 2).coerceAtLeast(0)
+            for (index in first until minOf(first + 5, search.pageCount)) {
+                ChoiceChip((index + 1).toString(), selected = index == search.pageIndex, modifier = Modifier.height(30.dp), enabled = !search.searching, onClick = { search.goToPage(index) })
+            }
+            Text("/ ${search.pageCount}", color = AWColors.TextMuted, translate = false)
+            AWButton("→", enabled = !search.searching && search.pageIndex + 1 < search.pageCount, onClick = { search.goToPage(search.pageIndex + 1) })
         }
     }
 }
@@ -358,8 +354,8 @@ private fun PackCard(state: LauncherState, model: PacksModel, hit: Modrinth.Sear
     CatalogProjectCard(hit, onClick = { onProject(false) }) {
         when {
             busy -> Text("В очереди", style = MaterialTheme.typography.bodySmall, color = AWColors.TextMuted)
-            pack != null && pack.id in state.packUpdates -> AWButton("Обновить", enabled = !busy, onClick = { state.updatePack(pack) })
-            pack != null -> AWButton("Играть", style = ButtonStyle.PRIMARY, enabled = !state.busy, onClick = {
+            pack != null && pack.id in state.packUpdates -> AWButton("Обновить", modifier = Modifier.fillMaxWidth(), enabled = !busy, onClick = { state.updatePack(pack) })
+            pack != null -> AWButton("Играть", modifier = Modifier.fillMaxWidth(), style = ButtonStyle.PRIMARY, enabled = !state.busy, onClick = {
                 state.selectEntry(state.entryFor(pack)); state.play()
             })
             else -> AWButton("Установить", style = ButtonStyle.PRIMARY, modifier = Modifier.fillMaxWidth(), enabled = model.resolving == null, onClick = { onProject(true) })
@@ -382,7 +378,7 @@ private fun ColumnScope.ContentTab(state: LauncherState, target: VersionEntry, m
             }
         }
     }
-    Spacer(Modifier.height(10.dp))
+    Spacer(Modifier.height(4.dp))
     when {
         kind == null -> ListBox(Modifier.weight(1f)) { InstalledList(state, target, model, it, onProject) }
         kind == ContentKind.SHADER && !state.supportsShaders(target) -> ListBox(Modifier.weight(1f)) {
@@ -400,9 +396,9 @@ private fun ColumnScope.ContentTab(state: LauncherState, target: VersionEntry, m
                 placeholder = kind.searchHint,
                 modifier = Modifier.fillMaxWidth(),
             )
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(4.dp))
             CatalogSort(search, state.catalogSource)
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(4.dp))
             CatalogGrid(search, Modifier.weight(1f)) { hit ->
                 val project = { onProject(hit.copy(projectType = kind.projectType)) }
                 CatalogProjectCard(hit, project) {
@@ -431,7 +427,7 @@ private fun CatalogSort(search: CatalogSearch, source: CatalogSource) {
     val options = listOf("downloads" to "По загрузкам", "relevance" to "По совпадению") +
         (if (source == CatalogSource.MODRINTH) listOf("follows" to "По подписчикам") else emptyList()) + listOf("updated" to "По обновлению")
     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-        options.forEach { (value, label) -> ChoiceChip(label, selected = search.sort == value, onClick = { search.sort = value }) }
+        options.forEach { (value, label) -> ChoiceChip(label, modifier = Modifier.height(30.dp), selected = search.sort == value, onClick = { search.sort = value }) }
         Text("Найдено: ${search.total}", color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall)
     }
 }

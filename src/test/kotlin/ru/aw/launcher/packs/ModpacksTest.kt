@@ -51,8 +51,11 @@ class ModpacksTest {
         val remote = ru.aw.launcher.mods.Modrinth.Version("v", "p", files = listOf(
             ru.aw.launcher.mods.Modrinth.VersionFile("https://cdn.modrinth.com/a.jar", "known.jar", hashes = mapOf("sha1" to knownHash))))
         val archive = temp.resolve("export.mrpack")
+        val progress = mutableListOf<Float>()
         runBlocking { Modpacks.export(game, archive, "Example", "1.21.1", LoaderKind.FABRIC, "0.16.14",
-            setOf("mods", "saves", "options.txt", "custom"), lookup = { mapOf(knownHash to remote) }) }
+            setOf("mods", "saves", "options.txt", "custom"), onProgress = { progress.add(it) }, lookup = { mapOf(knownHash to remote) }) }
+        assertEquals(1f, progress.last())
+        assertTrue(progress.zipWithNext().all { (a, b) -> b >= a })
         java.util.zip.ZipFile(archive.toFile()).use { zip ->
             val index = Modpacks.readIndex(zip)
             assertEquals("0.16.14", index.dependencies["fabric-loader"])

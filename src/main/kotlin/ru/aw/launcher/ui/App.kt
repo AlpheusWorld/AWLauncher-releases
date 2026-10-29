@@ -197,10 +197,10 @@ private fun CompactNavRail(state: LauncherState, expanded: Boolean) {
         if (expanded && !short) Text("ДРУГОЕ", color = AWColors.TextMuted, style = MaterialTheme.typography.labelSmall,
             modifier = Modifier.fillMaxWidth().padding(start = 16.dp, top = 14.dp, bottom = 4.dp))
         NavItem("Друзья", AWIcons.Friends, state.screen == Screen.FRIENDS, badge = friends.snapshot.requests.size + friends.snapshot.friends.count { it.invite != null }, compact = !expanded, itemHeight = itemHeight) { state.screen = Screen.FRIENDS }
-        Spacer(Modifier.weight(1f))
         NavItem("Скриншоты", AWIcons.Image, state.screen == Screen.SCREENSHOTS, compact = !expanded, itemHeight = itemHeight) { state.screen = Screen.SCREENSHOTS }
         NavItem("Активность", AWIcons.Activity, state.screen == Screen.ACTIVITY, compact = !expanded, itemHeight = itemHeight) { state.screen = Screen.ACTIVITY }
         NavItem("Уведомления", Icons.Default.Notifications, state.screen == Screen.NOTICES, badge = unread.size, badgeAlert = unread.any { it.level == NoticeLevel.ERROR }, compact = !expanded, itemHeight = itemHeight) { state.openNotices() }
+        Spacer(Modifier.weight(1f))
         if (!expanded) NavItem("Настройки", Icons.Default.Settings, state.modal is Modal.Settings, compact = true, itemHeight = itemHeight) { state.openSettings(section = -1) }
         Box {
         if (expanded) {

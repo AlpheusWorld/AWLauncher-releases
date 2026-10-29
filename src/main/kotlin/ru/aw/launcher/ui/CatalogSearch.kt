@@ -39,23 +39,29 @@ class CatalogSearch(
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Snapshot>?) = size > 8
     }
 
+    var pageIndex by mutableStateOf(0)
+        private set
+    val pageCount: Int get() = ((total + Modrinth.PAGE - 1) / Modrinth.PAGE).coerceAtLeast(1)
+    fun goToPage(index: Int) { if (!searching && index in 0 until pageCount) run(page = index) }
+
     val hasMore: Boolean get() = hits.size < total
 
-    fun run(more: Boolean = false, force: Boolean = false) {
+    fun run(more: Boolean = false, force: Boolean = false, page: Int = 0) {
         val requestedQuery = query.trim()
         val requestedSort = sort
-        val cacheKey = "$requestedSort\u0000$requestedQuery"
+        val cacheKey = "$requestedSort\u0000$requestedQuery" + if (page == 0) "" else "\u0000$page"
         if (more && (searching || completedQuery != cacheKey)) return
         if (!more && !force && !searching && !failed && completedQuery == cacheKey && System.currentTimeMillis() - completedAt < 300_000) return
         job?.cancel()
         val token = Any()
         requestToken = token
         if (!more && !force) previous[cacheKey]?.takeIf { System.currentTimeMillis() - it.time < 300_000 }?.let { cached ->
+            pageIndex = page
             hits = cached.hits; total = cached.total; completedQuery = cacheKey; completedAt = cached.time
             searching = false; failed = false; error = null
             return
         }
-        val offset = if (more) hits.size else 0
+        val offset = if (more) hits.size else page * Modrinth.PAGE
         if (!more && completedQuery != cacheKey) { hits = emptyList(); total = 0 }
         searching = true
         failed = false
@@ -68,6 +74,7 @@ class CatalogSearch(
                 }
                 if (requestToken !== token) return@launch
                 hits = if (more) hits + page.hits.filter { hit -> hits.none { it.projectId == hit.projectId } } else page.hits
+                pageIndex = offset / Modrinth.PAGE
                 total = page.totalHits
                 completedQuery = cacheKey
                 completedAt = System.currentTimeMillis()

@@ -44,6 +44,27 @@ class CatalogSearchTest {
         } finally { scene.close(); scope.cancel() }
     }
 
+    @Test fun `page navigation replaces results and restores cached pages`() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        val offsets = java.util.concurrent.CopyOnWriteArrayList<Int>()
+        val search = CatalogSearch(scope) { _, offset ->
+            offsets.add(offset)
+            Modrinth.SearchPage(hits = listOf(Modrinth.SearchHit("item-$offset")), totalHits = 60)
+        }
+        suspend fun finish() { withTimeout(5000) { while (search.searching) delay(5) } }
+        try {
+            search.run(); finish()
+            search.goToPage(1); finish()
+            assertEquals(1, search.pageIndex)
+            assertEquals(listOf("item-20"), search.hits.map { it.projectId })
+            search.goToPage(0); finish()
+            assertEquals(listOf("item-0"), search.hits.map { it.projectId })
+            assertEquals(listOf(0, 20), offsets.toList())
+            search.goToPage(-1)
+            assertEquals(0, search.pageIndex)
+        } finally { scope.cancel() }
+    }
+
     @Test fun `switching back to a previous query restores its pages immediately`() = runBlocking {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
         val count = AtomicInteger()

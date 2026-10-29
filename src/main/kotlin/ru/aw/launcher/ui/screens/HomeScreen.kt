@@ -320,13 +320,13 @@ fun EntryMenuItems(state: LauncherState, entry: VersionEntry, close: () -> Unit,
     val installed = state.isEntryInstalled(entry)
     val hasFolder = remember(entry, state.instanceRevision) { state.gameDirOf(entry).exists() }
     val metadata = state.libraryOptions(entry)
-    AWMenuItem(if (metadata.favorite) "Убрать из избранного" else "В избранное", enabled = !state.libraryBusy, onClick = { close(); state.toggleFavorite(entry) })
-    AWMenuItem("Изменить иконку", enabled = !state.libraryBusy && !state.busy && !state.buildsBusy, onClick = { close(); state.editInstanceIcon(entry) })
-    AWMenuItem("Изменить группу", enabled = !state.libraryBusy && !state.busy && !state.buildsBusy, onClick = { close(); state.modal = Modal.Groups(listOf(entry.key)) })
-    AWMenuItem("Экспортировать в .mrpack", enabled = hasFolder && !state.libraryBusy && !state.libraryEntryBusy(entry), onClick = {
+    AWMenuItem(if (metadata.favorite) "Убрать из избранного" else "В избранное", icon = AWIcons.Trophy, enabled = !state.libraryBusy, onClick = { close(); state.toggleFavorite(entry) })
+    AWMenuItem("Изменить иконку", icon = AWIcons.Image, enabled = !state.libraryBusy && !state.busy && !state.buildsBusy, onClick = { close(); state.editInstanceIcon(entry) })
+    AWMenuItem("Изменить группу", icon = AWIcons.Folder, enabled = !state.libraryBusy && !state.busy && !state.buildsBusy, onClick = { close(); state.modal = Modal.Groups(listOf(entry.key)) })
+    AWMenuItem("Экспортировать в .mrpack", icon = AWIcons.Download, enabled = hasFolder && !state.libraryBusy && !state.libraryEntryBusy(entry), onClick = {
         close(); state.modal = Modal.Export(entry)
     })
-    AWMenuItem("Дублировать", enabled = hasFolder && !state.busy && !state.buildsBusy && !state.libraryBusy, onClick = { close(); state.modal = Modal.Duplicate(entry) })
+    AWMenuItem("Дублировать", icon = AWIcons.Copy, enabled = hasFolder && !state.busy && !state.buildsBusy && !state.libraryBusy, onClick = { close(); state.modal = Modal.Duplicate(entry) })
     if (entry.build != null || entry.pack != null) AWMenuItem("Изменить версию Minecraft", icon = Icons.Default.Refresh,
         enabled = !state.libraryEntryBusy(entry), onClick = { close(); state.openMigration(entry) })
     MenuDivider()

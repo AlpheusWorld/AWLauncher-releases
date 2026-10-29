@@ -102,7 +102,7 @@ fun SettingsScreen(state: LauncherState, initialSection: Int = -1, inDialog: Boo
         SettingsSection(-1, "Аккаунты", "Выбранный аккаунт используется при запуске Minecraft", Icons.Default.Person),
         SettingsSection(0, "Общие", "Поведение лаунчера", Icons.Default.Settings),
         SettingsSection(2, "Игра", "Память", AWIcons.Memory),
-        SettingsSection(6, "Внешний вид", "Тема", AWIcons.Image),
+        SettingsSection(6, "Внешний вид", "Внешний вид", AWIcons.Image),
         SettingsSection(1, "Язык", "Язык приложения", AWIcons.Log),
         SettingsSection(3, "Загрузки", "Загрузка и целостность", AWIcons.Download),
         SettingsSection(5, "Discord", "Discord Rich Presence", AWIcons.Friends),
@@ -346,7 +346,6 @@ private fun AppearancePanel(settings: LauncherSettings) {
 @Composable
 private fun MemoryPanel(settings: LauncherSettings) {
     val total = remember { SettingsDefaults.totalSystemMemoryMb() }
-    val presets = remember { SettingsDefaults.memoryPresets(total) }
     val limit = remember { SettingsDefaults.memoryLimit(total) }
     val recommended = remember { SettingsDefaults.recommendedMemory(total) }
     var memoryText by remember(settings.memoryMb) { mutableStateOf(settings.memoryMb.toString()) }
@@ -368,25 +367,14 @@ private fun MemoryPanel(settings: LauncherSettings) {
                 color = AWColors.Accent,
             )
             Spacer(Modifier.height(8.dp))
-            Slider(
+            androidx.compose.material.Slider(
                 value = (customMemory ?: settings.memoryMb).coerceIn(512, limit).toFloat(),
                 onValueChange = { value -> memoryText = ((value / 256f).toInt() * 256).coerceIn(512, limit).toString() },
                 valueRange = 512f..limit.toFloat(),
-                colors = SliderDefaults.colors(thumbColor = AWColors.Accent, activeTrackColor = AWColors.Accent,
+                colors = androidx.compose.material.SliderDefaults.colors(thumbColor = AWColors.Accent, activeTrackColor = AWColors.Accent,
                     inactiveTrackColor = AWColors.Outline),
                 modifier = Modifier.fillMaxWidth(),
             )
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                presets.filter { it <= limit }.forEach { mb ->
-                    ChoiceChip(formatMemory(mb), outlined = true, selected = settings.memoryMb == mb, onClick = {
-                        memoryText = mb.toString()
-                        Settings.update { it.copy(memoryMb = mb) }
-                    })
-                }
-                if (settings.memoryMb !in presets) {
-                    ChoiceChip("${formatMemory(settings.memoryMb)} (своё)", outlined = true, selected = true, onClick = {})
-                }
-            }
             Spacer(Modifier.height(14.dp))
             OutlinedTextField(
                 value = memoryText,

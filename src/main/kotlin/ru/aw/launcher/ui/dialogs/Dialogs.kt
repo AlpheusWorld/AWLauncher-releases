@@ -56,6 +56,15 @@ import ru.aw.launcher.ui.theme.AWDimens
 
 @Composable
 fun ModalHost(state: LauncherState) {
+    state.exportProgress?.let { fraction ->
+        AWDialog("Экспорт сборки", onDismiss = {}, width = 420.dp) {
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Экспортировать в .mrpack", color = AWColors.Text)
+                ru.aw.launcher.ui.components.ThinProgress(fraction, Modifier.fillMaxWidth())
+                Text("${(fraction * 100).toInt()}%", color = AWColors.TextMuted, translate = false)
+            }
+        }
+    }
     androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize()) {
         SettingsWindowHost(state, (maxWidth - 32.dp).coerceIn(380.dp, 980.dp), (maxHeight - 48.dp).coerceIn(320.dp, 680.dp))
     }

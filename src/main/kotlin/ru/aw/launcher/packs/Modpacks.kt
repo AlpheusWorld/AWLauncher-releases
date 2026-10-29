@@ -106,6 +106,7 @@ object Modpacks {
 
     /** Export selected instance files, retaining unknown files as overrides. */
     suspend fun export(gameDir: Path, target: Path, name: String, gameVersion: String, loader: LoaderKind, loaderVersion: String?, selected: Set<String>,
+        onProgress: (Float) -> Unit = {},
         lookup: (Collection<String>) -> Map<String, Modrinth.Version> = Modrinth::versionsByHash) = withContext(Dispatchers.IO) {
         require(Files.isDirectory(gameDir, java.nio.file.LinkOption.NOFOLLOW_LINKS)) { "Папка сборки не найдена" }
         val dependencies = linkedMapOf("minecraft" to gameVersion)
@@ -143,10 +144,16 @@ object Modpacks {
             relative.nameCount == 2 && relative.getName(0).toString() in setOf("mods", "resourcepacks", "shaderpacks") &&
                 !file.fileName.toString().endsWith(".disabled", true)
         }
-        val hashes = candidates.associateWith { ru.aw.launcher.core.sha1Of(it) }
+        onProgress(0.05f)
+        val hashes = candidates.mapIndexed { index, file ->
+            val hash = ru.aw.launcher.core.sha1Of(file)
+            onProgress(0.05f + 0.2f * (index + 1) / candidates.size.coerceAtLeast(1))
+            file to hash
+        }.toMap()
         val versions = hashes.values.distinct().chunked(100).flatMap { batch ->
             runCatching { lookup(batch).entries.toList() }.getOrDefault(emptyList())
         }.associate { it.toPair() }
+        onProgress(0.3f)
         val indexed = mutableListOf<PackFile>()
         val overrides = mutableListOf<Path>()
         files.forEach { file ->
@@ -173,13 +180,15 @@ object Modpacks {
                 zip.putNextEntry(java.util.zip.ZipEntry(INDEX))
                 zip.write(PrettyJson.encodeToString(index).toByteArray(Charsets.UTF_8))
                 zip.closeEntry()
-                overrides.forEach { file ->
+                overrides.forEachIndexed { index, file ->
+                    onProgress(0.5f + 0.49f * index / overrides.size.coerceAtLeast(1))
                     zip.putNextEntry(java.util.zip.ZipEntry("overrides/" + root.relativize(file).toString().replace('\\', '/')))
                     Files.newInputStream(file).use { it.copyTo(zip) }
                     zip.closeEntry()
                 }
             }
             Files.move(temporary, destination, StandardCopyOption.REPLACE_EXISTING)
+            onProgress(1f)
         } finally { Files.deleteIfExists(temporary) }
     }
 
