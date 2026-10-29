@@ -137,7 +137,7 @@ internal fun AccountMenuRow(account: Account, isSelected: Boolean, onSelect: () 
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun AccountsScreen(state: LauncherState) {
+fun AccountsScreen(state: LauncherState, embedded: Boolean = false) {
     val accounts by state.accounts.collectAsState()
     val selected by state.selectedAccount.collectAsState()
     var nickname by remember { mutableStateOf("") }
@@ -147,16 +147,18 @@ fun AccountsScreen(state: LauncherState) {
         nicknameError = state.addOffline(nickname)
         if (nicknameError == null) nickname = ""
     }
-    Column(Modifier.fillMaxSize().padding(AWDimens.Gutter).verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(20.dp)) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text("Аккаунты", style = MaterialTheme.typography.headlineSmall, color = AWColors.Text, modifier = Modifier.weight(1f))
-            Text(accounts.size.toString(), color = AWColors.TextMuted, style = MaterialTheme.typography.titleSmall)
+    Column(Modifier.fillMaxSize().then(if (embedded) Modifier else Modifier.padding(AWDimens.Gutter)).verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        if (!embedded) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("Аккаунты", style = MaterialTheme.typography.headlineSmall, color = AWColors.Text, modifier = Modifier.weight(1f))
+                Text(accounts.size.toString(), color = AWColors.TextMuted, style = MaterialTheme.typography.titleSmall)
+            }
+            Text("Выбранный аккаунт используется при запуске Minecraft", color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall)
         }
-        Text("Выбранный аккаунт используется при запуске Minecraft", color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall)
         if (accounts.isEmpty()) {
             EmptyState(AWIcons.Image, "Аккаунтов пока нет", "Добавь аккаунт ниже", Modifier.fillMaxWidth().height(130.dp))
-        } else Column(Modifier.fillMaxWidth().background(AWColors.Surface, RoundedCornerShape(AWDimens.CornerCard)).padding(6.dp),
+        } else Column(Modifier.fillMaxWidth().background(if (embedded) AWColors.SurfaceHigh else AWColors.Surface, RoundedCornerShape(AWDimens.CornerCard)).padding(6.dp),
             verticalArrangement = Arrangement.spacedBy(2.dp)) {
             accounts.sortedByDescending { it.uuid == selected?.uuid }.forEach { account ->
                 AccountRow(account, account.uuid == selected?.uuid,
@@ -202,24 +204,12 @@ private fun AccountRow(
     onRemove: () -> Unit,
 ) {
     val interaction = remember { MutableInteractionSource() }
-    val hovered by interaction.collectIsHoveredAsState()
-    val background by animateColorAsState(
-        when {
-            isSelected -> AWColors.Accent.copy(alpha = 0.10f)
-            hovered -> AWColors.SurfaceHigh
-            else -> Color.Transparent
-        },
-        animationSpec = AWMotion.Hover,
-        label = "accountBackground",
-    )
-
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val compact = maxWidth < 540.dp
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(AWDimens.CornerMedium))
-                .background(background)
                 .selectable(selected = isSelected, role = Role.RadioButton, interactionSource = interaction, indication = null, onClick = onSelect)
                 .padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -231,7 +221,7 @@ private fun AccountRow(
                     account.name,
                     translate = false,
                     style = MaterialTheme.typography.titleMedium,
-                    color = if (isSelected) AWColors.Accent else AWColors.Text,
+                    color = AWColors.Text,
                     fontWeight = FontWeight.Medium,
                     maxLines = 1, overflow = TextOverflow.Ellipsis,
                 )

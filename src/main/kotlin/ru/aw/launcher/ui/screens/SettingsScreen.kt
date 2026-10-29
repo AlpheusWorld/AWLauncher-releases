@@ -31,6 +31,10 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.Icon
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
@@ -55,6 +59,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import ru.aw.launcher.core.LauncherSettings
 import ru.aw.launcher.core.Paths
@@ -87,36 +92,76 @@ import ru.aw.launcher.ui.theme.languageFont
 import ru.aw.launcher.update.UpdateState
 import ru.aw.launcher.update.Updater
 
+private data class SettingsSection(val id: Int, val label: String, val description: String, val icon: ImageVector)
+
 @Composable
 fun SettingsScreen(state: LauncherState) {
-    val sections = listOf(0 to "Общие", 2 to "Игра", 6 to "Внешний вид", 1 to "Язык", 3 to "Загрузки", 5 to "Discord", 4 to "О лаунчере")
-    var section by remember { mutableStateOf(0) }
+    val sections = listOf(
+        SettingsSection(-1, "Аккаунты", "Выбранный аккаунт используется при запуске Minecraft", Icons.Default.Person),
+        SettingsSection(0, "Общие", "Поведение лаунчера", Icons.Default.Settings),
+        SettingsSection(2, "Игра", "Память", AWIcons.Memory),
+        SettingsSection(6, "Внешний вид", "Тема", AWIcons.Image),
+        SettingsSection(1, "Язык", "Язык приложения", AWIcons.Log),
+        SettingsSection(3, "Загрузки", "Загрузка и целостность", AWIcons.Download),
+        SettingsSection(5, "Discord", "Discord Rich Presence", AWIcons.Friends),
+        SettingsSection(4, "О лаунчере", "Версия лаунчера", AWIcons.Log),
+    )
+    var section by remember { mutableStateOf(-1) }
+    var query by remember { mutableStateOf("") }
+    val language = ru.aw.launcher.ui.components.LocalLanguage.current
+    val filtered = sections.filter { query.isBlank() || ru.aw.launcher.core.I18n.text(it.label, language).contains(query.trim(), true) ||
+        ru.aw.launcher.core.I18n.text(it.description, language).contains(query.trim(), true) }
+    val current = sections.first { it.id == section }
     BoxWithConstraints(Modifier.fillMaxSize().padding(AWDimens.Gutter)) {
         val compact = maxWidth < 700.dp
-        Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(18.dp)) {
-            Text("Настройки", style = MaterialTheme.typography.displaySmall, color = AWColors.Text,
-                modifier = Modifier.fillMaxWidth())
+        val shape = RoundedCornerShape(AWDimens.CornerLarge)
+        Column(Modifier.fillMaxSize().clip(shape).background(AWColors.Surface).border(1.dp, AWColors.Outline, shape)) {
             if (compact) {
-                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    sections.forEach { (index, label) -> ChoiceChip(label, selected = section == index, onClick = { section = index }) }
-                }
-            }
-            Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
-                if (!compact) {
-                    Column(Modifier.width(200.dp).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        sections.forEach { (index, label) ->
-                            Text(label, color = if (section == index) AWColors.Accent else AWColors.TextSoft,
-                                style = MaterialTheme.typography.titleSmall,
-                                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(AWDimens.CornerMedium))
-                                    .background(if (section == index) AWColors.SurfaceHigh else Color.Transparent)
-                                    .clickable { section = index }.padding(horizontal = 14.dp, vertical = 14.dp))
-                        }
+                Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Настройки", style = MaterialTheme.typography.titleLarge, color = AWColors.Text)
+                    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        sections.forEach { item -> ChoiceChip(item.label, selected = section == item.id, onClick = { section = item.id }) }
                     }
                 }
-                Column(Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(AWDimens.CornerLarge))
-                    .background(AWColors.Surface).padding(if (compact) 16.dp else 24.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
-                    Text(sections.first { it.first == section }.second, color = AWColors.Text, style = MaterialTheme.typography.headlineSmall)
-                    Box(Modifier.weight(1f).fillMaxWidth()) { SettingsContent(state, section, separateAppearance = true) }
+                HorizontalDivider(color = AWColors.Outline)
+            }
+            Row(Modifier.weight(1f).fillMaxWidth()) {
+                if (!compact) {
+                    Column(Modifier.width(248.dp).fillMaxHeight().background(AWColors.Sidebar).padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text("Настройки", style = MaterialTheme.typography.titleLarge, color = AWColors.Text)
+                        ru.aw.launcher.ui.components.AWTextField(query, onValueChange = { query = it }, placeholder = "Найти раздел",
+                            modifier = Modifier.fillMaxWidth(), clearable = true)
+                        Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            filtered.forEach { item ->
+                                Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(AWDimens.CornerMedium))
+                                    .background(if (section == item.id) AWColors.SurfaceHigh else Color.Transparent)
+                                    .clickable { section = item.id }.padding(horizontal = 12.dp, vertical = 9.dp),
+                                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    Icon(item.icon, null, tint = if (section == item.id) AWColors.Text else AWColors.TextMuted, modifier = Modifier.size(18.dp))
+                                    Column(Modifier.weight(1f)) {
+                                        Text(item.label, style = MaterialTheme.typography.titleSmall, color = AWColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        Text(item.description, style = MaterialTheme.typography.bodySmall, color = AWColors.TextMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    }
+                                }
+                            }
+                            if (filtered.isEmpty()) Text("Раздел не найден", color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall)
+                        }
+                        Text("AWLauncher ${ArgumentBuilder.LAUNCHER_VERSION}", color = AWColors.TextMuted,
+                            style = MaterialTheme.typography.bodySmall, translate = false)
+                    }
+                    androidx.compose.material3.VerticalDivider(color = AWColors.Outline)
+                }
+                Column(Modifier.weight(1f).fillMaxHeight()) {
+                    Column(Modifier.fillMaxWidth().padding(horizontal = if (compact) 16.dp else 24.dp, vertical = 16.dp)) {
+                        Text(current.label, color = AWColors.Text, style = MaterialTheme.typography.titleLarge)
+                        Text(current.description, color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall, maxLines = 2)
+                    }
+                    HorizontalDivider(color = AWColors.Outline)
+                    Box(Modifier.weight(1f).fillMaxWidth().padding(if (compact) 16.dp else 24.dp)) {
+                        if (section == -1) AccountsScreen(state, embedded = true)
+                        else SettingsContent(state, section, separateAppearance = true)
+                    }
                 }
             }
         }
@@ -469,9 +514,10 @@ private fun DownloadsPanel(state: LauncherState, settings: LauncherSettings) {
 
 @Composable
 private fun SettingsGroup(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
-    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+    Column(modifier.fillMaxWidth().clip(RoundedCornerShape(AWDimens.CornerMedium))
+        .background(AWColors.SurfaceHigh).border(1.dp, AWColors.Outline, RoundedCornerShape(AWDimens.CornerMedium))
+        .padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         content()
-        HorizontalDivider(color = AWColors.TextMuted.copy(alpha = 0.4f), modifier = Modifier.padding(top = 8.dp))
     }
 }
 
