@@ -122,7 +122,3 @@ cd AWLauncher-releases
 Код AWLauncher распространяется по [MIT](LICENSE). Сторонние библиотеки, шрифты и ресурсы сохраняют свои лицензии; сведения о них находятся в [APPLICATION_LICENSE.md](APPLICATION_LICENSE.md).
 
 AWLauncher — независимый проект, не связанный с Mojang или Microsoft и не одобренный ими. Minecraft и другие товарные знаки принадлежат их правообладателям.
-
-## Контрибьюторы
-
-Список контрибьюторов находится в [CONTRIBUTORS.md](CONTRIBUTORS.md).
