@@ -201,7 +201,7 @@ private fun CompactNavRail(state: LauncherState, expanded: Boolean) {
         NavItem("Скриншоты", AWIcons.Image, state.screen == Screen.SCREENSHOTS, compact = !expanded, itemHeight = itemHeight) { state.screen = Screen.SCREENSHOTS }
         NavItem("Активность", AWIcons.Activity, state.screen == Screen.ACTIVITY, compact = !expanded, itemHeight = itemHeight) { state.screen = Screen.ACTIVITY }
         NavItem("Уведомления", Icons.Default.Notifications, state.screen == Screen.NOTICES, badge = unread.size, badgeAlert = unread.any { it.level == NoticeLevel.ERROR }, compact = !expanded, itemHeight = itemHeight) { state.openNotices() }
-        if (!expanded) NavItem("Настройки", Icons.Default.Settings, state.screen == Screen.SETTINGS, compact = true, itemHeight = itemHeight) { state.screen = Screen.SETTINGS }
+        if (!expanded) NavItem("Настройки", Icons.Default.Settings, state.modal is Modal.Settings, compact = true, itemHeight = itemHeight) { state.openSettings(section = -1) }
         Box {
         if (expanded) {
             val account by state.selectedAccount.collectAsState()
@@ -214,7 +214,7 @@ private fun CompactNavRail(state: LauncherState, expanded: Boolean) {
                     Text(if (account == null) "Не выбран" else if (account?.isOffline == true) "Офлайн" else "Microsoft",
                         color = AWColors.TextMuted, style = MaterialTheme.typography.labelSmall)
                 }
-                IconButton(onClick = { state.screen = Screen.SETTINGS }, modifier = Modifier.size(30.dp)) { Icon(Icons.Default.Settings, "Настройки", tint = AWColors.TextMuted, modifier = Modifier.size(18.dp)) }
+                IconButton(onClick = { state.openSettings(section = -1) }, modifier = Modifier.size(30.dp)) { Icon(Icons.Default.Settings, "Настройки", tint = AWColors.TextMuted, modifier = Modifier.size(18.dp)) }
             }
         } else NavItem("Аккаунты", Icons.Default.Person, state.accountMenuOpen, compact = true, itemHeight = itemHeight) { state.accountMenuOpen = true }
         ru.aw.launcher.ui.screens.AccountMenu(state, menuHeight)

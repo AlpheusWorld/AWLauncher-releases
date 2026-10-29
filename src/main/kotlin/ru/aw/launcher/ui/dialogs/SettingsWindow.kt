@@ -31,6 +31,7 @@ import ru.aw.launcher.ui.*
 import ru.aw.launcher.ui.components.*
 import ru.aw.launcher.ui.components.LocalizedText as Text
 import ru.aw.launcher.ui.screens.InstanceSettingsContent
+import ru.aw.launcher.ui.screens.SettingsScreen
 import ru.aw.launcher.ui.screens.SettingsContent
 import ru.aw.launcher.ui.theme.AWColors
 import ru.aw.launcher.ui.theme.AWMotion
@@ -100,6 +101,9 @@ internal fun SettingsWindowHost(state: LauncherState, width: Dp, height: Dp) {
                 .pointerInput(Unit) { detectTapGestures(onTap = {}) }
                 .focusRequester(focus).focusProperties { exit = { FocusRequester.Cancel } }.focusable()
                 .semantics { paneTitle = I18n.text(if (modal.entry == null) "Настройки" else "Настройки сборки") }) {
+                if (modal.entry == null) {
+                    SettingsScreen(state, initialSection = modal.section, inDialog = true, onClose = { state.modal = null })
+                } else {
                 Row(Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text(if (modal.entry == null) "Настройки" else "Настройки сборки", style = MaterialTheme.typography.titleLarge, color = AWColors.Text)
@@ -151,6 +155,7 @@ internal fun SettingsWindowHost(state: LauncherState, width: Dp, height: Dp) {
                         if (modal.entry == null) SettingsContent(state, section)
                         else InstanceSettingsContent(state, modal.entry, section)
                     }
+                }
                 }
             }
         }

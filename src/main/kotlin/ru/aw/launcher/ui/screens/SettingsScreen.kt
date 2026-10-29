@@ -34,6 +34,8 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.RadioButton
@@ -95,7 +97,7 @@ import ru.aw.launcher.update.Updater
 private data class SettingsSection(val id: Int, val label: String, val description: String, val icon: ImageVector)
 
 @Composable
-fun SettingsScreen(state: LauncherState) {
+fun SettingsScreen(state: LauncherState, initialSection: Int = -1, inDialog: Boolean = false, onClose: (() -> Unit)? = null) {
     val sections = listOf(
         SettingsSection(-1, "Аккаунты", "Выбранный аккаунт используется при запуске Minecraft", Icons.Default.Person),
         SettingsSection(0, "Общие", "Поведение лаунчера", Icons.Default.Settings),
@@ -106,13 +108,13 @@ fun SettingsScreen(state: LauncherState) {
         SettingsSection(5, "Discord", "Discord Rich Presence", AWIcons.Friends),
         SettingsSection(4, "О лаунчере", "Версия лаунчера", AWIcons.Log),
     )
-    var section by remember { mutableStateOf(-1) }
+    var section by remember(initialSection) { mutableStateOf(initialSection.takeIf { id -> sections.any { it.id == id } } ?: -1) }
     var query by remember { mutableStateOf("") }
     val language = ru.aw.launcher.ui.components.LocalLanguage.current
     val filtered = sections.filter { query.isBlank() || ru.aw.launcher.core.I18n.text(it.label, language).contains(query.trim(), true) ||
         ru.aw.launcher.core.I18n.text(it.description, language).contains(query.trim(), true) }
     val current = sections.first { it.id == section }
-    BoxWithConstraints(Modifier.fillMaxSize().padding(AWDimens.Gutter)) {
+    BoxWithConstraints(Modifier.fillMaxSize().then(if (inDialog) Modifier else Modifier.padding(AWDimens.Gutter))) {
         val compact = maxWidth < 700.dp
         val shape = RoundedCornerShape(AWDimens.CornerLarge)
         Column(Modifier.fillMaxSize().clip(shape).background(AWColors.Surface).border(1.dp, AWColors.Outline, shape)) {
@@ -153,9 +155,15 @@ fun SettingsScreen(state: LauncherState) {
                     androidx.compose.material3.VerticalDivider(color = AWColors.Outline)
                 }
                 Column(Modifier.weight(1f).fillMaxHeight()) {
-                    Column(Modifier.fillMaxWidth().padding(horizontal = if (compact) 16.dp else 24.dp, vertical = 16.dp)) {
-                        Text(current.label, color = AWColors.Text, style = MaterialTheme.typography.titleLarge)
-                        Text(current.description, color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall, maxLines = 2)
+                    Row(Modifier.fillMaxWidth().padding(start = if (compact) 16.dp else 24.dp, end = if (compact) 12.dp else 18.dp, top = 12.dp, bottom = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(current.label, color = AWColors.Text, style = MaterialTheme.typography.titleLarge)
+                            Text(current.description, color = AWColors.TextMuted, style = MaterialTheme.typography.bodySmall, maxLines = 2)
+                        }
+                        if (onClose != null) IconButton(onClick = onClose, modifier = Modifier.size(36.dp)) {
+                            Icon(Icons.Default.Close, "Закрыть", tint = AWColors.TextMuted, modifier = Modifier.size(18.dp))
+                        }
                     }
                     HorizontalDivider(color = AWColors.Outline)
                     Box(Modifier.weight(1f).fillMaxWidth().padding(if (compact) 16.dp else 24.dp)) {
@@ -359,7 +367,15 @@ private fun MemoryPanel(settings: LauncherSettings) {
                 style = MaterialTheme.typography.bodySmall,
                 color = AWColors.Accent,
             )
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(8.dp))
+            Slider(
+                value = (customMemory ?: settings.memoryMb).coerceIn(512, limit).toFloat(),
+                onValueChange = { value -> memoryText = ((value / 256f).toInt() * 256).coerceIn(512, limit).toString() },
+                valueRange = 512f..limit.toFloat(),
+                colors = SliderDefaults.colors(thumbColor = AWColors.Accent, activeTrackColor = AWColors.Accent,
+                    inactiveTrackColor = AWColors.Outline),
+                modifier = Modifier.fillMaxWidth(),
+            )
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 presets.filter { it <= limit }.forEach { mb ->
                     ChoiceChip(formatMemory(mb), outlined = true, selected = settings.memoryMb == mb, onClick = {

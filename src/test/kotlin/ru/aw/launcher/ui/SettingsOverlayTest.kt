@@ -122,7 +122,7 @@ class SettingsOverlayTest {
             repeat(20) { scene.render(it * 16_666_667L).close() }
             scene.sendPointerEvent(PointerEventType.Press, Offset(32f, 361f))
             scene.sendPointerEvent(PointerEventType.Release, Offset(32f, 361f))
-            assertTrue(state.screen == Screen.SETTINGS, "The bottom navigation button must be visible and clickable")
+            assertTrue(state.modal is Modal.Settings, "The settings dialog must be visible and clickable")
         } finally { scene.close(); scope.cancel() }
     }
 
@@ -135,7 +135,7 @@ class SettingsOverlayTest {
             repeat(20) { scene.render(it * 16_666_667L).close() }
             scene.sendPointerEvent(PointerEventType.Press, Offset(187f, 465f))
             scene.sendPointerEvent(PointerEventType.Release, Offset(187f, 465f))
-            assertTrue(state.screen == Screen.SETTINGS, "The bottom navigation button must remain reachable")
+            assertTrue(state.modal is Modal.Settings, "The settings dialog must remain reachable")
         } finally { scene.close(); scope.cancel() }
     }
 
