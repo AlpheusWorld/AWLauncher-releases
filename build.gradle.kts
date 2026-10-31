@@ -4,6 +4,8 @@ import java.security.MessageDigest
 import java.util.Base64
 import java.util.UUID
 import java.util.zip.ZipFile
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
 
 plugins {
     alias(libs.plugins.kotlin.jvm)
@@ -13,7 +15,7 @@ plugins {
 }
 
 group = "ru.aw"
-version = "1.0.49"
+version = "1.0.50"
 
 kotlin {
     jvmToolchain(21)
@@ -43,6 +45,7 @@ tasks.test {
     useJUnitPlatform()
     systemProperty("user.home", temporaryDir.absolutePath)
     systemProperty("aw.test.expectedVersion", project.version.toString())
+    systemProperty("aw.test.rustHash", providers.gradleProperty("awRustHash").orElse("false").get())
 }
 
 val microsoftClientId = providers.environmentVariable("AW_MS_CLIENT_ID")
@@ -82,8 +85,30 @@ val generateLauncherConfig = tasks.register("generateLauncherConfig") {
 }
 
 sourceSets["main"].resources.srcDir(generatedLauncherConfig)
+val rustHashEnabled = providers.gradleProperty("awRustHash").map { it.toBoolean() }.orElse(false)
+val buildRustHash = tasks.register<Exec>("buildRustHash") {
+    onlyIf { rustHashEnabled.get() }
+    doFirst {
+        val os = System.getProperty("os.name").lowercase()
+        val arch = System.getProperty("os.arch").lowercase()
+        require((os.contains("windows") || os.contains("linux")) && arch in setOf("amd64", "x86_64")) {
+            "The experimental Rust hash library supports Windows and Linux x64 only"
+        }
+    }
+    workingDir("rust/hash")
+    commandLine("cargo", "build", "--release", "--locked")
+    inputs.files(fileTree("rust/hash/src"), "rust/hash/Cargo.toml", "rust/hash/Cargo.lock")
+    outputs.dir("rust/hash/target/release")
+}
 tasks.processResources.configure {
     dependsOn(generateLauncherConfig)
+    if (rustHashEnabled.get()) {
+        dependsOn(buildRustHash)
+        val windows = System.getProperty("os.name").lowercase().contains("win")
+        from("rust/hash/target/release/${if (windows) "aw_hash.dll" else "libaw_hash.so"}") {
+            into("native/${if (windows) "windows-x86_64" else "linux-x86_64"}")
+        }
+    }
     from("branding/AWLauncher.ico") { into("update"); rename { "app.ico" } }
 }
 
@@ -220,9 +245,35 @@ tasks.register<JavaExec>("smokeMicrosoftAuth") {
 }
 
 val desktopInstallDir = File(System.getProperty("user.home"), "AWLauncher")
+val buildNativeUi = tasks.register<Exec>("buildNativeUi") {
+    workingDir("rust/ui")
+    commandLine("cargo", "rustc", "--release", "--locked", "--bin", "awlauncher-ui", "--", "-C", "extra-filename=-package")
+    inputs.files(fileTree("rust/ui/src"),fileTree("rust/ui/assets"),"rust/ui/Cargo.toml","rust/ui/Cargo.lock")
+    inputs.dir("src/main/resources/fonts")
+    inputs.dir("src/main/resources/instance-icons")
+    outputs.dir("rust/ui/target/release")
+}
+tasks.register<JavaExec>("nativeBackendSmoke") {
+    group="verification"
+    classpath=sourceSets["main"].runtimeClasspath
+    mainClass.set("ru.aw.launcher.MainKt")
+    args("--native-task")
+    systemProperty("user.home",temporaryDir.absolutePath)
+    standardInput=ByteArrayInputStream("{\"op\":\"ping\"}\n".toByteArray())
+    val captured=ByteArrayOutputStream()
+    standardOutput=captured
+    doLast {check(captured.toString().contains("\"protocol\":1")){"Native engine protocol handshake failed: $captured"}}
+}
 
 val distributionLegal = layout.buildDirectory.dir("distribution-legal")
+val collectNativeNotices=tasks.register<Exec>("collectNativeNotices"){
+    dependsOn(buildNativeUi)
+    commandLine("python", "tools/collect_rust_notices.py")
+    inputs.files("rust/ui/Cargo.toml","rust/ui/Cargo.lock","tools/collect_rust_notices.py")
+    outputs.dir(distributionLegal.map{it.dir("rust")})
+}
 val generateDistributionLegal = tasks.register("generateDistributionLegal") {
+    dependsOn(collectNativeNotices)
     inputs.files(configurations.runtimeClasspath)
     inputs.dir("branding/legal")
     inputs.dir("src/main/resources/fonts")
@@ -259,11 +310,23 @@ val generateDistributionLegal = tasks.register("generateDistributionLegal") {
 
 tasks.matching { it.name == "createDistributable" || it.name == "createReleaseDistributable" }.configureEach {
     dependsOn(generateDistributionLegal)
+    dependsOn(buildNativeUi)
+    inputs.file(layout.projectDirectory.file("rust/ui/target/release/deps/${if(System.getProperty("os.name").lowercase().contains("win"))"awlauncher_ui-package.exe" else "awlauncher_ui-package"}"))
     doLast {
         val image = (this as AbstractJPackageTask).destinationDir.get().asFile.resolve("AWLauncher")
         val launcher = if (System.getProperty("os.name").lowercase().contains("win")) image.resolve("AWLauncher.exe") else image.resolve("bin/AWLauncher")
         check(launcher.exists()) { "Application image is missing" }
         copy { from(distributionLegal); into(image.resolve("legal")) }
+        val windows=System.getProperty("os.name").lowercase().contains("win")
+        val app=image.resolve(if(windows)"app" else "lib/app")
+        val native=file("rust/ui/target/release/deps/${if(windows)"awlauncher_ui-package.exe" else "awlauncher_ui-package"}")
+        check(native.isFile){"Native UI executable is missing"}
+        native.copyTo(app.resolve(if(windows)"AWLauncher-native.exe" else "awlauncher-native"),overwrite=true).setExecutable(true,false)
+        app.resolve("native-ui-protocol.txt").writeText("1\n")
+        val javaHome=javaToolchains.launcherFor{languageVersion.set(JavaLanguageVersion.of(21))}.get().metadata.installationPath.asFile
+        val runtime=image.resolve(if(windows)"runtime/bin" else "lib/runtime/bin")
+        runtime.mkdirs()
+        File(javaHome,"bin/${if(windows)"java.exe" else "java"}").copyTo(runtime.resolve(if(windows)"java.exe" else "java"),overwrite=true).setExecutable(true,false)
     }
 }
 
@@ -305,7 +368,7 @@ tasks.withType<AbstractJPackageTask>().configureEach {
                 "--app-version", packageVersion.get(), "--vendor", packageVendor.get(),
                 "--linux-package-name", "awlauncher", "--linux-menu-group", "Games",
                 "--linux-app-category", "Game", "--linux-shortcut",
-                "--linux-package-deps", if (deb) "libsecret-tools, gnome-keyring, pkexec, xdg-utils" else "libsecret, gnome-keyring, polkit, xdg-utils",
+                "--linux-package-deps", if (deb) "libsecret-tools, gnome-keyring, pkexec, xdg-utils, libxkbcommon-x11-0, libegl1, libgl1" else "libsecret, gnome-keyring, polkit, xdg-utils, libxkbcommon-x11, mesa-libEGL, mesa-libGL",
             )
             if (deb) options.addAll(listOf("--linux-deb-maintainer", "contact@awlauncher.ru"))
             else options.addAll(listOf("--linux-rpm-license-type", "MIT"))

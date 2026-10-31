@@ -20,11 +20,12 @@ object Log {
     @Volatile var currentFile: Path? = null
         private set
 
-    fun init() {
+    fun init(prefix: String = "launcher") {
+        require(prefix.matches(Regex("[a-z-]+")))
         runCatching {
             Paths.logs.createDirectories()
-            pruneOldLogs()
-            val file = Paths.logs.resolve("launcher_${LocalDateTime.now().format(fileStamp)}.log")
+            pruneOldLogs(prefix)
+            val file = Paths.logs.resolve("${prefix}_${LocalDateTime.now().format(fileStamp)}.log")
             writer = PrintWriter(
                 Files.newBufferedWriter(file, StandardOpenOption.CREATE, StandardOpenOption.APPEND),
                 true,
@@ -33,9 +34,9 @@ object Log {
         }
     }
 
-    private fun pruneOldLogs() {
+    private fun pruneOldLogs(prefix: String) {
         runCatching {
-            Paths.logs.listDirectoryEntries("launcher_*.log")
+            Paths.logs.listDirectoryEntries("${prefix}_*.log")
                 .sortedDescending()
                 .drop(9)
                 .forEach { it.deleteIfExists() }

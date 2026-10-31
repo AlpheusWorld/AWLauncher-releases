@@ -47,6 +47,11 @@ import ru.aw.launcher.ui.theme.AWTheme
 import ru.aw.launcher.ui.theme.isDark
 
 fun main(args: Array<String>) {
+    if(args.firstOrNull()=="--native-task"){
+        System.getenv("AW_NATIVE_DATA_HOME")?.takeIf{it.isNotBlank()}?.let{home->val path=java.nio.file.Path.of(home);require(path.isAbsolute){"Native data home must be absolute"};System.setProperty("user.home",path.normalize().toString())}
+        ru.aw.launcher.nativeui.NativeTasks.run();return
+    }
+    if(ru.aw.launcher.nativeui.NativeWindow.start(args))return
     val instance = bootstrap(args)
     val playRequest = PlayArguments.parse(args)?.also { Log.info("asked to start ${it.versionId} (${it.loader})") }
     val startupScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)

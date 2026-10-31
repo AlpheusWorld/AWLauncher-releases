@@ -159,8 +159,10 @@ object GameLauncher {
             else withContext(Dispatchers.IO) { installer.resolve(profileId) }
 
             val installed = installer.install(version, gameDir, onStage, progress.sink("game"))
-            onStage("Подготовка игры с друзьями")
-            FriendsMod.prepare(gameDir,loader,versionId,progress.sink("friends"),onNotice)
+            if(System.getProperty("aw.native.backend")!="true") {
+                onStage("Подготовка игры с друзьями")
+                FriendsMod.prepare(gameDir,loader,versionId,progress.sink("friends"),onNotice)
+            }
             PreparedLaunch(installed, gameDir, awaitJava(), settings.memoryMb, settings, options)
         }
     }

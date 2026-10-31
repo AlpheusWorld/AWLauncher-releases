@@ -1,0 +1,436 @@
+pub fn flags() -> Vec<(&'static str, &'static [u8])> {
+    vec![
+        (
+            "am",
+            include_bytes!("../../../src/main/resources/flags/am.png"),
+        ),
+        (
+            "az",
+            include_bytes!("../../../src/main/resources/flags/az.png"),
+        ),
+        (
+            "ba",
+            include_bytes!("../../../src/main/resources/flags/ba.png"),
+        ),
+        (
+            "bd",
+            include_bytes!("../../../src/main/resources/flags/bd.png"),
+        ),
+        (
+            "bg",
+            include_bytes!("../../../src/main/resources/flags/bg.png"),
+        ),
+        (
+            "br",
+            include_bytes!("../../../src/main/resources/flags/br.png"),
+        ),
+        (
+            "cn",
+            include_bytes!("../../../src/main/resources/flags/cn.png"),
+        ),
+        (
+            "cz",
+            include_bytes!("../../../src/main/resources/flags/cz.png"),
+        ),
+        (
+            "de",
+            include_bytes!("../../../src/main/resources/flags/de.png"),
+        ),
+        (
+            "dk",
+            include_bytes!("../../../src/main/resources/flags/dk.png"),
+        ),
+        (
+            "ee",
+            include_bytes!("../../../src/main/resources/flags/ee.png"),
+        ),
+        (
+            "es",
+            include_bytes!("../../../src/main/resources/flags/es.png"),
+        ),
+        (
+            "es-ct",
+            include_bytes!("../../../src/main/resources/flags/es-ct.png"),
+        ),
+        (
+            "fi",
+            include_bytes!("../../../src/main/resources/flags/fi.png"),
+        ),
+        (
+            "fr",
+            include_bytes!("../../../src/main/resources/flags/fr.png"),
+        ),
+        (
+            "gb",
+            include_bytes!("../../../src/main/resources/flags/gb.png"),
+        ),
+        (
+            "ge",
+            include_bytes!("../../../src/main/resources/flags/ge.png"),
+        ),
+        (
+            "gr",
+            include_bytes!("../../../src/main/resources/flags/gr.png"),
+        ),
+        (
+            "hr",
+            include_bytes!("../../../src/main/resources/flags/hr.png"),
+        ),
+        (
+            "hu",
+            include_bytes!("../../../src/main/resources/flags/hu.png"),
+        ),
+        (
+            "id",
+            include_bytes!("../../../src/main/resources/flags/id.png"),
+        ),
+        (
+            "il",
+            include_bytes!("../../../src/main/resources/flags/il.png"),
+        ),
+        (
+            "in",
+            include_bytes!("../../../src/main/resources/flags/in.png"),
+        ),
+        (
+            "ir",
+            include_bytes!("../../../src/main/resources/flags/ir.png"),
+        ),
+        (
+            "is",
+            include_bytes!("../../../src/main/resources/flags/is.png"),
+        ),
+        (
+            "it",
+            include_bytes!("../../../src/main/resources/flags/it.png"),
+        ),
+        (
+            "jp",
+            include_bytes!("../../../src/main/resources/flags/jp.png"),
+        ),
+        (
+            "kr",
+            include_bytes!("../../../src/main/resources/flags/kr.png"),
+        ),
+        (
+            "kz",
+            include_bytes!("../../../src/main/resources/flags/kz.png"),
+        ),
+        (
+            "lt",
+            include_bytes!("../../../src/main/resources/flags/lt.png"),
+        ),
+        (
+            "lv",
+            include_bytes!("../../../src/main/resources/flags/lv.png"),
+        ),
+        (
+            "mx",
+            include_bytes!("../../../src/main/resources/flags/mx.png"),
+        ),
+        (
+            "my",
+            include_bytes!("../../../src/main/resources/flags/my.png"),
+        ),
+        (
+            "nl",
+            include_bytes!("../../../src/main/resources/flags/nl.png"),
+        ),
+        (
+            "no",
+            include_bytes!("../../../src/main/resources/flags/no.png"),
+        ),
+        (
+            "pl",
+            include_bytes!("../../../src/main/resources/flags/pl.png"),
+        ),
+        (
+            "pt",
+            include_bytes!("../../../src/main/resources/flags/pt.png"),
+        ),
+        (
+            "ro",
+            include_bytes!("../../../src/main/resources/flags/ro.png"),
+        ),
+        (
+            "rs",
+            include_bytes!("../../../src/main/resources/flags/rs.png"),
+        ),
+        (
+            "ru",
+            include_bytes!("../../../src/main/resources/flags/ru.png"),
+        ),
+        (
+            "sa",
+            include_bytes!("../../../src/main/resources/flags/sa.png"),
+        ),
+        (
+            "se",
+            include_bytes!("../../../src/main/resources/flags/se.png"),
+        ),
+        (
+            "si",
+            include_bytes!("../../../src/main/resources/flags/si.png"),
+        ),
+        (
+            "sk",
+            include_bytes!("../../../src/main/resources/flags/sk.png"),
+        ),
+        (
+            "th",
+            include_bytes!("../../../src/main/resources/flags/th.png"),
+        ),
+        (
+            "tr",
+            include_bytes!("../../../src/main/resources/flags/tr.png"),
+        ),
+        (
+            "tw",
+            include_bytes!("../../../src/main/resources/flags/tw.png"),
+        ),
+        (
+            "ua",
+            include_bytes!("../../../src/main/resources/flags/ua.png"),
+        ),
+        (
+            "us",
+            include_bytes!("../../../src/main/resources/flags/us.png"),
+        ),
+        (
+            "vn",
+            include_bytes!("../../../src/main/resources/flags/vn.png"),
+        ),
+    ]
+}
+pub fn fallback_fonts(fonts: &mut eframe::egui::FontDefinitions) {
+    fonts.font_data.insert(
+        "NotoSans-Regular".into(),
+        eframe::egui::FontData::from_static(include_bytes!(
+            "../../../src/main/resources/fonts/NotoSans-Regular.ttf"
+        ))
+        .into(),
+    );
+    fonts
+        .families
+        .get_mut(&eframe::egui::FontFamily::Proportional)
+        .unwrap()
+        .push("NotoSans-Regular".into());
+    fonts.font_data.insert(
+        "NotoSansArabic-Regular".into(),
+        eframe::egui::FontData::from_static(include_bytes!(
+            "../../../src/main/resources/fonts/NotoSansArabic-Regular.ttf"
+        ))
+        .into(),
+    );
+    fonts
+        .families
+        .get_mut(&eframe::egui::FontFamily::Proportional)
+        .unwrap()
+        .push("NotoSansArabic-Regular".into());
+    fonts.font_data.insert(
+        "NotoSansArmenian-Regular".into(),
+        eframe::egui::FontData::from_static(include_bytes!(
+            "../../../src/main/resources/fonts/NotoSansArmenian-Regular.ttf"
+        ))
+        .into(),
+    );
+    fonts
+        .families
+        .get_mut(&eframe::egui::FontFamily::Proportional)
+        .unwrap()
+        .push("NotoSansArmenian-Regular".into());
+    fonts.font_data.insert(
+        "NotoSansBengali-Regular".into(),
+        eframe::egui::FontData::from_static(include_bytes!(
+            "../../../src/main/resources/fonts/NotoSansBengali-Regular.ttf"
+        ))
+        .into(),
+    );
+    fonts
+        .families
+        .get_mut(&eframe::egui::FontFamily::Proportional)
+        .unwrap()
+        .push("NotoSansBengali-Regular".into());
+    fonts.font_data.insert(
+        "NotoSansDevanagari-Regular".into(),
+        eframe::egui::FontData::from_static(include_bytes!(
+            "../../../src/main/resources/fonts/NotoSansDevanagari-Regular.ttf"
+        ))
+        .into(),
+    );
+    fonts
+        .families
+        .get_mut(&eframe::egui::FontFamily::Proportional)
+        .unwrap()
+        .push("NotoSansDevanagari-Regular".into());
+    fonts.font_data.insert(
+        "NotoSansGeorgian-Regular".into(),
+        eframe::egui::FontData::from_static(include_bytes!(
+            "../../../src/main/resources/fonts/NotoSansGeorgian-Regular.ttf"
+        ))
+        .into(),
+    );
+    fonts
+        .families
+        .get_mut(&eframe::egui::FontFamily::Proportional)
+        .unwrap()
+        .push("NotoSansGeorgian-Regular".into());
+    fonts.font_data.insert(
+        "NotoSansHebrew-Regular".into(),
+        eframe::egui::FontData::from_static(include_bytes!(
+            "../../../src/main/resources/fonts/NotoSansHebrew-Regular.ttf"
+        ))
+        .into(),
+    );
+    fonts
+        .families
+        .get_mut(&eframe::egui::FontFamily::Proportional)
+        .unwrap()
+        .push("NotoSansHebrew-Regular".into());
+    fonts.font_data.insert(
+        "NotoSansJP-Regular".into(),
+        eframe::egui::FontData::from_static(include_bytes!(
+            "../../../src/main/resources/fonts/NotoSansJP-Regular.ttf"
+        ))
+        .into(),
+    );
+    fonts
+        .families
+        .get_mut(&eframe::egui::FontFamily::Proportional)
+        .unwrap()
+        .push("NotoSansJP-Regular".into());
+    fonts.font_data.insert(
+        "NotoSansKR-Regular".into(),
+        eframe::egui::FontData::from_static(include_bytes!(
+            "../../../src/main/resources/fonts/NotoSansKR-Regular.ttf"
+        ))
+        .into(),
+    );
+    fonts
+        .families
+        .get_mut(&eframe::egui::FontFamily::Proportional)
+        .unwrap()
+        .push("NotoSansKR-Regular".into());
+    fonts.font_data.insert(
+        "NotoSansSC-Regular".into(),
+        eframe::egui::FontData::from_static(include_bytes!(
+            "../../../src/main/resources/fonts/NotoSansSC-Regular.ttf"
+        ))
+        .into(),
+    );
+    fonts
+        .families
+        .get_mut(&eframe::egui::FontFamily::Proportional)
+        .unwrap()
+        .push("NotoSansSC-Regular".into());
+    fonts.font_data.insert(
+        "NotoSansTC-Regular".into(),
+        eframe::egui::FontData::from_static(include_bytes!(
+            "../../../src/main/resources/fonts/NotoSansTC-Regular.ttf"
+        ))
+        .into(),
+    );
+    fonts
+        .families
+        .get_mut(&eframe::egui::FontFamily::Proportional)
+        .unwrap()
+        .push("NotoSansTC-Regular".into());
+    fonts.font_data.insert(
+        "NotoSansThai-Regular".into(),
+        eframe::egui::FontData::from_static(include_bytes!(
+            "../../../src/main/resources/fonts/NotoSansThai-Regular.ttf"
+        ))
+        .into(),
+    );
+    fonts
+        .families
+        .get_mut(&eframe::egui::FontFamily::Proportional)
+        .unwrap()
+        .push("NotoSansThai-Regular".into());
+}
+
+pub fn system_fallback_fonts(fonts: &mut eframe::egui::FontDefinitions) {
+    // Bundled fonts contain the interface glyphs. Project descriptions can use
+    // additional characters, supplied by fonts already installed on the OS.
+    #[cfg(windows)]
+    let candidates: Vec<std::path::PathBuf> = {
+        let root = std::env::var_os("WINDIR")
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|| "C:/Windows".into())
+            .join("Fonts");
+        ["msyh.ttc", "msgothic.ttc", "malgun.ttf", "seguisym.ttf"]
+            .iter()
+            .map(|name| root.join(name))
+            .collect()
+    };
+    #[cfg(target_os = "linux")]
+    let candidates: Vec<std::path::PathBuf> = [
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+        "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+    ]
+    .into_iter()
+    .map(Into::into)
+    .collect();
+    #[cfg(target_os = "macos")]
+    let candidates: Vec<std::path::PathBuf> = [
+        "/System/Library/Fonts/PingFang.ttc",
+        "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
+    ]
+    .into_iter()
+    .map(Into::into)
+    .collect();
+    #[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
+    let candidates = Vec::<std::path::PathBuf>::new();
+    for (index, path) in candidates.iter().enumerate() {
+        if !std::fs::metadata(path)
+            .is_ok_and(|meta| meta.is_file() && meta.len() <= 64 * 1024 * 1024)
+        {
+            continue;
+        }
+        if let Ok(bytes) = std::fs::read(path) {
+            let name = format!("system-project-font-{index}");
+            fonts.font_data.insert(
+                name.clone(),
+                eframe::egui::FontData::from_owned(bytes).into(),
+            );
+            fonts
+                .families
+                .get_mut(&eframe::egui::FontFamily::Proportional)
+                .unwrap()
+                .push(name);
+        }
+    }
+}
+
+#[cfg(all(test, windows))]
+mod system_font_tests {
+    use super::*;
+    #[test]
+    fn project_description_glyphs_resolve_with_installed_cjk_fonts() {
+        let root = std::env::var_os("WINDIR")
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|| "C:/Windows".into());
+        if !root.join("Fonts/msyh.ttc").is_file() {
+            return;
+        }
+        let mut definitions = eframe::egui::FontDefinitions::default();
+        fallback_fonts(&mut definitions);
+        let context = eframe::egui::Context::default();
+        let font = eframe::egui::FontId::proportional(13.0);
+        context.set_fonts(definitions.clone());
+        let _ = context.run(Default::default(), |ctx| {
+            assert!(
+                !ctx.fonts(|fonts| fonts.has_glyphs(&font, "僵尸入侵")),
+                "Fixture should reproduce the subset-font limitation"
+            );
+        });
+        system_fallback_fonts(&mut definitions);
+        context.set_fonts(definitions);
+        let _ = context.run(Default::default(), |ctx| {
+            assert!(
+                ctx.fonts(|fonts| fonts.has_glyphs(&font, "僵尸入侵")),
+                "Catalog description must render real characters instead of replacement boxes"
+            );
+        });
+    }
+}

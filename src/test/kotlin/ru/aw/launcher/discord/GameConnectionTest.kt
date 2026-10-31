@@ -83,7 +83,8 @@ class GameConnectionTest {
     fun `native snapshot also handles IPv6 sockets`() {
         assumeTrue(Shell.isWindows || Shell.isLinux)
         val address = InetAddress.getByName("::1")
-        assumeTrue(runCatching { ServerSocket(0, 1, address).use { } }.isSuccess)
+        assumeTrue(runCatching { ServerSocket(0, 1, address).use { server -> Socket(address, server.localPort).use { server.accept().close() } } }.isSuccess,
+            "The environment must allow both binding and connecting to IPv6 loopback")
         checkSocket(address)
     }
 

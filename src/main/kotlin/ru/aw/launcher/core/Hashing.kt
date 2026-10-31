@@ -35,4 +35,16 @@ fun sha1Of(stream: InputStream, buffer: ByteArray = ByteArray(64 * 1024)): Strin
     return md.digest().toHex()
 }
 
-fun sha1Of(path: Path): String = Files.newInputStream(path).buffered(64 * 1024).use { sha1Of(it) }
+fun sha1Of(path: Path): String = RustHash.sha1(path)
+    ?: Files.newInputStream(path).buffered(64 * 1024).use { sha1Of(it) }
+
+fun sha256Of(path: Path): String = RustHash.sha256(path) ?: Files.newInputStream(path).buffered(64 * 1024).use { input ->
+    val digest = MessageDigest.getInstance("SHA-256")
+    val buffer = ByteArray(64 * 1024)
+    while (true) {
+        val n = input.read(buffer)
+        if (n < 0) break
+        digest.update(buffer, 0, n)
+    }
+    digest.digest().toHex()
+}

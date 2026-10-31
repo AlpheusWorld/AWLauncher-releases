@@ -4,12 +4,11 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import ru.aw.launcher.core.Json
 import ru.aw.launcher.core.Log
-import ru.aw.launcher.core.toHex
+import ru.aw.launcher.core.sha256Of
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.LinkOption
 import java.nio.file.Path
-import java.security.MessageDigest
 
 @Serializable
 private data class CompanionRecord(val sha256: String)
@@ -23,12 +22,7 @@ internal object CompanionMod {
         if (Files.size(target) !in 1..16_777_216 || Files.size(recordFile) !in 1..4096) return false
         val owned = runCatching { Json.decodeFromString<CompanionRecord>(Files.readString(recordFile)).sha256 }.getOrNull() ?: return false
         if (!owned.matches(Regex("[a-f0-9]{64}"))) return false
-        val hash = Files.newInputStream(target).use { stream ->
-            val digest = MessageDigest.getInstance("SHA-256")
-            val buffer = ByteArray(64 * 1024)
-            while (true) { val size = stream.read(buffer); if (size < 0) break; digest.update(buffer, 0, size) }
-            digest.digest().toHex()
-        }
+        val hash = sha256Of(target)
         if (hash != owned || ModCompat.read(target)?.id != "awassistant") return false
         var disabled = target.resolveSibling("awassistant.jar.disabled")
         var suffix = 0

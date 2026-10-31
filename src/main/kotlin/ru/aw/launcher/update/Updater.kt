@@ -381,7 +381,7 @@ object Updater {
                 val msi = installer.toString().endsWith(".msi")
                 val command = UpdateSplash.command(
                     executable = executable,
-                    launcher = ProcessHandle.current().pid(),
+                    launcher = (System.getProperty("aw.native.pid")?.toLongOrNull()?.takeIf { it > 0 } ?: ProcessHandle.current().pid()),
                     installer = if (msi) Path.of(System.getenv("SystemRoot") ?: "C:/Windows", "System32", "msiexec.exe").toString() else installer.toString(),
                     arguments = if (msi) msiArguments(installer, Shortcuts.appOnDesktop(app).exists(), dir.resolve("install.log"), app.parent) else "",
                     app = app, assets = dir, version = version, ready = ready,
@@ -449,7 +449,7 @@ object Updater {
             ready.deleteIfExists()
             failed.deleteIfExists()
             ProcessBuilder(listOf("/bin/sh", "-c", linuxInstallerScript(), "awlauncher-update",
-                ProcessHandle.current().pid().toString(), privilege.toString(), manager.toString(),
+                (System.getProperty("aw.native.pid")?.toLongOrNull()?.takeIf { it > 0 } ?: ProcessHandle.current().pid()).toString(), privilege.toString(), manager.toString(),
                 if (extension == "deb") "--install" else "--upgrade", installer.toAbsolutePath().toString(),
                 dir.resolve("install.log").toString(), app.toAbsolutePath().toString(), failed.toString(), ready.toString()))
                 .redirectOutput(ProcessBuilder.Redirect.DISCARD).redirectError(ProcessBuilder.Redirect.DISCARD).start()

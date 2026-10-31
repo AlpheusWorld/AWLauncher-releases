@@ -6,12 +6,26 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asSkiaBitmap
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
@@ -80,6 +94,45 @@ fun main(args: Array<String>) {
         }
         File("branding/AWLauncher-mark.png").copyTo(File(out,"awlauncher.png"),overwrite=true)
         println("rendered Discord assets in $out"); exitProcess(0)
+    }
+    if (selectedScreens == setOf("nav-assets")) {
+        val icons = File(out, "nav-icons").apply { mkdirs() }
+        val artwork = listOf(
+            "play" to androidx.compose.material.icons.Icons.Default.PlayArrow,
+            "layers" to ru.aw.launcher.ui.components.AWIcons.Layers,
+            "search" to androidx.compose.material.icons.Icons.Default.Search,
+            "download" to ru.aw.launcher.ui.components.AWIcons.Download,
+            "friends" to ru.aw.launcher.ui.components.AWIcons.Friends,
+            "image" to ru.aw.launcher.ui.components.AWIcons.Image,
+            "activity" to ru.aw.launcher.ui.components.AWIcons.Activity,
+            "notices" to androidx.compose.material.icons.Icons.Default.Notifications,
+            "settings" to androidx.compose.material.icons.Icons.Default.Settings,
+            "account" to androidx.compose.material.icons.Icons.Default.Person,
+            "clock" to ru.aw.launcher.ui.components.AWIcons.Clock,
+            "calendar" to ru.aw.launcher.ui.components.AWIcons.Calendar,
+            "flame" to ru.aw.launcher.ui.components.AWIcons.Flame,
+            "trophy" to ru.aw.launcher.ui.components.AWIcons.Trophy,
+            "server" to ru.aw.launcher.ui.components.AWIcons.Server,
+            "history" to ru.aw.launcher.ui.components.AWIcons.History,
+            "folder" to ru.aw.launcher.ui.components.AWIcons.Folder,
+            "file" to ru.aw.launcher.ui.components.AWIcons.Log,
+            "extension" to ru.aw.launcher.ui.components.AWIcons.Extension,
+            "delete" to androidx.compose.material.icons.Icons.Default.Delete,
+            "refresh" to androidx.compose.material.icons.Icons.Default.Refresh,
+            "back" to androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowBack,
+            "forward" to androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowForward,
+            "add" to androidx.compose.material.icons.Icons.Default.Add,
+            "star" to androidx.compose.material.icons.Icons.Default.Star,
+            "chevron-down" to androidx.compose.material.icons.Icons.Default.KeyboardArrowDown,
+        )
+        for ((name, vector) in artwork) {
+            val scene = ImageComposeScene(width = 72, height = 72, density = Density(3f), content = {
+                androidx.compose.material3.Icon(vector, null, modifier = Modifier.fillMaxSize(), tint = androidx.compose.ui.graphics.Color.White)
+            })
+            try { scene.render(0).use { image -> image.encodeToData(EncodedImageFormat.PNG)!!.use { File(icons, "$name.png").writeBytes(it.bytes) } } }
+            finally { scene.close() }
+        }
+        println("rendered $icons"); exitProcess(0)
     }
     if(selectedScreens == setOf("icon-assets")) {
         val icons=File(out,"instance-icons").apply { mkdirs() }
@@ -521,6 +574,17 @@ fun main(args: Array<String>) {
                     Column(Modifier.fillMaxSize()) {
                         ru.aw.launcher.ui.LauncherTitleBar(withBuilds)
                         Box(Modifier.weight(1f)) { InstanceScreen(withBuilds, initialTab = index) }
+                    }
+                }
+            }
+        }
+        for (index in listOf(1,2)) render("instance-${if(index==1) "files" else "worlds"}-reference",1280,780) {
+            AWTheme(ThemeMode.OLED) {
+                Column(Modifier.fillMaxSize()) {
+                    ru.aw.launcher.ui.LauncherTitleBar(withBuilds)
+                    androidx.compose.foundation.layout.Row(Modifier.weight(1f)) {
+                        Box(Modifier.width(214.dp).fillMaxHeight().background(ru.aw.launcher.ui.theme.AWColors.Sidebar))
+                        Box(Modifier.weight(1f).fillMaxHeight()){InstanceScreen(withBuilds,initialTab=index)}
                     }
                 }
             }

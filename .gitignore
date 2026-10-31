@@ -37,3 +37,6 @@ __pycache__/
 *.zip
 *.tar.gz
 *.dpapi.json
+
+/rust/hash/target/
+/rust/ui/target/
