@@ -2,6 +2,7 @@
 
 mod activity;
 mod activity_visual;
+mod backend;
 mod catalog;
 mod catalog_ui;
 mod downloads_ui;
@@ -16,11 +17,13 @@ mod logs;
 mod project_markup;
 mod project_ui;
 mod remote_images;
+mod screenshot_files;
 mod screenshots;
 mod settings;
 mod settings_assets;
 mod settings_ui;
 mod tasks;
+mod translation_core;
 mod translations;
 mod visual;
 
@@ -370,6 +373,7 @@ enum InstanceTab {
     Worlds,
     Journal,
     Statistics,
+    Screenshots,
     History,
 }
 
@@ -1364,7 +1368,7 @@ impl App {
         }
     }
 
-    fn screenshots_page(&mut self, ui: &mut egui::Ui) {
+    fn screenshots_page(&mut self, ui: &mut egui::Ui, instance: Option<&str>) {
         if self.shot_last_scan.elapsed() >= std::time::Duration::from_secs(5) {
             self.refresh_screenshots(ui.ctx());
         }
@@ -1384,20 +1388,26 @@ impl App {
         if self.shot_scan.is_some() {
             ui.label(RichText::new(translations::text("Загружаю…")).color(self.palette.muted));
         }
-        egui::ComboBox::from_id_salt("shot-group")
-            .selected_text(
-                self.shot_group
-                    .as_ref()
-                    .and_then(|key| self.builds.iter().find(|b| &b.key() == key))
-                    .map(|b| b.name.clone())
-                    .unwrap_or_else(|| translations::text("Все сборки")),
-            )
-            .show_ui(ui, |ui| {
-                ui.selectable_value(&mut self.shot_group, None, translations::text("Все сборки"));
-                for build in &self.builds {
-                    ui.selectable_value(&mut self.shot_group, Some(build.key()), &build.name);
-                }
-            });
+        if instance.is_none() {
+            egui::ComboBox::from_id_salt("shot-group")
+                .selected_text(
+                    self.shot_group
+                        .as_ref()
+                        .and_then(|key| self.builds.iter().find(|b| &b.key() == key))
+                        .map(|b| b.name.clone())
+                        .unwrap_or_else(|| translations::text("Все сборки")),
+                )
+                .show_ui(ui, |ui| {
+                    ui.selectable_value(
+                        &mut self.shot_group,
+                        None,
+                        translations::text("Все сборки"),
+                    );
+                    for build in &self.builds {
+                        ui.selectable_value(&mut self.shot_group, Some(build.key()), &build.name);
+                    }
+                });
+        }
         ui.add(
             egui::TextEdit::singleline(&mut self.shot_query)
                 .hint_text(translations::text("Поиск скриншотов…"))
@@ -1408,9 +1418,9 @@ impl App {
             .shots
             .iter()
             .filter(|shot| {
-                self.shot_group
-                    .as_ref()
-                    .map(|key| key == &shot.key)
+                instance
+                    .or(self.shot_group.as_deref())
+                    .map(|key| key == shot.key)
                     .unwrap_or(true)
                     && (query.is_empty()
                         || shot.title.to_lowercase().contains(&query)
@@ -1496,10 +1506,9 @@ impl App {
             }
             return;
         }
-        let columns = ((ui.available_width() / 200.0) as usize).clamp(1, 5);
-        let cell = ((ui.available_width() - (columns.saturating_sub(1) as f32 * 10.0))
-            / columns as f32)
-            .max(90.0);
+        let width = (ui.available_width() - ui.spacing().scroll.allocated_width()).max(1.0);
+        let columns = ((width / 200.0) as usize).clamp(1, 5);
+        let cell = ((width - (columns.saturating_sub(1) as f32 * 10.0)) / columns as f32).max(1.0);
         let mut requests = Vec::new();
         if visible.is_empty() && self.shot_scan.is_none() {
             ui.label(translations::text("Скриншотов пока нет"));
@@ -1509,14 +1518,17 @@ impl App {
             for index in range {
                 let row = &visible[index * columns..((index + 1) * columns).min(visible.len())];
                 ui.horizontal_top(|ui| {
+                    ui.spacing_mut().item_spacing.x = 10.0;
                     for shot in row {
                         ui.vertical(|ui| {
+                            ui.set_width(cell);
                             let key = (shot.path.clone(), 384);
                             let response = if let Some(texture) = self.shot_images.get(&key) {
-                                ui.add(egui::ImageButton::new(
+                                ui.add(
                                     egui::Image::new(texture)
-                                        .fit_to_exact_size(Vec2::new(cell, cell * 0.58)),
-                                ))
+                                        .fit_to_exact_size(Vec2::new(cell, cell * 0.58))
+                                        .sense(egui::Sense::click()),
+                                )
                             } else if self.shot_errors.contains(&key) {
                                 ui.add_sized(
                                     [cell, cell * 0.58],
@@ -1537,17 +1549,23 @@ impl App {
                             if response.clicked() {
                                 self.shot_selected = Some(shot.path.clone());
                             }
-                            ui.label(
-                                RichText::new(
-                                    shot.path.file_name().unwrap_or_default().to_string_lossy(),
+                            ui.add(
+                                egui::Label::new(
+                                    RichText::new(
+                                        shot.path.file_name().unwrap_or_default().to_string_lossy(),
+                                    )
+                                    .family(FontFamily::Name("aw-semibold".into()))
+                                    .size(12.0),
                                 )
-                                .family(FontFamily::Name("aw-semibold".into()))
-                                .size(12.0),
+                                .truncate(),
                             );
-                            ui.label(
-                                RichText::new(&shot.title)
-                                    .color(self.palette.muted)
-                                    .size(11.0),
+                            ui.add(
+                                egui::Label::new(
+                                    RichText::new(&shot.title)
+                                        .color(self.palette.muted)
+                                        .size(11.0),
+                                )
+                                .truncate(),
                             );
                         });
                     }
@@ -2073,7 +2091,7 @@ impl eframe::App for App {
                 match self.screen {
                     Screen::Home => self.exact_home(ui),
                     Screen::Library => self.library_page(ui),
-                    Screen::Screenshots => self.screenshots_page(ui),
+                    Screen::Screenshots => self.screenshots_page(ui, None),
                     Screen::Activity => self.activity_page(ui),
                     Screen::Notices => self.notices_page(ui),
                     Screen::Catalog => self.catalog_page(ui),
@@ -2090,6 +2108,8 @@ impl eframe::App for App {
                                 self.history_page(ui, &build);
                             } else if self.instance_tab == InstanceTab::Statistics {
                                 self.activity_page(ui);
+                            } else if self.instance_tab == InstanceTab::Screenshots {
+                                self.screenshots_page(ui, Some(&build.key()));
                             } else if self.instance_tab == InstanceTab::Journal {
                                 self.instance_log(ui, &build);
                             } else if self.instance_tab != InstanceTab::Content {

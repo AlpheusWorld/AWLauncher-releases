@@ -15,7 +15,7 @@ plugins {
 }
 
 group = "ru.aw"
-version = "1.0.50"
+version = "1.0.51"
 
 kotlin {
     jvmToolchain(21)
@@ -245,13 +245,16 @@ tasks.register<JavaExec>("smokeMicrosoftAuth") {
 }
 
 val desktopInstallDir = File(System.getProperty("user.home"), "AWLauncher")
+val nativeProfile = if (providers.gradleProperty("awNativeDebug").orNull == "true") "debug" else "release"
 val buildNativeUi = tasks.register<Exec>("buildNativeUi") {
-    workingDir("rust/ui")
-    commandLine("cargo", "rustc", "--release", "--locked", "--bin", "awlauncher-ui", "--", "-C", "extra-filename=-package")
-    inputs.files(fileTree("rust/ui/src"),fileTree("rust/ui/assets"),"rust/ui/Cargo.toml","rust/ui/Cargo.lock")
+    workingDir("rust/tauri")
+    commandLine(listOf("cargo", "build", "--locked") + if (nativeProfile == "release") listOf("--release") else emptyList())
+    inputs.files(fileTree("rust/tauri/src"),fileTree("rust/tauri/web"),fileTree("rust/ui/src"),fileTree("rust/ui/assets"),"rust/tauri/Cargo.toml","rust/tauri/Cargo.lock","rust/tauri/tauri.conf.json","rust/tauri/build.rs")
     inputs.dir("src/main/resources/fonts")
     inputs.dir("src/main/resources/instance-icons")
-    outputs.dir("rust/ui/target/release")
+    inputs.dir("src/main/resources/flags")
+    inputs.dir("src/main/resources/i18n")
+    outputs.file("rust/tauri/target/$nativeProfile/${if(System.getProperty("os.name").lowercase().contains("win"))"awlauncher-tauri.exe" else "awlauncher-tauri"}")
 }
 tasks.register<JavaExec>("nativeBackendSmoke") {
     group="verification"
@@ -269,7 +272,7 @@ val distributionLegal = layout.buildDirectory.dir("distribution-legal")
 val collectNativeNotices=tasks.register<Exec>("collectNativeNotices"){
     dependsOn(buildNativeUi)
     commandLine("python", "tools/collect_rust_notices.py")
-    inputs.files("rust/ui/Cargo.toml","rust/ui/Cargo.lock","tools/collect_rust_notices.py")
+    inputs.files("rust/tauri/Cargo.toml","rust/tauri/Cargo.lock","tools/collect_rust_notices.py")
     outputs.dir(distributionLegal.map{it.dir("rust")})
 }
 val generateDistributionLegal = tasks.register("generateDistributionLegal") {
@@ -311,7 +314,7 @@ val generateDistributionLegal = tasks.register("generateDistributionLegal") {
 tasks.matching { it.name == "createDistributable" || it.name == "createReleaseDistributable" }.configureEach {
     dependsOn(generateDistributionLegal)
     dependsOn(buildNativeUi)
-    inputs.file(layout.projectDirectory.file("rust/ui/target/release/deps/${if(System.getProperty("os.name").lowercase().contains("win"))"awlauncher_ui-package.exe" else "awlauncher_ui-package"}"))
+    inputs.file(layout.projectDirectory.file("rust/tauri/target/$nativeProfile/${if(System.getProperty("os.name").lowercase().contains("win"))"awlauncher-tauri.exe" else "awlauncher-tauri"}"))
     doLast {
         val image = (this as AbstractJPackageTask).destinationDir.get().asFile.resolve("AWLauncher")
         val launcher = if (System.getProperty("os.name").lowercase().contains("win")) image.resolve("AWLauncher.exe") else image.resolve("bin/AWLauncher")
@@ -319,7 +322,7 @@ tasks.matching { it.name == "createDistributable" || it.name == "createReleaseDi
         copy { from(distributionLegal); into(image.resolve("legal")) }
         val windows=System.getProperty("os.name").lowercase().contains("win")
         val app=image.resolve(if(windows)"app" else "lib/app")
-        val native=file("rust/ui/target/release/deps/${if(windows)"awlauncher_ui-package.exe" else "awlauncher_ui-package"}")
+        val native=file("rust/tauri/target/$nativeProfile/${if(windows)"awlauncher-tauri.exe" else "awlauncher-tauri"}")
         check(native.isFile){"Native UI executable is missing"}
         native.copyTo(app.resolve(if(windows)"AWLauncher-native.exe" else "awlauncher-native"),overwrite=true).setExecutable(true,false)
         app.resolve("native-ui-protocol.txt").writeText("1\n")
@@ -368,7 +371,7 @@ tasks.withType<AbstractJPackageTask>().configureEach {
                 "--app-version", packageVersion.get(), "--vendor", packageVendor.get(),
                 "--linux-package-name", "awlauncher", "--linux-menu-group", "Games",
                 "--linux-app-category", "Game", "--linux-shortcut",
-                "--linux-package-deps", if (deb) "libsecret-tools, gnome-keyring, pkexec, xdg-utils, libxkbcommon-x11-0, libegl1, libgl1" else "libsecret, gnome-keyring, polkit, xdg-utils, libxkbcommon-x11, mesa-libEGL, mesa-libGL",
+                "--linux-package-deps", if (deb) "libsecret-tools, gnome-keyring, pkexec, xdg-utils, libxkbcommon-x11-0, libegl1, libgl1, libwebkit2gtk-4.1-0" else "libsecret, gnome-keyring, polkit, xdg-utils, libxkbcommon-x11, mesa-libEGL, mesa-libGL, webkit2gtk4.1",
             )
             if (deb) options.addAll(listOf("--linux-deb-maintainer", "contact@awlauncher.ru"))
             else options.addAll(listOf("--linux-rpm-license-type", "MIT"))

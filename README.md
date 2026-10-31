@@ -1,4 +1,6 @@
 <div align="center">
+
+Версия 1.0.51: основное окно на Tauri, полный Kotlin-редактор скинов и расширенные операции сборки в отдельных окнах. [Подробности интерфейса](rust/tauri/README.md).
   <img src="branding/AWLauncher-mark.png" alt="Логотип AWLauncher" width="96">
   <h1>AWLauncher</h1>
   <p>Лаунчер Minecraft Java Edition с открытым исходным кодом</p>

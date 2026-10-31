@@ -135,7 +135,7 @@ checksum = "f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53"
 
 [[package]]
 name = "awlauncher-ui"
-version = "1.0.50"
+version = "1.0.51"
 dependencies = [
  "chrono",
  "eframe",
@@ -346,6 +346,7 @@ checksum = "1aa79e62e7697b8e29b513a68abacf485adcd1fe8284a4316c5ae868e6633327"
 dependencies = [
  "iana-time-zone",
  "num-traits",
+ "serde",
  "windows-link",
 ]
 

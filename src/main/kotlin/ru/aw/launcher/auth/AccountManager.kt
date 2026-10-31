@@ -30,11 +30,24 @@ object AccountManager {
     private var protectedAccounts = emptyMap<String, Account>()
     val selected: StateFlow<Account?> = _selected.asStateFlow()
 
+    private fun readStore(): AccountStore = Json.decodeFromString(Paths.accountsFile.readText())
+
+    /** Selection does not need to decrypt or re-encrypt the stored credentials. */
+    @Synchronized
+    internal fun selectSaved(uuid: String) {
+        val store = try { readStore() }
+        catch (error: Exception) { throw AuthException("Не удалось прочитать список аккаунтов", error) }
+        if (store.accounts.none { it.uuid == uuid }) throw AuthException("Аккаунт больше не найден")
+        if (store.selectedUuid == uuid) return
+        try { Paths.accountsFile.writeAtomically(PrettyJson.encodeToString(store.copy(selectedUuid = uuid))) }
+        catch (error: Exception) { throw AuthException("Не удалось сохранить выбранный аккаунт", error) }
+    }
+
     fun load() {
         val file = Paths.accountsFile
         if (!file.exists()) return
         runCatching {
-            val store = Json.decodeFromString<AccountStore>(file.readText())
+            val store = readStore()
             protectedAccounts = store.accounts.associateBy { it.uuid }
             val loaded = store.accounts.map { account ->
                 if (account.isOffline) account else account.copy(

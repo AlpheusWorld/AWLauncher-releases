@@ -140,7 +140,7 @@ impl App {
             ("Миры", Some(InstanceTab::Worlds)),
             ("Журнал", Some(InstanceTab::Journal)),
             ("Статистика", Some(InstanceTab::Statistics)),
-            ("Скриншоты", None),
+            ("Скриншоты", Some(InstanceTab::Screenshots)),
             ("История", Some(InstanceTab::History)),
         ] {
             let text = self.tr(label_text);
@@ -186,15 +186,14 @@ impl App {
                             self.activity_week_offset = 0;
                             self.refresh_activity(&ui.ctx().clone());
                         }
+                        InstanceTab::Screenshots => {
+                            self.shot_selected = None;
+                            self.shot_query.clear();
+                            self.refresh_screenshots(ui.ctx());
+                        }
                         InstanceTab::History => self.refresh_history(build),
                         _ => {}
                     }
-                } else {
-                    self.shot_group = Some(build.key());
-                    self.shot_selected = None;
-                    self.shot_query.clear();
-                    self.navigate(Screen::Screenshots);
-                    self.refresh_screenshots(&ui.ctx().clone());
                 }
             }
             x += w + 4.0;

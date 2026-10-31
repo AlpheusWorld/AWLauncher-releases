@@ -1,7 +1,7 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::{io::Read, time::Duration};
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Hit {
     pub project_id: String,
     pub slug: String,
@@ -17,7 +17,7 @@ pub struct Hit {
     #[serde(default)]
     pub categories: Vec<String>,
 }
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Page {
     #[serde(default)]
     pub hits: Vec<Hit>,

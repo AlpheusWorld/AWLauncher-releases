@@ -40,3 +40,8 @@ __pycache__/
 
 /rust/hash/target/
 /rust/ui/target/
+/rust/tauri/dist/
+/rust/tauri/target/
+/rust/tauri/node_modules/
+/rust/tauri/test-results/
+/rust/tauri/gen/

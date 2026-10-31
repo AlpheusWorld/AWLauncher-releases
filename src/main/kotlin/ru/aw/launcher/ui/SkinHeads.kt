@@ -77,6 +77,15 @@ object SkinHeads {
         runCatching { account.skinUrl?.let(::downloadSkin) ?: defaultSkin(account) }.getOrNull()
     }
 
+    internal fun cachedTexture(account: Account): BufferedImage? = runCatching {
+        account.skinUrl?.let(::cachedSkin) ?: defaultSkin(account)
+    }.getOrNull()
+
+    private fun cachedSkin(url: String): BufferedImage? {
+        val file = Paths.cache.resolve("skins").resolve(sha1Of(url.byteInputStream()) + ".png")
+        return if (Files.isRegularFile(file)) downloadSkin(url) else null
+    }
+
     internal suspend fun texture(url: String): BufferedImage? = withContext(Dispatchers.IO) {
         val uri = runCatching { java.net.URI(url) }.getOrNull() ?: return@withContext null
         if (uri.scheme != "https" || uri.host != "textures.minecraft.net" || uri.userInfo != null) return@withContext null

@@ -40,7 +40,7 @@ jobs:
       - name: Install Linux build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libsecret-tools gnome-keyring dbus-x11 xvfb libgl1 libegl1 libgtk-3-0 libxrender1 libxtst6 libxi6 libxkbcommon-dev libxkbcommon-x11-dev libxcb-shape0-dev libxcb-xfixes0-dev libwayland-dev libx11-dev libxrandr-dev libxcursor-dev libxinerama-dev libegl1-mesa-dev pkg-config rpm fakeroot desktop-file-utils pkexec
+          sudo apt-get install -y libsecret-tools gnome-keyring dbus-x11 xvfb libgl1 libegl1 libgtk-3-dev libwebkit2gtk-4.1-dev libxrender1 libxtst6 libxi6 libxkbcommon-dev libxkbcommon-x11-dev libxcb-shape0-dev libxcb-xfixes0-dev libwayland-dev libx11-dev libxrandr-dev libxcursor-dev libxinerama-dev libegl1-mesa-dev pkg-config rpm fakeroot desktop-file-utils pkexec
       - name: Verify and package Linux
         run: |
           chmod +x gradlew

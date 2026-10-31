@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>AWLauncher</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <header class="titlebar" data-tauri-drag-region>
+      <div class="brand" data-tauri-drag-region>
+        <img src="assets/mark.png" alt="" /><span><b>AW</b>Launcher</span>
+      </div>
+      <button id="back" class="icon-button" aria-label="Назад">
+        <img src="assets/nav/back.png" alt="" /></button
+      ><button id="forward" class="icon-button" aria-label="Вперёд">
+        <img src="assets/nav/forward.png" alt="" /></button
+      ><span class="breadcrumb"
+        >AWLauncher › <strong id="crumb">Играть</strong></span
+      >
+      <div class="title-status">
+        <span id="version" class="badge"></span
+        ><span id="game-status">● Нет активных сборок</span>
+      </div>
+      <div class="window-controls">
+        <button data-window="minimize" aria-label="Свернуть" title="Свернуть">
+          <svg viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M3.2 10.4H12.8" stroke-width="1.3" />
+          </svg></button
+        ><button
+          data-window="toggleMaximize"
+          aria-label="Развернуть"
+          title="Развернуть"
+        >
+          <svg viewBox="0 0 16 16" aria-hidden="true">
+            <rect
+              class="maximize-shape"
+              x="3.2"
+              y="3.2"
+              width="9.6"
+              height="9.6"
+              stroke-width="1.2"
+            />
+            <g class="restore-shape" stroke-width="1.2">
+              <rect x="5.76" y="2.56" width="7.68" height="7.68" />
+              <rect x="2.56" y="5.76" width="7.68" height="7.68" />
+            </g>
+          </svg></button
+        ><button data-window="close" aria-label="Закрыть" title="Закрыть">
+          <svg viewBox="0 0 16 16" aria-hidden="true">
+            <path
+              d="M3.52 3.52L12.48 12.48M3.52 12.48L12.48 3.52"
+              stroke-width="1.3"
+            />
+          </svg>
+        </button>
+      </div>
+    </header>
+    <aside id="sidebar">
+      <nav aria-label="Главное меню" id="navigation"></nav>
+      <div class="sidebar-footer">
+        <button id="account-button" class="account">
+          <span class="avatar" id="avatar">A</span
+          ><span
+            ><strong id="account-name">Аккаунты</strong
+            ><small id="account-type">Добавь аккаунт</small></span
+          ></button
+        ><button
+          id="settings-button"
+          class="icon-button"
+          aria-label="Настройки"
+        >
+          <img src="assets/nav/settings.png" alt="" />
+        </button>
+      </div>
+    </aside>
+    <main id="main" tabindex="-1">
+      <div class="empty">
+        <span class="loading"></span>
+        <h2>Загружаю лаунчер</h2>
+      </div>
+    </main>
+    <div id="account-menu" class="account-menu" hidden></div>
+    <dialog id="settings" class="settings-dialog"></dialog>
+    <dialog id="modal" class="modal"></dialog>
+    <div id="toast" role="status" aria-live="polite" hidden></div>
+  </body>
+</html>

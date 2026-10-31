@@ -8,7 +8,7 @@ with tempfile.TemporaryDirectory(prefix='aw-native-smoke-') as folder:
  with zipfile.ZipFile(game/'mods/test.jar','w') as archive:
   archive.writestr('fabric.mod.json',json.dumps(dict(schemaVersion=1,id='aw_smoke',version='1.0',name='AW smoke',depends={'minecraft':'*'})))
  def run(request):
-  process=subprocess.Popen([str(java),'-Dfile.encoding=UTF-8',f'-Duser.home={home}','-Daw.native.backend=true','-cp',str(app/'app/*'),'ru.aw.launcher.MainKt','--native-task'],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,encoding='utf-8')
+  process=subprocess.Popen([str(java),'-Xms16m','-Xmx512m','-Dfile.encoding=UTF-8',f'-Duser.home={home}','-Daw.native.backend=true','-cp',str(app/'app/*'),'ru.aw.launcher.MainKt','--native-task'],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,encoding='utf-8')
   process.stdin.write(json.dumps(request)+'\n');process.stdin.flush()
   result=None
   for line in process.stdout:
@@ -26,6 +26,9 @@ with tempfile.TemporaryDirectory(prefix='aw-native-smoke-') as folder:
   print('Real catalog project lookup and verified mod installation passed in temporary profile')
 
  assert run(dict(op='ping'))['data']['protocol']==1
+ state=run(dict(op='launcherState'));assert state['type']=='done',state
+ assert state['data']['builds'][0]['key']==target
+ assert 'settings' in state['data'] and 'accounts' in state['data']
  content=run(dict(op='content',target=target));assert content['type']=='done',content;assert any(item['file']=='mods/test.jar' for item in content['data'])
  disabled=run(dict(op='toggle',target=target,kind='mod',file='mods/test.jar',enabled=False));assert disabled['type']=='done',disabled;assert (game/'mods/test.jar.disabled').is_file()
  enabled=run(dict(op='toggle',target=target,kind='mod',file='mods/test.jar.disabled',enabled=True));assert enabled['type']=='done',enabled;assert (game/'mods/test.jar').is_file()
@@ -38,7 +41,24 @@ with tempfile.TemporaryDirectory(prefix='aw-native-smoke-') as folder:
  restored=run(dict(op='restore',target=target,snapshot=history['data'][-1]['id']));assert restored['type']=='done',restored
  renamed=run(dict(op='rename',target=target,title='Renamed test'));assert renamed['type']=='done',renamed
  account=run(dict(op='accountOffline',title='SmokePlayer'));assert account['type']=='done',account
+ state=run(dict(op='launcherState'));assert state['type']=='done',state
+ assert state['data']['accounts'][0]['name']=='SmokePlayer'
+ assert {'id','name','type','selected'} <= set(state['data']['accounts'][0]) <= {'id','name','type','selected','face'}
  accounts=json.loads((root/'accounts.json').read_text(encoding='utf-8'));assert accounts['accounts'][0]['name']=='SmokePlayer'
+ first=accounts['accounts'][0]['uuid']
+ second=run(dict(op='accountOffline',title='SmokeSecond'));assert second['type']=='done',second
+ stored=json.loads((root/'accounts.json').read_text(encoding='utf-8'));second_id=stored['selectedUuid']
+ protected=dict(uuid='00000000-0000-4000-8000-000000000099',name='ProtectedSmoke',type='MICROSOFT',accessToken='dpapi:test-access-bytes',refreshToken='dpapi:test-refresh-bytes')
+ stored['accounts'].append(protected);(root/'accounts.json').write_text(json.dumps(stored),encoding='utf-8')
+ selected=run(dict(op='accountSelect',file=first));assert selected['type']=='done',selected
+ after=json.loads((root/'accounts.json').read_text(encoding='utf-8'));assert after['selectedUuid']==first
+ saved_protected=next(a for a in after['accounts'] if a['uuid']==protected['uuid'])
+ assert saved_protected['accessToken']==protected['accessToken'] and saved_protected['refreshToken']==protected['refreshToken']
+ invalid=run(dict(op='accountSelect',file='missing'));assert invalid['type']=='failed',invalid
+ assert json.loads((root/'accounts.json').read_text(encoding='utf-8'))['selectedUuid']==first
+ after['accounts']=[a for a in after['accounts'] if a['uuid']!=protected['uuid']];(root/'accounts.json').write_text(json.dumps(after),encoding='utf-8')
+ removed_second=run(dict(op='accountRemove',file=second_id,options=dict(returnAccounts=True)));assert removed_second['type']=='done' and len(removed_second['data'])==1,removed_second
+ denied_skin=run(dict(op='accountSkinProfile',file=first));assert denied_skin['type']=='failed',denied_skin
  removed=run(dict(op='accountRemove',file=accounts['accounts'][0]['uuid']));assert removed['type']=='done',removed
  assert not json.loads((root/'accounts.json').read_text(encoding='utf-8')).get('accounts',[])
  blocker=subprocess.Popen([sys.executable,'-c','import time;time.sleep(15)','--gameDir',str(game)])
@@ -51,7 +71,7 @@ with tempfile.TemporaryDirectory(prefix='aw-native-smoke-') as folder:
  disabled=run(dict(op='toggle',target=target,kind='datapack',file='saves/World/datapacks/test.zip',enabled=False));assert disabled['type']=='done',disabled
  assert (world/'datapacks/test.zip.disabled').exists()
  request=dict(op='project',project='P7dR8mSH',kind='mod',target=target)
- process=subprocess.Popen([str(java),'-Dfile.encoding=UTF-8',f'-Duser.home={home}','-Daw.native.backend=true','-cp',str(app/'app/*'),'ru.aw.launcher.MainKt','--native-task'],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,encoding='utf-8')
+ process=subprocess.Popen([str(java),'-Xms16m','-Xmx512m','-Dfile.encoding=UTF-8',f'-Duser.home={home}','-Daw.native.backend=true','-cp',str(app/'app/*'),'ru.aw.launcher.MainKt','--native-task'],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,encoding='utf-8')
  out,err=process.communicate(json.dumps(request)+'\ncancel\n',timeout=30)
  terminal=[json.loads(line[7:]) for line in out.splitlines() if line.startswith('AW_RPC ') and json.loads(line[7:])['type'] in ('done','cancelled','failed')]
  assert any(item['type']=='cancelled' for item in terminal),(terminal,err)

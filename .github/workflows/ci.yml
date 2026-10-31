@@ -27,7 +27,13 @@ jobs:
           cache: gradle
 
       - name: Test native UI
-        run: cargo test --locked --manifest-path rust/ui/Cargo.toml
+        run: |
+          cargo test --locked --manifest-path rust/ui/Cargo.toml
+          cargo test --locked --manifest-path rust/tauri/Cargo.toml
+          cd rust/tauri
+          npm ci
+          npx playwright install chromium
+          npm test
 
       - name: Run tests
         run: .\gradlew.bat test nativeBackendSmoke --no-daemon
@@ -54,7 +60,7 @@ jobs:
       - name: Install desktop and packaging dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libsecret-tools gnome-keyring dbus-x11 xvfb libgl1 libegl1 libgtk-3-0 libxrender1 libxtst6 libxi6 libxkbcommon-dev libxkbcommon-x11-dev libxcb-shape0-dev libxcb-xfixes0-dev libwayland-dev libx11-dev libxrandr-dev libxcursor-dev libxinerama-dev libegl1-mesa-dev pkg-config rpm fakeroot desktop-file-utils pkexec
+          sudo apt-get install -y libsecret-tools gnome-keyring dbus-x11 xvfb libgl1 libegl1 libgtk-3-dev libwebkit2gtk-4.1-dev libxrender1 libxtst6 libxi6 libxkbcommon-dev libxkbcommon-x11-dev libxcb-shape0-dev libxcb-xfixes0-dev libwayland-dev libx11-dev libxrandr-dev libxcursor-dev libxinerama-dev libegl1-mesa-dev pkg-config rpm fakeroot desktop-file-utils pkexec
 
       - name: Test Linux integrations and build DEB and RPM
         run: |

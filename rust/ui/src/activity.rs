@@ -47,7 +47,7 @@ struct CachedLog {
     modified: u128,
     session: Option<Session>,
 }
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Serialize)]
 pub struct Stats {
     pub total_ms: i64,
     pub week_ms: i64,
