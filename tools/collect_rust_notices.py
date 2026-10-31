@@ -3,7 +3,7 @@ root=pathlib.Path(__file__).resolve().parent.parent
 output=root/'build/distribution-legal/rust'
 platform='x86_64-pc-windows-msvc' if sys.platform=='win32' else 'x86_64-unknown-linux-gnu'
 command=['cargo','metadata','--locked','--format-version','1','--filter-platform',platform,'--manifest-path',str(root/'rust/tauri/Cargo.toml')]
-result=subprocess.run(command,capture_output=True,text=True,check=True)
+result=subprocess.run(command,capture_output=True,text=True,encoding="utf-8",check=True)
 data=json.loads(result.stdout)
 output.mkdir(parents=True,exist_ok=True)
 lines=['# Rust components','', '| Component | License | Source |','| --- | --- | --- |']
