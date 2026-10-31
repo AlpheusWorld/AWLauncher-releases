@@ -80,6 +80,7 @@ jobs:
           grep -R -F 'startup: native launcher ready' "$HOME/.aw/logs"
 
       - name: Retain Linux packages and test results
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: linux-build

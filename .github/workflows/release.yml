@@ -23,6 +23,8 @@ jobs:
       AW_MS_CLIENT_ID: ${{ vars.AW_MS_CLIENT_ID }}
       AW_DISCORD_APP_ID: ${{ vars.AW_DISCORD_APP_ID }}
       AW_CURSEFORGE_API_KEY: ''
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -61,14 +63,17 @@ jobs:
           test "$status" -eq 124 -o "$status" -eq 0
           grep -R -F 'startup: native launcher ready' "$HOME/.aw/logs"
 
-      - name: Retain Linux installers
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-installers
-          path: |
-            build/compose/binaries/main/deb/*.deb
-            build/compose/binaries/main/rpm/*.rpm
-          if-no-files-found: error
+      - name: Stage verified Linux installers in a draft release
+        shell: bash
+        run: |
+          version=$(sed -n 's/^version = "\([^"]*\)"/\1/p' build.gradle.kts)
+          stage="ci-$version-${GITHUB_SHA:0:7}"
+          if ! gh release view "$stage" >/dev/null 2>&1; then
+            gh release create "$stage" --draft --target "$GITHUB_SHA" --title "AWLauncher $version CI staging" --notes "Internal transfer of verified release assets."
+          fi
+          cp build/compose/binaries/main/deb/*.deb "$RUNNER_TEMP/AWLauncher-linux-x64.deb"
+          cp build/compose/binaries/main/rpm/*.rpm "$RUNNER_TEMP/AWLauncher-linux-x64.rpm"
+          gh release upload "$stage" "$RUNNER_TEMP/AWLauncher-linux-x64.deb" "$RUNNER_TEMP/AWLauncher-linux-x64.rpm" --clobber
 
   release:
     needs: linux
@@ -86,6 +91,7 @@ jobs:
       AW_UPDATE_SIGNING_PRIVATE_KEY: ${{ secrets.AW_UPDATE_SIGNING_PRIVATE_KEY }}
       AW_PUBLIC_RELEASE_TOKEN: ${{ secrets.AW_PUBLIC_RELEASE_TOKEN }}
       GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -155,11 +161,16 @@ jobs:
             }
           }
 
-      - name: Retrieve Linux installers
-        uses: actions/download-artifact@v4
-        with:
-          name: linux-installers
-          path: build/linux-artifacts
+      - name: Retrieve verified Linux installers from the draft release
+        shell: pwsh
+        run: |
+          $version = [regex]::Match((Get-Content 'build.gradle.kts' -Raw), '(?m)^version = "([^"]+)"').Groups[1].Value
+          $stage = "ci-$version-$($env:GITHUB_SHA.Substring(0, 7))"
+          gh release download $stage --pattern 'AWLauncher-linux-x64.deb' --pattern 'AWLauncher-linux-x64.rpm' --dir build/linux-artifacts
+          if ($LASTEXITCODE -ne 0) { throw 'Verified Linux installer download failed' }
+          foreach ($format in @('deb', 'rpm')) {
+            Move-Item -LiteralPath "build/linux-artifacts/AWLauncher-linux-x64.$format" -Destination "build/linux-artifacts/AWLauncher-$version-linux-x64.$format"
+          }
 
       - name: Prepare signed public release bundle
         shell: pwsh
@@ -169,24 +180,20 @@ jobs:
           .\tools\prepare_release_sources.ps1 -Version $version
           .\tools\publish_release.ps1 -Version $version -Artifacts 'build/compose/binaries/main' -LinuxArtifacts 'build/linux-artifacts' -Notes $notes -PrepareOnly
 
-      - name: Retain verified release assets
-        uses: actions/upload-artifact@v4
-        with:
-          name: public-release
-          path: |
-            build/publication/v*/*.exe
-            build/publication/v*/*.msi
-            build/publication/v*/*.deb
-            build/publication/v*/*.rpm
-            build/publication/v*/*.json
-            build/publication/v*/*.sig
-            build/publication/v*/*.txt
-            build/publication/v*/*.zip
-            build/publication/v*/*.tar.gz
-            build/publication/v*/*.part??
-            build/publication/v*/*.md
-          if-no-files-found: error
-          retention-days: 30
+      - name: Retain verified release assets in the draft release
+        shell: pwsh
+        run: |
+          $version = [regex]::Match((Get-Content 'build.gradle.kts' -Raw), '(?m)^version = "([^"]+)"').Groups[1].Value
+          $stage = "ci-$version-$($env:GITHUB_SHA.Substring(0, 7))"
+          $folder = "build/publication/v$version"
+          $names = @('AWLauncher-Setup.exe', 'AWLauncher.msi', 'update.json', 'update.json.sig', 'SHA256SUMS.txt', 'AWLauncher-third-party-sources.zip', 'OpenJDK-sources.part01', 'OpenJDK-sources.part02', 'OpenJDK-SOURCES.md', 'AWLauncher-linux-x64.deb', 'AWLauncher-linux-x64.rpm', 'update-linux-deb-x64.json', 'update-linux-deb-x64.json.sig', 'update-linux-rpm-x64.json', 'update-linux-rpm-x64.json.sig')
+          $assetPaths = $names | ForEach-Object {
+            $path = Join-Path $folder $_
+            if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "Missing verified asset: $_" }
+            (Resolve-Path -LiteralPath $path).Path
+          }
+          gh release upload $stage @assetPaths --clobber
+          if ($LASTEXITCODE -ne 0) { throw 'Verified release asset upload failed' }
 
       - name: Publish public release with repository-scoped credentials
         if: env.AW_PUBLIC_RELEASE_TOKEN != '' || github.repository == 'AlpheusWorld/AWLauncher-releases'
