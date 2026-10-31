@@ -73,13 +73,16 @@ jobs:
       - name: Verify the installed Linux application starts
         env:
           LIBGL_ALWAYS_SOFTWARE: '1'
+          # Xvfb has no hardware compositor; keep this confined to the smoke test.
+          WEBKIT_DISABLE_DMABUF_RENDERER: '1'
+          WEBKIT_DISABLE_COMPOSITING_MODE: '1'
         run: |
           sudo mkdir -p /usr/share/desktop-directories
           sudo dpkg --install build/compose/binaries/main/deb/*.deb
           app_binary=$(dpkg -L awlauncher | awk '/\/bin\/AWLauncher$/ { print; exit }')
           test -n "$app_binary"
           set +e
-          timeout -k 5s 30s xvfb-run -a "$app_binary"
+          timeout -k 5s 45s xvfb-run -a dbus-run-session -- "$app_binary"
           status=$?
           set -e
           test "$status" -eq 124 -o "$status" -eq 0
