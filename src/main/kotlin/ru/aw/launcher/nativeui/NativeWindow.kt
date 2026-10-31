@@ -21,7 +21,7 @@ object NativeWindow {
     internal suspend fun openOriginal(request:NativeTasks.Request,onReady:()->Unit={},onGameStarted:(Process)->Unit={}) {
         val operation=currentCoroutineContext()[Job]
         val preloaded=Preloader.run { _,_-> }
-        application {
+        application(exitProcessOnExit=false) {
             val scope=rememberCoroutineScope()
             val state=remember { LauncherState(scope,preloaded) }
             val settings by Settings.state.collectAsState()
