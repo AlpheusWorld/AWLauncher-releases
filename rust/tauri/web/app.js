@@ -1121,7 +1121,32 @@ function pumpImages() {
       });
   }
 }
+const localOperations = new Set(["saveOptions", "rename", "shortcut", "createBuild", "accountOffline", "checkUpdate", "snapshot", "restore", "duplicate", "buildDelete", "remove", "buildExport"]);
+const immediateOperations = new Map();
+async function runImmediate(title, request, callbacks) {
+  const key=JSON.stringify(request);
+  if(immediateOperations.has(key))return immediateOperations.get(key);
+  const operation=(async()=>{
+    let result;
+    try {
+      result=await rpc(request);
+      if(result?.failed)throw Error(result.message||"Операция не завершена");
+      if(request.op==='saveOptions')syncBuildUi(request.target,{options:{...state.data.builds.find(b=>b.key===request.target)?.options,...request.options}});
+      else if(request.op==='rename')syncBuildUi(request.target,{name:request.title});
+      else if(!['shortcut','checkUpdate','buildExport'].includes(request.op)) {
+        await refresh();invalidateViews(request.target||'');
+        if(request.op!=='buildDelete'&&['instance','library','home'].includes(state.route.page))await render({refresh:true});
+      }
+      toast(typeof result==='string'?result:result?.message||'Готово');
+      await callbacks.onSuccess?.(result);
+      return result;
+    }catch(error){await callbacks.onFailure?.(error,result);throw error;}
+  })();
+  immediateOperations.set(key,operation);
+  try{return await operation;}finally{immediateOperations.delete(key);}
+}
 async function enqueue(title, request, callbacks = {}) {
+  if(localOperations.has(request.op))return runImmediate(title,request,callbacks);
   state.queue.push({
     id: `task-${++state.serial}`,
     title,
@@ -2055,11 +2080,11 @@ const actions = {
     const key = el.dataset.key,
       value = el.getAttribute("aria-checked") !== "true";
     if (el.dataset.instance) {
-      await enqueue("Настройки сборки", {
-        op: "saveOptions",
-        target: selected().key,
-        options: { [key]: value },
-      });
+      el.disabled=true;el.setAttribute('aria-busy','true');
+      try {
+        await enqueue("Настройки сборки", {op:"saveOptions",target:selected().key,options:{[key]:value}});
+        el.classList.toggle('on',value);el.setAttribute('aria-checked',String(value));
+      } finally {el.disabled=false;el.removeAttribute('aria-busy');}
     } else {
       await saveSetting(key, value);
       el.classList.toggle("on", value);

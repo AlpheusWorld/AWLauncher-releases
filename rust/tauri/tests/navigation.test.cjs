@@ -708,6 +708,21 @@ async function buildDialog(kind) {
   else {await page.locator('.instance-header [data-action=build-menu]').click();await page.locator(`.build-actions [data-kind=${kind}]`).click();}
   await page.locator('.build-dialog').waitFor();
 }
+test("избранное сохраняется сразу при остановленной очереди без перезагрузки экрана",async()=>{
+  await openBuild();await page.evaluate(()=>{state.paused=true;window.oldTable=document.querySelector('.content-table');});
+  await page.locator('.instance-header [data-action=build-menu]').click();await page.getByRole('button',{name:'В избранное',exact:true}).click();
+  await page.waitForFunction(()=>window.calls.some(x=>x.args?.request?.op==='saveOptions'&&x.args.request.options.favorite===true));
+  assert.equal(await page.evaluate(()=>state.queue.length),0);
+  assert.equal(await page.evaluate(()=>document.querySelector('.content-table')===window.oldTable),true);
+  assert.doesNotMatch(await page.locator('#toast').innerText(),/очеред/);
+});
+test("ошибка немедленного сохранения не добавляет запись в загрузки",async()=>{
+  await openBuild();await page.evaluate(()=>{const original=window.__TAURI__.core.invoke;window.__TAURI__.core.invoke=(command,args)=>args?.request?.op==='saveOptions'?Promise.reject(Error('Ошибка записи')):original(command,args);});
+  await page.locator('.instance-header [data-action=build-menu]').click();await page.getByRole('button',{name:'В избранное',exact:true}).click();
+  await page.waitForFunction(()=>document.querySelector('#toast').textContent==='Ошибка записи');
+  assert.equal(await page.evaluate(()=>state.queue.length),0);
+  assert.equal(await page.evaluate(()=>state.data.builds[0].options.favorite||false),false);
+});
 test("настройки сборки сохраняют память JVM и окно в Tauri",async()=>{
   await buildDialog('settings');const d=page.locator('.build-settings-window');await d.locator('[data-build-tab="1"]').click();
   await d.locator('[data-build-toggle=memory]').click();await d.locator('[name=memoryMb]').fill('6144');
