@@ -144,9 +144,10 @@ const assert = require("node:assert/strict");
         .locator("#account-menu [data-action=edit-account]")
         .first()
         .click();
-      await page.waitForFunction(()=>state.originalWindowReady===true,{},{timeout:90000});
-      await page.evaluate(()=>window.__TAURI__.core.invoke('cancel',{id:state.originalWindowTaskId}));
-      await page.waitForFunction(()=>state.originalWindow===false,{},{timeout:30000});
+      await page.locator('#skin-page .skin-card[data-id=current]').waitFor({timeout:30000});
+      assert.equal(await page.locator('#main').isVisible(),true);
+      await page.waitForFunction(()=>document.querySelector('.skin-live-preview canvas')?.dataset.ready==='true',{},{timeout:30000});
+      await page.screenshot({path:path.join(out,'native-tauri-skins.png')});
 
     }
     await page.locator("#settings-button").click();

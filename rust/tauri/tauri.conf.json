@@ -6,7 +6,7 @@
   "build": { "frontendDist": "dist" },
   "app": {
     "withGlobalTauri": true,
-    "windows": [{ "label": "main", "title": "AWLauncher", "width": 1280, "height": 780, "minWidth": 600, "minHeight": 420, "decorations": false, "backgroundColor": "#111713" }],
+    "windows": [{ "label": "main", "title": "AWLauncher", "width": 1280, "height": 780, "minWidth": 600, "minHeight": 420, "decorations": false, "dragDropEnabled": false, "backgroundColor": "#111713" }],
     "security": {
       "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self'; connect-src 'self' ipc: http://ipc.localhost; object-src 'none'; frame-src 'none'; base-uri 'none'",
       "capabilities": [{ "identifier": "main", "windows": ["main"], "permissions": ["core:default", "core:window:allow-minimize", "core:window:allow-toggle-maximize", "core:window:allow-close", "core:window:allow-start-dragging"] }]

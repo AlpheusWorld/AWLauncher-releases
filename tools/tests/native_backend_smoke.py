@@ -61,6 +61,32 @@ with tempfile.TemporaryDirectory(prefix='aw-native-smoke-') as folder:
  denied_skin=run(dict(op='accountSkinProfile',file=first));assert denied_skin['type']=='failed',denied_skin
  removed=run(dict(op='accountRemove',file=accounts['accounts'][0]['uuid']));assert removed['type']=='done',removed
  assert not json.loads((root/'accounts.json').read_text(encoding='utf-8')).get('accounts',[])
+ # Exercise skin data/library operations in the isolated home, without changing a live Minecraft profile.
+ import struct,zlib,base64
+ def chunk(kind,data):return struct.pack('>I',len(data))+kind+data+struct.pack('>I',zlib.crc32(kind+data)&0xffffffff)
+ png=b'\x89PNG\r\n\x1a\n'+chunk(b'IHDR',struct.pack('>IIBBBBB',64,64,8,6,0,0,0))+chunk(b'IDAT',zlib.compress((b'\0'+b'\x80\x40\x20\xff'*64)*64))+chunk(b'IEND',b'')
+ skin_png='data:image/png;base64,'+base64.b64encode(png).decode()
+ skin_owner='00000000-0000-4000-8000-000000000077'
+ (root/'accounts.json').write_text(json.dumps(dict(accounts=[dict(uuid=skin_owner,name='SkinSmoke',type='MICROSOFT',accessToken='isolated-smoke-token',refreshToken='isolated-smoke-refresh')],selectedUuid=skin_owner)),encoding='utf-8')
+ skin_state=run(dict(op='accountSkinState',file=skin_owner));assert skin_state['type']=='done',skin_state
+ assert len(skin_state['data']['presets'])>9 and skin_state['data']['saved']==[]
+ assert 'isolated-smoke-token' not in json.dumps(skin_state) and 'refreshToken' not in json.dumps(skin_state)
+ invalid_image=run(dict(op='accountSkinRead',options=dict(png='data:image/png;base64,bm90LXBuZw==')));assert invalid_image['type']=='failed',invalid_image
+ added=run(dict(op='accountSkinSave',file=skin_owner,title='Saved skin',kind='CLASSIC',options=dict(png=skin_png)));assert added['type']=='done',added
+ skin_id=added['data']['selected'];assert len(added['data']['saved'])==1
+ edited=run(dict(op='accountSkinSave',file=skin_owner,project=skin_id,title='Renamed skin',kind='SLIM',options=dict(png=skin_png)));assert edited['type']=='done' and edited['data']['saved'][0]['model']=='SLIM',edited
+ assert edited['data']['selected']==skin_id
+ second_skin=run(dict(op='accountSkinSave',file=skin_owner,title='Second skin',kind='CLASSIC',options=dict(png=skin_png)));assert second_skin['type']=='done',second_skin
+ moved=run(dict(op='accountSkinMove',file=skin_owner,project=skin_id,options=dict(position=1)));assert moved['type']=='done' and moved['data'][-1]['id']==skin_id,moved
+ textures=run(dict(op='accountSkinTextures',file=skin_owner,options=dict(ids=[skin_id])));assert textures['type']=='done' and textures['data'][0]['png'].startswith('data:image/png;base64,'),textures
+ denied_cape=run(dict(op='accountSkinSave',file=skin_owner,title='Invalid cape',kind='CLASSIC',options=dict(png=skin_png,capeId='not-owned')));assert denied_cape['type']=='failed',denied_cape
+ traversal=run(dict(op='accountSkinSave',file=skin_owner,project='../../escape',title='Invalid path',kind='CLASSIC',options=dict(png=skin_png)));assert traversal['type']=='failed',traversal
+ old_window=run(dict(op='accountSkinWindow',file=skin_owner));assert old_window['type']=='failed',old_window
+ for item in second_skin['data']['saved']:
+  removed_skin=run(dict(op='accountSkinRemove',file=skin_owner,project=item['id']));assert removed_skin['type']=='done',removed_skin
+ assert json.loads((root/'skins/library.json').read_text())==[]
+ run(dict(op='accountRemove',file=skin_owner))
+ print('Embedded skin protocol: catalog, import validation, library round-trip, reorder, texture, ownership and path checks passed')
  blocker=subprocess.Popen([sys.executable,'-c','import time;time.sleep(15)','--gameDir',str(game)])
  try:
   blocked=run(dict(op='toggle',target=target,kind='mod',file='mods/test.jar',enabled=False));assert blocked['type']=='failed' and 'Minecraft' in blocked['data'],blocked

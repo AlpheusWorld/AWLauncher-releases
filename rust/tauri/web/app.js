@@ -27,6 +27,7 @@ const date = (value) =>
     : "Ещё не запускалась";
 const names = {
   home: "Играть",
+  skins: "Скины",
   library: "Сборки",
   catalog: "Каталог",
   downloads: "Загрузки",
@@ -239,6 +240,7 @@ async function render({ refresh: force = false } = {}) {
   activeView = null;
   try {
     const html = await {
+      skins: () => '<section class="skin-screen" id="skin-page"></section>',
       home: homePage,
       library: libraryPage,
       catalog: catalogPage,
@@ -334,6 +336,15 @@ function finishView(root) {
   const activity = root.querySelector("#home-activity");
   if (activity && state.homeStats)
     activity.innerHTML = `<small>Время в игре</small><h2 style="margin:6px 0">${ms(state.homeStats.week_ms)}</h2><small>Эта неделя</small>${miniBars(state.homeStats)}`;
+  const skins = root.querySelector('#skin-page');
+  if (skins) {
+    if (!skins._skins) skins._skins = AWSkins.mount(skins, {
+      rpc, esc, accounts: () => state.data.accounts, applyAccounts, toast,
+      editIcon: editAccountIcon, enhance: enhanceSelects, translate: node => translateVisible(node).catch(() => {}),
+      popover: openPopover, closePopover, confirm: confirmAction,
+    });
+    skins._skins.resume(state.route.target);
+  }
   enhanceSelects(root);
   enhanceTooltips(root);
   loadImages();
@@ -899,7 +910,16 @@ function weeklyChart(stats) {
   const offset = state.activityWeekOffset || 0,
     values = weekValues(stats),
     total = values.reduce((a, b) => a + b, 0);
-  return `<div class="row spread"><div><h3>Время по дням</h3><small>${offset ? "Недель назад: " + offset : "Эта неделя"}</small></div><div class="row week-controls">${btn("‹", "week-prev", "icon-button", 'aria-label="Предыдущая неделя"')}${btn("›", "week-next", "icon-button", `aria-label="Следующая неделя" ${offset ? "" : "disabled"}`)}<h2>${ms(total)}</h2></div></div>${weekBars(stats)}`;
+  return `<div class="row spread"><div><h3>Время по дням</h3><small>${weekRange(offset)}</small></div><div class="row week-controls">${btn("‹", "week-prev", "icon-button", 'aria-label="Предыдущая неделя"')}${btn("›", "week-next", "icon-button", `aria-label="Следующая неделя" ${offset ? "" : "disabled"}`)}<h2>${ms(total)}</h2></div></div>${weekBars(stats)}`;
+}
+function weekRange(offset = 0) {
+  const start = new Date();
+  start.setDate(start.getDate() - ((start.getDay() + 6) % 7) - offset * 7);
+  const end = new Date(start); end.setDate(start.getDate() + 6);
+  const options = { day: "numeric", month: "short" };
+  if (start.getFullYear() !== end.getFullYear() || start.getFullYear() !== new Date().getFullYear()) options.year = "numeric";
+  const format = new Intl.DateTimeFormat("ru", options);
+  return `${format.format(start)} — ${format.format(end)}`;
 }
 function localDate(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -973,6 +993,7 @@ const imageObserver = new IntersectionObserver(
   { root: $("#main"), rootMargin: "300px" },
 );
 function disposeImages(root) {
+  root.querySelectorAll("#skin-page").forEach(node => { node._skins?.destroy(); node._skins = null; });
   root.querySelectorAll("img[data-image-target]").forEach((img) => {
     imageObserver.unobserve(img);
     img._observed = false;
@@ -2075,7 +2096,10 @@ const actions = {
     return enqueue("Вход через Microsoft", { op: "accountMicrosoft" });
   },
   "select-account": (el) => selectAccount(el.dataset.id),
-  "edit-account": el => openOriginalWindow({op:"accountSkinWindow",file:el.dataset.id}),
+  "edit-account": el => {
+    closeAccountMenu(); closePopover(); if ($('#settings').open) $('#settings').close();
+    navigate({page:'skins',target:el.dataset.id});
+  },
   "remove-account": (el) => {
     const id = el.dataset.id;
     closeAccountMenu();

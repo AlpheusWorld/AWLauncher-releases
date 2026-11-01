@@ -1,3 +1,93 @@
+.page-view:has(.skin-screen) { height: 100%; min-height: 0; }
+.skin-screen { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 16px; position: relative; }
+.skin-heading { flex: none; }
+.skin-heading h1 { margin: 0; font-size: 36px; }
+.skin-account { display: flex; align-items: center; gap: 8px; }
+.skin-account > .icon { width: 18px; height: 18px; }
+.skins-layout { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,2.5fr); gap: 32px; min-height: 0; flex: 1; }
+.skin-inspector { border-radius: 16px; background: var(--high); padding: 18px; display: flex; flex-direction: column; align-items: center; gap: 10px; min-height: 0; min-width: 0; }
+.skin-owner { font-size: 14px; color: var(--soft); font-weight: 600; }
+.skin-live-preview { flex: 1; min-height: 180px; width: 100%; }
+.skin-live-preview, .skin-editor-preview { position: relative; }
+.skin-live-preview canvas,.skin-editor-preview canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+.skin-live-preview canvas:active,.skin-editor-preview canvas:active { cursor: grabbing; }
+.skin-preview-ground { position: absolute; left: 50%; top: 0; pointer-events: none; background: radial-gradient(ellipse,#83cdb026,transparent 72%); border-radius: 50%; }
+.skin-preview-tools { position: absolute; top: 0; right: 0; display: flex; gap: 2px; }
+.skin-preview-tools button { background: transparent; border-radius: 50%; min-height: 32px; width: 32px; padding: 7px; color: var(--soft); }
+.skin-preview-tools button.off { opacity: .4; }
+.skin-preview-tools svg,.skin-preview-tools img { width: 18px; height: 18px; fill: currentColor; }
+.skin-preview-hint { position: absolute; bottom: 0; left: 0; right: 0; text-align: center; padding: 0 10px; font-size: 12px; color: var(--muted); pointer-events: none; }
+.skin-preview-status { position: absolute; top: 45%; left: 10%; right: 10%; text-align: center; font-size: 12px; color: var(--muted); }
+.skin-inspector-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; position: relative; }
+.skin-inspector-actions button svg { width: 18px; height: 18px; fill: currentColor; }
+.skin-draft-badge { position: absolute; bottom: calc(100% + 12px); padding: 6px 10px; background: var(--surface); border-radius: 6px; color: var(--accent); font-size: 12px; }
+.skin-account-hint:empty { display: none; }
+.skin-library { display: flex; flex-direction: column; gap: 12px; padding: 18px; background: var(--surface); border-radius: 16px; min-width: 0; min-height: 0; }
+.skin-library > .search { flex: none; width: 100%; }
+.skin-gallery { overflow: auto; scrollbar-gutter: stable; flex: 1; min-height: 0; padding-right: 12px; position: relative; overscroll-behavior: contain; }
+.skin-section-heading { min-height: 44px; width: 100%; padding: 4px 0; display: flex; justify-content: space-between; border-radius: 0; background: var(--surface); position: sticky; top: 0; z-index: 2; font-size: 16px; text-align: left; }
+.skin-section-heading:hover { filter: none; color: var(--accent); }
+.skin-section-heading svg { width: 24px; height: 24px; fill: var(--muted); }
+.skin-section-arrow { display: flex; transition: transform .16s ease; }
+.skin-section-arrow.expanded { transform: rotate(180deg); }
+.skin-grid { display: grid; grid-template-columns: repeat(var(--skin-columns,3),minmax(0,1fr)); gap: 12px; padding-bottom: 12px; }
+.skin-card { border-radius: 20px; border: 2px solid transparent; padding: 8px; aspect-ratio: 31/40; display: flex; flex-direction: column; align-items: center; min-width: 0; position: relative; cursor: pointer; background: var(--surface); transition: border-color .15s,background .15s; }
+.skin-card:hover { background: color-mix(in srgb,var(--high) 55%,var(--surface)); }
+.skin-card.chosen { background: var(--high); border-color: var(--accent); }
+.skin-card[aria-disabled=true] { cursor: progress; }
+.skin-card.dragging { opacity: .45; }
+.skin-card-image { width: 100%; flex: 1; min-height: 0; position: relative; }
+.skin-card-image > img { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
+.skin-card-placeholder { position: absolute; inset: 0; display: grid; place-items: center; }
+.skin-card-placeholder img { width: 24px; height: 24px; opacity: .5; }
+.skin-picked { position: absolute; top: 0; left: 0; color: var(--accent); }
+.skin-picked svg { width: 18px; height: 18px; fill: currentColor; }
+.skin-card-menu { position: absolute; right: -2px; top: -2px; width: 30px; min-height: 30px; padding: 6px; background: transparent; color: var(--muted); }
+.skin-card-menu svg { width: 18px; height: 18px; fill: currentColor; }
+.skin-card > strong { width: 100%; flex: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; font-size: 12px; font-weight: 600; }
+.skin-add { border-radius: 20px; aspect-ratio: 31/40; background: var(--surface); flex-direction: column; gap: 12px; min-width: 0; white-space: normal; padding: 8px; color: var(--soft); }
+.skin-add svg { width: 32px; height: 32px; fill: currentColor; }
+.skin-add strong { font-size: 14px; }
+.skin-error { display: flex; align-items: center; gap: 12px; color: var(--danger); font-size: 12px; flex: none; }
+.skin-error > span { flex: 1; }
+.skin-file-over::after { content: 'Отпусти PNG, чтобы добавить скин'; position: absolute; inset: 0; background: color-mix(in srgb,var(--surface) 94%,transparent); border: 2px dashed var(--accent); border-radius: 16px; z-index: 3; display: grid; place-items: center; color: var(--accent); font-size: 20px; pointer-events: none; }
+.skin-editor-dialog { width: 760px; max-width: calc(100vw - 32px); max-height: calc(100dvh - 32px); }
+.skin-editor-dialog .modal-head h2 { font-size: 20px; }
+.skin-editor-dialog .modal-head svg { width: 18px; height: 18px; fill: currentColor; }
+.skin-editor-form { padding: 24px; display: flex; flex-direction: column; gap: 16px; }
+.skin-editor-body { display: grid; grid-template-columns: 256px minmax(0,1fr); gap: 24px; align-items: center; }
+.skin-editor-preview { height: 400px; }
+.skin-editor-controls { max-height: 450px; overflow: auto; display: flex; flex-direction: column; gap: 16px; padding-right: 4px; }
+.skin-editor-controls label { display: flex; flex-direction: column; gap: 16px; font-weight: 600; }
+.skin-editor-controls input[name=name] { font-weight: 400; width: 100%; }
+.skin-editor-controls h3 { font-size: 14px; margin: 0 0 12px; }
+.skin-model-options { flex-wrap: wrap; gap: 8px; }
+.skin-model-options button { min-height: 36px; padding: 0 14px; border: 1px solid transparent; background: var(--surface); }
+.skin-model-options button.selected { border-color: var(--accent); color: var(--accent); background: var(--high); }
+.skin-cape-options { display: grid; grid-template-columns: repeat(auto-fill,minmax(72px,1fr)); gap: 8px; max-height: 220px; overflow: auto; }
+.skin-cape-options button { padding: 8px; flex-direction: column; gap: 6px; background: var(--high); min-width: 0; border: 1px solid transparent; border-radius: 8px; }
+.skin-cape-options button.selected { border-color: var(--accent); background: var(--selected); color: var(--accent); }
+.skin-cape-options button > span { height: 64px; width: 100%; display: grid; place-items: center; }
+.skin-cape-options svg { width: 24px; height: 24px; fill: currentColor; }
+.skin-cape-options canvas { width: 36px; height: 58px; image-rendering: pixelated; }
+.skin-cape-options small { font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; text-align: center; }
+.skin-editor-footer { display: flex; justify-content: flex-end; gap: 8px; }
+.skin-editor-error { font-size: 12px; margin: 0; }
+.skin-screen [hidden],.skin-editor-dialog [hidden] { display: none !important; }
+@media (max-width: 961px) {
+  .skins-layout { display: flex; flex-direction: column; overflow: auto; gap: 16px; }
+  .skin-inspector { height: 330px; min-height: 330px; background: transparent; padding: 0; }
+  .skin-library { padding: 0; background: transparent; min-height: 350px; flex: 1; overflow: visible; }
+  .skin-gallery { overflow: visible; }
+}
+@media (max-width: 600px) {
+  .skin-editor-body { grid-template-columns: minmax(0,1fr); }
+  .skin-editor-preview { height: 150px; }
+  .skin-editor-form { padding: 16px; }
+  .skin-editor-controls { max-height: none; }
+  .skin-editor-dialog { overflow: auto; }
+  .skin-heading h1 { font-size: 28px; }
+}
 @font-face {
   font-family: Onest;
   src: url("assets/fonts/Onest-Regular.ttf");

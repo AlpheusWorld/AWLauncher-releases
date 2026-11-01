@@ -32,6 +32,10 @@ object AccountManager {
 
     private fun readStore(): AccountStore = Json.decodeFromString(Paths.accountsFile.readText())
 
+    /** Public appearance metadata does not need credentials or a rewrite of the account store. */
+    internal fun savedProfile(uuid: String): Account? = readStore().accounts.firstOrNull { it.uuid == uuid }
+        ?.copy(accessToken = "", refreshToken = "")
+
     /** Selection does not need to decrypt or re-encrypt the stored credentials. */
     @Synchronized
     internal fun selectSaved(uuid: String) {

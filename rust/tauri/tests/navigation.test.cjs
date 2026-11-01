@@ -135,6 +135,13 @@ beforeEach(async () => {
           modified: 800,
         },
       ];
+      const skinCanvas=document.createElement('canvas');skinCanvas.width=skinCanvas.height=64;
+      const skinContext=skinCanvas.getContext('2d');skinContext.fillStyle='#e6463c';skinContext.fillRect(0,0,32,16);skinContext.fillStyle='#3c8cd2';skinContext.fillRect(0,16,64,16);skinContext.fillRect(16,48,32,16);skinContext.fillStyle='#32d250';skinContext.fillRect(40,8,8,8);
+      const skinPng=skinCanvas.toDataURL('image/png');window.testSkinPng=skinPng;
+      skinCanvas.height=32;skinContext.fillStyle='#2850f5';skinContext.fillRect(0,0,64,32);const capePng=skinCanvas.toDataURL('image/png');
+      const skinProfile={id:'two',name:'MicrosoftPlayer',model:'CLASSIC',png:skinPng,capes:[{id:'cape-1',alias:'Доступный плащ'}],capeId:null};
+      let skinSaved=[{id:'saved-one',name:'Красный скин',model:'CLASSIC'},{id:'saved-two',name:'Синий скин',model:'SLIM'}];
+      const skinPresets=[{id:'preset:default',name:'Steve',section:'Стандартные скины',model:'CLASSIC'},{id:'preset:event',name:'Праздничный',section:'Праздничный набор',model:'SLIM'}];
       window.calls = [];
       window.deferScreenshots = false;
       window.rejectToggle = false;
@@ -143,7 +150,14 @@ beforeEach(async () => {
         if (command === "request") {
           const r = args.request;
           if (r.op === "launcherState") return structuredClone(snapshot);
-          if(r.op==='accountSkinWindow'||r.op==='instanceWindow')return structuredClone(snapshot.accounts);
+          if(r.op==='instanceWindow')return structuredClone(snapshot.accounts);
+          if(r.op==='accountSkinState'){if(window.failSkinStateOnce){window.failSkinStateOnce=false;throw Error('Не удалось открыть библиотеку скинов');}return {profile:structuredClone(skinProfile),saved:structuredClone(skinSaved),presets:skinPresets};}
+          if(r.op==='accountSkinProfile')return {profile:structuredClone(skinProfile),accounts:structuredClone(snapshot.accounts)};
+          if(r.op==='accountSkinTextures')return r.options.ids.map(id=>({id,png:id.startsWith('cape:')?capePng:skinPng}));
+          if(r.op==='accountSkinSave') {const id=r.project||'saved-new',item={id,name:r.title,model:r.kind,capeId:r.options.capeId};const old=skinSaved.findIndex(s=>s.id===id);if(old<0)skinSaved.push(item);else skinSaved[old]=item;return {saved:structuredClone(skinSaved),selected:id};}
+          if(r.op==='accountSkinMove'){const index=skinSaved.findIndex(s=>s.id===r.project),item=skinSaved.splice(index,1)[0];skinSaved.splice(r.options.position,0,item);return structuredClone(skinSaved);}
+          if(r.op==='accountSkinRemove'){skinSaved=skinSaved.filter(s=>s.id!==r.project);return structuredClone(skinSaved);}
+          if(r.op==='accountSkinApply'){if(r.options.changeSkin){skinProfile.png=r.options.png||skinPng;skinProfile.model=r.kind;}if(r.options.changeCape)skinProfile.capeId=r.options.capeId;return {profile:structuredClone(skinProfile),accounts:structuredClone(snapshot.accounts)};}
           if (r.op === "accountSelect") {
             if (window.deferAccount)
               await new Promise((resolve) => (window.commitAccount = resolve));
@@ -782,7 +796,95 @@ test("запуск ждёт подтверждения сохранённого 
     ),
   );
 });
-test("редактор аккаунта открывает полный исходный раздел скинов",async()=>{await page.locator('#account-button').click();assert.equal(await page.locator('#account-menu [data-action=remove-account]').count(),2);const edit=page.locator('#account-menu [data-action=edit-account][data-id=two]');assert.equal(await edit.locator('svg.material-icon path').count(),1);await edit.click();await page.waitForFunction(()=>window.calls.some(x=>x.command==='request'&&x.args.request.op==='accountSkinWindow'&&x.args.request.file==='two'));});
+async function openSkins() {
+  await page.locator('#account-button').click();
+  await page.locator('#account-menu [data-action=edit-account][data-id=two]').click();
+  await page.locator('#skin-page .skin-card[data-id=current]').waitFor();
+  await page.waitForFunction(()=>document.querySelector('.skin-live-preview canvas')?.dataset.ready==='true');
+}
+test("ошибка библиотеки скинов повторяется в той же странице",async()=>{
+  await page.evaluate(()=>window.failSkinStateOnce=true);await page.locator('#account-button').click();await page.locator('#account-menu [data-action=edit-account][data-id=two]').click();
+  await page.locator('.skin-error').waitFor();await page.locator('.skin-error [data-skin=refresh]').click();await page.locator('.skin-card[data-id=current]').waitFor();
+  assert.equal(await page.locator('.skin-error').isVisible(),false);assert.equal(page.context().pages().length,1);
+});
+test("скины открываются внутри Tauri без отдельного окна",async()=>{
+  await openSkins();assert.equal(await page.locator('#main').isVisible(),true);
+  assert.equal(await page.locator('#crumb').innerText(),'Скины');
+  assert.equal(await page.evaluate(()=>window.calls.some(x=>x.args?.request?.op==='accountSkinWindow')),false);
+  assert.equal(page.context().pages().length,1);
+  assert.equal(await page.locator('.skin-card').count(),4);
+  const out=path.resolve(__dirname,'../test-results');await fs.mkdir(out,{recursive:true});await page.screenshot({path:path.join(out,'tauri-skins.png')});
+});
+test("каталог скинов фильтруется и разворачивает наборы без перезагрузки",async()=>{
+  await openSkins();await page.getByRole('searchbox',{name:'Поиск скинов или набора'}).fill('праздничный');
+  assert.equal(await page.locator('.skin-card').count(),1);assert.equal(await page.locator('.skin-card').getAttribute('data-id'),'preset:event');
+  await page.getByRole('searchbox',{name:'Поиск скинов или набора'}).fill('');
+  await page.getByRole('button',{name:'Сохранённые скины',exact:true}).click();
+  assert.equal(await page.locator('.skin-card[data-id=saved-one]').count(),0);
+  assert.equal(await page.evaluate(()=>window.calls.filter(x=>x.args?.request?.op==='launcherState').length),1);
+});
+test("редактор хранит модель и плащ до явного применения",async()=>{
+  await openSkins();await page.locator('[data-skin=edit]').click();const dialog=page.locator('.skin-editor-dialog');await dialog.waitFor();
+  await dialog.locator('[name=name]').fill('Мой сохранённый скин');await dialog.locator('[data-model=SLIM]').click();await dialog.locator('[data-cape=cape-1]').click();
+  assert.equal(await dialog.locator('[data-cape=cape-1]').getAttribute('aria-checked'),'true');
+  assert.equal(await dialog.locator('[data-cape=""]').getAttribute('aria-checked'),'false');
+  await page.screenshot({path:path.resolve(__dirname,'../test-results/tauri-skin-editor.png')});
+  await dialog.getByRole('button',{name:'Добавить скин',exact:true}).click();await dialog.waitFor({state:'detached'});
+  assert.equal(await page.evaluate(()=>window.calls.some(x=>x.args?.request?.op==='accountSkinApply')),false);
+  assert.equal(await page.locator('.skin-card[data-id=saved-new]').getAttribute('aria-selected'),'true');
+  await page.locator('[data-skin=apply]').click();await page.waitForFunction(()=>window.calls.some(x=>x.args?.request?.op==='accountSkinApply'));
+  const request=await page.evaluate(()=>window.calls.find(x=>x.args?.request?.op==='accountSkinApply').args.request);
+  assert.equal(request.kind,'SLIM');assert.equal(request.options.capeId,'cape-1');assert.equal(request.options.changeCape,true);
+});
+test("скин переставляется и удаляется после подтверждения",async()=>{
+  await openSkins();await page.locator('.skin-card[data-id=saved-one] [data-skin=menu]').click();await page.getByRole('button',{name:'Вправо',exact:true}).click();
+  await page.waitForFunction(()=>document.querySelector('.skin-card[data-id=saved-two]')?.nextElementSibling?.dataset.id==='saved-one');
+  await page.locator('.skin-card[data-id=saved-one] [data-skin=menu]').click();await page.locator('[data-skin-menu=delete]').click();
+  assert.equal(await page.evaluate(()=>window.calls.some(x=>x.args?.request?.op==='accountSkinRemove')),false);
+  await page.locator('#modal [data-action=confirm]').click();await page.locator('.skin-card[data-id=saved-one]').waitFor({state:'detached'});
+});
+test("статистика показывает даты выбранной недели",async()=>{
+  await page.locator('#navigation [data-page=activity]').click();await page.getByRole('heading',{name:'Время по дням'}).waitFor();
+  const label=()=>page.locator('.week-controls').locator('..').locator('small').first().innerText();
+  const current=await label();assert.match(current,/\d.*—.*\d/);await page.locator('[data-action=week-prev]').click();const previous=await label();assert.notEqual(current,previous);assert.doesNotMatch(previous,/назад/);
+});
+test("3D-перенос сохраняет слои, модель, плащ и движение",async()=>{
+  const result=await page.evaluate(async()=>{
+    const canvas=document.createElement('canvas');canvas.width=256;canvas.height=400;
+    const scene=new AWSkinPreview.Scene(canvas);await scene.setSkin(window.testSkinPng);
+    const counts=()=>{const copy=document.createElement('canvas');copy.width=256;copy.height=400;const ctx=copy.getContext('2d');ctx.drawImage(canvas,0,0);const data=ctx.getImageData(0,0,256,400).data;let red=0,green=0;for(let i=0;i<data.length;i+=4){if(data[i+3]>200&&data[i]>150)red++;if(data[i+3]>200&&data[i+1]>150&&data[i]<100)green++;}return {red,green};};
+    scene.draw({yaw:0,layers:false});const base=canvas.toDataURL(),baseColors=counts();
+    scene.draw({yaw:0,layers:true});const outer=canvas.toDataURL(),outerColors=counts();
+    scene.draw({yaw:0,layers:false,model:'SLIM'});const slim=canvas.toDataURL();
+    scene.draw({yaw:90,layers:false});const rotated=canvas.toDataURL();
+    scene.draw({yaw:0,layers:false,time:2});const idle=canvas.toDataURL();
+    scene.draw({yaw:0,layers:false,wave:.5});const wave=canvas.toDataURL();
+    scene.draw({yaw:180,layers:false});const plainRear=canvas.toDataURL();
+    const capeCanvas=document.createElement('canvas');capeCanvas.width=64;capeCanvas.height=32;const capeContext=capeCanvas.getContext('2d');capeContext.fillStyle='#2850f5';capeContext.fillRect(0,0,64,32);
+    await scene.setCape(capeCanvas.toDataURL());scene.draw({yaw:180,layers:false});const cape=plainRear!==canvas.toDataURL();
+    scene.destroy();return {baseColors,outerColors,layers:outer!==base,slim:slim!==base,rotated:rotated!==base,idle:idle!==base,wave:wave!==base,cape};
+  });
+  assert.ok(result.baseColors.red>1000);assert.ok(result.outerColors.green>1000);
+  for(const key of ['layers','slim','rotated','idle','wave','cape'])assert.equal(result[key],true,key);
+});
+test("PNG импортируется в редактор без изменения профиля Minecraft",async()=>{
+  await openSkins();const png=await page.evaluate(()=>window.testSkinPng);
+  await page.locator('.skin-file-input').setInputFiles({name:'Imported.png',mimeType:'image/png',buffer:Buffer.from(png.split(',')[1],'base64')});
+  const dialog=page.locator('.skin-editor-dialog');await dialog.waitFor();assert.equal(await dialog.locator('[name=name]').inputValue(),'Imported');
+  assert.equal(await page.evaluate(()=>window.calls.some(x=>x.args?.request?.op==='accountSkinApply')),false);
+  await dialog.getByRole('button',{name:'Отменить',exact:true}).click();await dialog.waitFor({state:'detached'});
+  await page.locator('.skin-file-input').setInputFiles({name:'Invalid.png',mimeType:'image/png',buffer:Buffer.from('<svg></svg>')});
+  await page.locator('.skin-error').waitFor();assert.equal(await page.locator('.skin-editor-dialog').count(),0);
+});
+test("старые PNG зеркалят конечности и скрывают непрозрачный старый верхний слой",async()=>{
+  const result=await page.evaluate(async()=>{
+    const c=document.createElement('canvas');c.width=64;c.height=32;const ctx=c.getContext('2d');ctx.fillStyle='#112233';ctx.fillRect(0,0,64,32);
+    for(let x=4;x<8;x++){ctx.fillStyle=`rgb(170,51,${x})`;ctx.fillRect(x,20,1,12);}
+    const image=new Image();image.src=c.toDataURL();await image.decode();const out=AWSkinPreview.normalize(image).getContext('2d');
+    return {a:[...out.getImageData(20,52,1,1).data],b:[...out.getImageData(23,52,1,1).data],hat:out.getImageData(40,8,1,1).data[3],overlay:out.getImageData(20,36,1,1).data[3]};
+  });
+  assert.deepEqual(result.a,[170,51,7,255]);assert.deepEqual(result.b,[170,51,4,255]);assert.equal(result.hat,0);assert.equal(result.overlay,0);
+});
 test("удаление обновляет только аккаунты и подтверждается отдельно", async () => {
   await page.locator("#account-button").click();
   await page

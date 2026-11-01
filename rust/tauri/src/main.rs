@@ -125,7 +125,7 @@ fn run_task(
     request: &Value,
     events: &Channel<Value>,
 ) -> Result<Value, String> {
-    let _engine = state.engine.lock().map_err(|e| e.to_string())?;
+    let _engine = if request["op"] == "accountSkinTextures" { None } else { Some(state.engine.lock().map_err(|e| e.to_string())?) };
     if id.len() > 128 || id.is_empty() {
         return Err("Некорректный номер операции".into());
     }
@@ -220,7 +220,7 @@ async fn request(
         let state = app.state::<State>();
         let original_window = matches!(
             request["op"].as_str(),
-            Some("accountSkinWindow" | "instanceWindow")
+            Some("instanceWindow")
         );
         let window = if original_window {
             app.get_webview_window("main")

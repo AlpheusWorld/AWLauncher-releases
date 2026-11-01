@@ -25,7 +25,7 @@ object NativeTasks {
     @Synchronized private fun send(type:String, data:JsonElement=JsonNull) { protocolOut.println("AW_RPC "+buildJsonObject { put("type",type);put("data",data) });protocolOut.flush() }
     private fun stage(text:String)=send("stage",JsonPrimitive(text))
     private fun progress(p:DownloadProgress)=send("progress",buildJsonObject{put("fraction",p.fraction);put("completedBytes",p.completedBytes);put("totalBytes",p.totalBytes);put("bytesPerSecond",p.bytesPerSecond);put("currentFile",p.currentFile)})
-    private fun accountsData():JsonArray=buildJsonArray {
+    internal fun accountsData():JsonArray=buildJsonArray {
         AccountManager.accounts.value.forEach { a->add(buildJsonObject {
             put("id",a.uuid);put("name",a.name);put("type",a.type.name);put("selected",AccountManager.selected.value?.uuid==a.uuid)
             if(!a.isOffline){put("skinModel",a.skinModel.name);put("capes",ru.aw.launcher.core.Json.encodeToJsonElement(a.capes));a.capeId?.let{put("capeId",it)}}
@@ -71,7 +71,7 @@ object NativeTasks {
             val verifiesFiles=!request.op.startsWith("account")&&request.op!="launcherState"
             Paths.ensureBaseDirs();Settings.load();java.util.Locale.setDefault(java.util.Locale.forLanguageTag(Settings.current.language.tag));javax.swing.JComponent.setDefaultLocale(java.util.Locale.getDefault());Log.init("native-engine");if(verifiesFiles)VerifyCache.load()
             val lockFile=java.nio.channels.FileChannel.open(Paths.root.resolve("native-operation.lock"),StandardOpenOption.CREATE,StandardOpenOption.WRITE)
-            lockFile.use { channel->val readOnly=request.op in setOf("ping","launcherState","content","history","project","versions","accountFace");val lock=if(readOnly)null else channel.tryLock()?:throw IOException("Дождись завершения другой операции лаунчера");lock.use {
+            lockFile.use { channel->val readOnly=request.op in setOf("ping","launcherState","content","history","project","versions","accountFace","accountSkinState","accountSkinTextures","accountSkinRead");val lock=if(readOnly)null else channel.tryLock()?:throw IOException("Дождись завершения другой операции лаунчера");lock.use {
                 val legacyChannel=if(readOnly)null else java.nio.channels.FileChannel.open(Paths.root.resolve("launcher.lock"),StandardOpenOption.CREATE,StandardOpenOption.WRITE)
                 legacyChannel.use { oldChannel ->
                 val oldLock=if(readOnly)null else oldChannel!!.tryLock()?:throw IOException("Закрой установленный AWLauncher перед изменением сборок в новой версии")
@@ -93,15 +93,11 @@ object NativeTasks {
     }
     private suspend fun execute(r:Request):JsonElement {
         if(r.op=="ping")return buildJsonObject{put("protocol",1);put("version",ru.aw.launcher.launch.ArgumentBuilder.LAUNCHER_VERSION)}
-        if(r.op in setOf("accountSkinWindow","instanceWindow")) {
+        if(r.op.startsWith("accountSkin"))return NativeSkins.execute(r)
+        if(r.op=="instanceWindow") {
             AccountManager.load()
-            if(r.op=="accountSkinWindow") {
-                val account=AccountManager.accounts.value.firstOrNull{it.uuid==r.file}?:throw IOException("Аккаунт больше не найден")
-                if(account.isOffline)throw IOException("Скин и плащ доступны для лицензионного аккаунта Minecraft")
-            } else {
-                if(r.kind !in setOf("settings","icon","groups","export","duplicate","migrate","download","reinstall","delete"))throw IOException("Неизвестное действие сборки")
-                editable(target(r.target))
-            }
+            if(r.kind !in setOf("settings","icon","groups","export","duplicate","migrate","download","reinstall","delete"))throw IOException("Неизвестное действие сборки")
+            editable(target(r.target))
             NativeWindow.openOriginal(r,onReady={send("originalWindowReady")},onGameStarted={send("gameStarted",JsonPrimitive(it.pid()))})
             return accountsData()
         }
