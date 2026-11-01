@@ -268,7 +268,10 @@ internal sealed class SetupForm : Form
         primary.Enabled = false;
         try
         {
-            string[] installed = await Task.Run(delegate { return Native.FindInstallation(assets.UpgradeCode, assets.ProductCode); });
+            string[] installed = await Task.Run(delegate {
+                return Native.FindInstallation(assets.UpgradeCode, assets.ProductCode) ??
+                    Native.FindInstallation("{9F1D3B2A-7C4E-4E8B-9A21-5D6E8C0F3B71}", assets.ProductCode);
+            });
             if (IsDisposed) return;
             if (installed != null)
             {
@@ -422,12 +425,20 @@ internal sealed class SetupForm : Form
                 if (result == 3010) detail.Text = "Лаунчер установлен — Windows может потребовать перезагрузку";
             }
             else if (result == 1602) { SetStage("welcome"); detail.Text = "Установка отменена — можно попробовать снова"; }
-            else { SetStage("error"); detail.Text = "Не удалось установить AWLauncher\n" + InstallJob.ErrorMessage(result); }
+            else { SetStage("error"); detail.Text = "Не удалось установить AWLauncher\n" + InstallJob.ErrorMessage(result);
+#if AW_DIAGNOSTIC
+                string report = "Код Windows Installer: " + result.ToString(CultureInfo.InvariantCulture) + "\nЭтап: " + job.Status + "\n\n" + job.ErrorDetails + "\n\nПолный журнал: " + (job.LogPath ?? "не создан");
+                MessageBox.Show(report, "AWLauncher — диагностика установки", MessageBoxButtons.OK, MessageBoxIcon.Error);
+#endif
+            }
         }
         catch (Exception failure)
         {
             animation.Stop(); close.Enabled = true;
             SetStage("error"); detail.Text = failure.Message;
+#if AW_DIAGNOSTIC
+            MessageBox.Show("Этап: " + (job == null ? "Проверка папки установки" : job.Status) + "\n\n" + failure.ToString() + "\n\nЖурнал MSI: " + (job == null || job.LogPath == null ? "не создан" : job.LogPath), "AWLauncher — диагностика установки", MessageBoxButtons.OK, MessageBoxIcon.Error);
+#endif
         }
         finally { if (!IsDisposed) primary.Enabled = true; }
     }
@@ -566,6 +577,11 @@ internal sealed class InstallJob : IDisposable
     private volatile bool cancel, canCancel = true;
     private double progress;
     private string status = "Подготавливаем файлы установщика";
+#if AW_DIAGNOSTIC
+    internal string LogPath;
+    private readonly List<string> errorDetails = new List<string>();
+    internal string ErrorDetails { get { lock (errorDetails) return errorDetails.Count == 0 ? "Windows не сообщила подробную причину. Проверь полный журнал." : string.Join("\n", errorDetails.ToArray()); } }
+#endif
     internal double Progress { get { return Interlocked.CompareExchange(ref progress, 0, 0); } }
     internal string Status { get { return Volatile.Read(ref status); } }
     internal bool CanCancel { get { return canCancel; } }
@@ -582,7 +598,12 @@ internal sealed class InstallJob : IDisposable
         if (msi == null || cancel) return 1602;
         string logDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AlpheusWorld", "InstallerLogs");
         Directory.CreateDirectory(logDirectory);
-        Native.MsiEnableLog(0x3fff, Path.Combine(logDirectory, "AWLauncher-" + DateTime.Now.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture) + ".log"), 0);
+        string logPath = Path.Combine(logDirectory, "AWLauncher-" + DateTime.Now.ToString("yyyyMMdd-HHmmss-fff", CultureInfo.InvariantCulture) + ".log");
+#if AW_DIAGNOSTIC
+        LogPath = logPath;
+#endif
+        uint logStatus = Native.MsiEnableLog(0x3fff, logPath, 0);
+        if (logStatus != 0) throw new IOException("Не удалось включить журнал Windows Installer: " + logStatus.ToString(CultureInfo.InvariantCulture) + "; " + logPath);
         uint oldUi = Native.MsiSetInternalUI(2, IntPtr.Zero);
         IntPtr previous;
         uint configured = Native.MsiSetExternalUIRecord(handler, 0x07ffffff, IntPtr.Zero, out previous);
@@ -660,6 +681,13 @@ internal sealed class InstallJob : IDisposable
         try
         {
             uint kind = type & 0xff000000;
+#if AW_DIAGNOSTIC
+            if (kind == 0x01000000 || kind == 0x00000000 || kind == 0x07000000 || kind == 0x05000000 || kind == 0x19000000)
+            {
+                string message = Native.FormatRecord(record);
+                if (!string.IsNullOrWhiteSpace(message)) lock (errorDetails) { if (errorDetails.Count < 12 && !errorDetails.Contains(message)) errorDetails.Add(message); }
+            }
+#endif
             if (kind == 0x0a000000)
             {
                 int operation = Native.MsiRecordGetInteger(record, 1);
@@ -736,11 +764,30 @@ internal static class Native
     [DllImport("msi.dll", CharSet = CharSet.Unicode, EntryPoint = "MsiQueryProductStateW")] private static extern int MsiQueryProductState(string product);
     [DllImport("shell32.dll", CharSet = CharSet.Unicode)] private static extern int SHCreateItemFromParsingName(string path, IntPtr context, ref Guid iid, out IShellItem item);
 
+#if AW_DIAGNOSTIC
+    [DllImport("msi.dll", CharSet = CharSet.Unicode, EntryPoint = "MsiFormatRecordW")] private static extern uint MsiFormatRecord(uint install, uint record, StringBuilder value, ref uint size);
+    internal static string FormatRecord(uint record)
+    {
+        uint size = 0;
+        MsiFormatRecord(0, record, null, ref size);
+        StringBuilder buffer = new StringBuilder((int)size + 1);
+        size++;
+        uint result = MsiFormatRecord(0, record, buffer, ref size);
+        return result == 0 ? buffer.ToString() : RecordString(record, 0);
+    }
+#endif
     internal static string RecordString(uint record, uint field)
     {
         uint length = 256; StringBuilder text = new StringBuilder((int)length);
         if (MsiRecordGetString(record, field, text, ref length) == 234) { text = new StringBuilder((int)++length); MsiRecordGetString(record, field, text, ref length); }
         return text.ToString();
+    }
+
+    private static string ProductInfo(string product, string property)
+    {
+        uint length = 1024;
+        StringBuilder value = new StringBuilder((int)length);
+        return MsiGetProductInfo(product, property, value, ref length) == 0 ? value.ToString() : "";
     }
 
     internal static string[] FindInstallation(string upgrade, string productCode)
@@ -751,6 +798,9 @@ internal static class Native
             StringBuilder product = new StringBuilder(39);
             if (MsiEnumRelatedProducts(upgrade, 0, index, product) != 0) break;
             if (MsiQueryProductState(product.ToString()) != 5) continue;
+            // The legacy upgrade code is shared with other products. Never treat them as AWLauncher.
+            if (!string.Equals(ProductInfo(product.ToString(), "ProductName"), "AWLauncher", StringComparison.OrdinalIgnoreCase) ||
+                !string.Equals(ProductInfo(product.ToString(), "Publisher"), "AlpheusWorld", StringComparison.OrdinalIgnoreCase)) continue;
             uint length = 1024; StringBuilder location = new StringBuilder((int)length);
             if (MsiGetProductInfo(product.ToString(), "InstallLocation", location, ref length) == 0 && location.Length > 0 && File.Exists(Path.Combine(location.ToString(), "AWLauncher.exe")))
             {

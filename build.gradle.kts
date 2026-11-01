@@ -180,7 +180,7 @@ compose.desktop {
                 shortcut = true
                 perUserInstall = true
                 dirChooser = true
-                upgradeUuid = "9F1D3B2A-7C4E-4E8B-9A21-5D6E8C0F3B71"
+                upgradeUuid = "C46C0DBA-3FD0-47F9-84FB-61F746715307"
                 console = false
                 iconFile.set(project.file("branding/AWLauncher.ico"))
             }
