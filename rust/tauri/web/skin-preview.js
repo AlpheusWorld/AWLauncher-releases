@@ -74,49 +74,68 @@
     const data=ctx.getImageData(0,0,64,64);for(const [x,y,w,h] of [[0,0,32,16],[0,16,64,16],[16,48,32,16]])for(let yy=y;yy<y+h;yy++)for(let xx=x;xx<x+w;xx++)data.data[(yy*64+xx)*4+3]=255;ctx.putImageData(data,0,0);return canvas;
   }
   class Scene {
-    constructor(canvas) {
-      this.canvas=canvas;const gl=this.gl=canvas.getContext('webgl',{alpha:true,antialias:true,premultipliedAlpha:false,preserveDrawingBuffer:true});
+    constructor(canvas,{preserveDrawingBuffer=true}={}) {
+      this.canvas=canvas;const gl=this.gl=canvas.getContext('webgl',{alpha:true,antialias:true,premultipliedAlpha:false,preserveDrawingBuffer,depth:true});
       if(!gl)throw Error('3D-предпросмотр недоступен: WebGL отключён');
       const shader=(type,code)=>{const s=gl.createShader(type);gl.shaderSource(s,code);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(s));return s;};
-      const vertex=shader(gl.VERTEX_SHADER,'attribute vec3 p;attribute vec2 uv;attribute float light;attribute float cape;uniform vec2 size;uniform float focal;uniform float distance;varying vec2 vUV;varying float vLight;varying float vCape;void main(){float z=distance-p.z;gl_Position=vec4(2.0*focal/size.x*p.x,2.0*focal/size.y*(p.y+1.1)+0.06*z,0.0,z);vUV=uv/vec2(64.0,cape>0.5?32.0:64.0);vLight=light;vCape=cape;}');
-      const fragment=shader(gl.FRAGMENT_SHADER,'precision mediump float;uniform sampler2D skin;uniform sampler2D capeSkin;varying vec2 vUV;varying float vLight;varying float vCape;void main(){vec4 c=vCape>0.5?texture2D(capeSkin,vUV):texture2D(skin,vUV);if(c.a<0.0039)discard;gl_FragColor=vec4(c.rgb*vLight,c.a);}');
+      const vertex=shader(gl.VERTEX_SHADER,'attribute vec3 p;attribute vec2 uv;attribute float light;attribute float cape;uniform vec2 size;uniform float focal;uniform float distance;varying vec2 vUV;varying float vLight;varying float vCape;void main(){float z=distance-p.z;gl_Position=vec4(2.0*focal/size.x*p.x,2.0*focal/size.y*(p.y+1.1)+0.06*z,((distance+65.0)*z-2.0*(distance+64.0))/(distance+63.0),z);vUV=uv/vec2(64.0,cape>0.5?32.0:64.0);vLight=light;vCape=cape;}');
+      const fragment=shader(gl.FRAGMENT_SHADER,'precision mediump float;uniform sampler2D skin;uniform sampler2D capeSkin;uniform float pass;varying vec2 vUV;varying float vLight;varying float vCape;void main(){vec4 c=vCape>0.5?texture2D(capeSkin,vUV):texture2D(skin,vUV);if(c.a<0.0039||(pass<0.5?c.a<0.999:c.a>=0.999))discard;gl_FragColor=vec4(c.rgb*vLight,c.a);}');
       this.program=gl.createProgram();gl.attachShader(this.program,vertex);gl.attachShader(this.program,fragment);gl.linkProgram(this.program);gl.deleteShader(vertex);gl.deleteShader(fragment);if(!gl.getProgramParameter(this.program,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(this.program));
       gl.useProgram(this.program);this.buffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,this.buffer);
       for(const [name,n,offset] of [['p',3,0],['uv',2,3],['light',1,5],['cape',1,6]]){const a=gl.getAttribLocation(this.program,name);gl.enableVertexAttribArray(a);gl.vertexAttribPointer(a,n,gl.FLOAT,false,28,offset*4);}
-      this.textures=[gl.createTexture(),gl.createTexture()];gl.uniform1i(gl.getUniformLocation(this.program,'skin'),0);gl.uniform1i(gl.getUniformLocation(this.program,'capeSkin'),1);
+      this.masks=[];this.stream=new Float32Array(4096);this.textures=[gl.createTexture(),gl.createTexture()];gl.uniform1i(gl.getUniformLocation(this.program,'skin'),0);gl.uniform1i(gl.getUniformLocation(this.program,'capeSkin'),1);
       this.textures.forEach((texture,i)=>{gl.activeTexture(gl.TEXTURE0+i);gl.bindTexture(gl.TEXTURE_2D,texture);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array([0,0,0,0]));});
-      gl.enable(gl.BLEND);gl.blendFuncSeparate(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA,gl.ONE,gl.ONE_MINUS_SRC_ALPHA);
+      gl.enable(gl.DEPTH_TEST);gl.depthFunc(gl.LEQUAL);gl.enable(gl.BLEND);gl.blendFuncSeparate(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA,gl.ONE,gl.ONE_MINUS_SRC_ALPHA);
     }
     async setSkin(source) {const generation=this.skinGeneration=(this.skinGeneration||0)+1,img=normalize(await image(source));if(this.closed||this.skinGeneration!==generation)return;this.texture(0,img);this.ready=true;}
     async setCape(source) {const generation=this.capeGeneration=(this.capeGeneration||0)+1;if(!source){this.hasCape=false;return;}const img=await image(source);if(this.closed||this.capeGeneration!==generation)return;if(img.width!==64||img.height!==32)throw Error('Некорректная текстура плаща');this.texture(1,img);this.hasCape=true;}
-    texture(index,img) {const gl=this.gl;gl.activeTexture(gl.TEXTURE0+index);gl.bindTexture(gl.TEXTURE_2D,this.textures[index]);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,img);}
+    texture(index,img) {const scan=document.createElement('canvas');scan.width=img.width;scan.height=img.height;const ctx=scan.getContext('2d',{willReadFrequently:true});ctx.drawImage(img,0,0);const pixels=ctx.getImageData(0,0,img.width,img.height).data,stride=img.width+1,prefix=new Uint16Array(stride*(img.height+1));for(let y=0;y<img.height;y++)for(let x=0;x<img.width;x++){const alpha=pixels[(y*img.width+x)*4+3],i=(y+1)*stride+x+1;prefix[i]=+(alpha>0&&alpha<255)+prefix[i-1]+prefix[i-stride]-prefix[i-stride-1];}this.masks[index]={prefix,stride};const gl=this.gl;gl.activeTexture(gl.TEXTURE0+index);gl.bindTexture(gl.TEXTURE_2D,this.textures[index]);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,img);}
+    partial(face) {
+      const mask=this.masks[face.cape?1:0];if(!mask)return false;
+      const xs=face.p.map(p=>p[3]),ys=face.p.map(p=>p[4]),x=Math.min(...xs),right=Math.max(...xs),y=Math.min(...ys),bottom=Math.max(...ys),{prefix,stride}=mask;
+      return prefix[bottom*stride+right]-prefix[y*stride+right]-prefix[bottom*stride+x]+prefix[y*stride+x]>0;
+    }
+    upload(polygons,eye) {
+      const gl=this.gl,count=polygons.reduce((n,f)=>n+(f.p.length-2)*3,0),needed=count*7;
+      if(needed>this.stream.length)this.stream=new Float32Array(2**Math.ceil(Math.log2(needed)));
+      let offset=0;
+      for(const face of polygons){const n=dot(face.n,sub(eye,face.p[0]))>0?face.n:mul(face.n,-1),light=Math.floor(204+Math.round(Math.max(0,Math.min(1,dot(n,[-3,4,2])/Math.sqrt(29)))*32)*51/32)/255;
+        for(let i=1;i<face.p.length-1;i++)for(const p of [face.p[0],face.p[i],face.p[i+1]]){for(let j=0;j<5;j++)this.stream[offset++]=p[j];this.stream[offset++]=light;this.stream[offset++]=face.cape?1:0;}}
+      gl.bindBuffer(gl.ARRAY_BUFFER,this.buffer);
+      if(this.gpuBytes!==this.stream.byteLength){gl.bufferData(gl.ARRAY_BUFFER,this.stream.byteLength,gl.DYNAMIC_DRAW);this.gpuBytes=this.stream.byteLength;}
+      gl.bufferSubData(gl.ARRAY_BUFFER,0,this.stream.subarray(0,needed));gl.drawArrays(gl.TRIANGLES,0,count);
+    }
     draw({model='CLASSIC',yaw=-22.5,pitch=0,zoom=1,layers=true,time=0,wave=0}={}) {
-      if(this.closed)return;const gl=this.gl,w=this.canvas.width,h=this.canvas.height;gl.viewport(0,0,w,h);gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT);if(!this.ready||!w||!h)return;
+      if(this.closed)return;const gl=this.gl,w=this.canvas.width,h=this.canvas.height;gl.viewport(0,0,w,h);gl.depthMask(true);gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);if(!this.ready||!w||!h)return;
       const focal=h/2/Math.tan(35*PI/360),distance=Math.max(17/.76,11.3/(w/h*.8))/Math.tan(35*PI/360)/zoom,eye=[0,-1.1,distance];
-      const polygons=faces(model,yaw,pitch,time,wave,this.hasCape).filter(f=>layers||!f.outer).map(f=>({...f,n:normal(f)})).filter(f=>f.outer||dot(f.n,sub(eye,f.p[0]))>0),data=[];
-      for(const face of ordered(polygons,eye)){const n=dot(face.n,sub(eye,face.p[0]))>0?face.n:mul(face.n,-1),light=Math.floor(204+Math.round(Math.max(0,Math.min(1,dot(n,[-3,4,2])/Math.sqrt(29)))*32)*51/32)/255;
-        for(let i=1;i<face.p.length-1;i++)for(const p of [face.p[0],face.p[i],face.p[i+1]])data.push(...p,light,face.cape?1:0);}
-      gl.useProgram(this.program);gl.bindBuffer(gl.ARRAY_BUFFER,this.buffer);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(data),gl.DYNAMIC_DRAW);gl.uniform2f(gl.getUniformLocation(this.program,'size'),w,h);gl.uniform1f(gl.getUniformLocation(this.program,'focal'),focal);gl.uniform1f(gl.getUniformLocation(this.program,'distance'),distance);gl.drawArrays(gl.TRIANGLES,0,data.length/7);this.canvas.dataset.ready='true';
+      const polygons=faces(model,yaw,pitch,time,wave,this.hasCape).filter(f=>layers||!f.outer).map(f=>({...f,n:normal(f)})).filter(f=>f.outer||dot(f.n,sub(eye,f.p[0]))>0);
+      gl.useProgram(this.program);gl.uniform2f(gl.getUniformLocation(this.program,'size'),w,h);gl.uniform1f(gl.getUniformLocation(this.program,'focal'),focal);gl.uniform1f(gl.getUniformLocation(this.program,'distance'),distance);
+      // Binary-alpha skin pixels use the GPU depth buffer, avoiding per-frame polygon splitting.
+      gl.disable(gl.BLEND);gl.uniform1f(gl.getUniformLocation(this.program,'pass'),0);this.upload(polygons,eye);
+      const translucent=polygons.filter(f=>this.partial(f));
+      if(translucent.length){gl.enable(gl.BLEND);gl.depthMask(false);gl.uniform1f(gl.getUniformLocation(this.program,'pass'),1);this.upload(ordered(translucent,eye),eye);gl.depthMask(true);}
+      this.canvas.dataset.ready='true';
     }
     destroy(){this.closed=true;const gl=this.gl;this.textures.forEach(t=>gl.deleteTexture(t));gl.deleteBuffer(this.buffer);gl.deleteProgram(this.program);}
   }
   function mount(root,{png,model='CLASSIC',cape=null,onError=()=>{}}={}) {
     root.innerHTML='<div class="skin-preview-ground" aria-hidden="true"></div><canvas tabindex="0" aria-label="3D-предпросмотр скина"></canvas><div class="skin-preview-tools"><button type="button" data-preview="layers" title="Слой одежды" aria-label="Слой одежды"><img src="assets/nav/layers.png" alt=""></button><button type="button" data-preview="animation" title="Анимации" aria-label="Анимации"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h4v14H6zm8 0h4v14h-4z"/></svg></button><button type="button" data-preview="reset" title="Сбросить вид" aria-label="Сбросить вид"><img src="assets/nav/refresh.png" alt=""></button></div><small class="skin-preview-hint">Тяни мышью для вращения · колёсико для масштаба</small><span class="skin-preview-status">Загружаю скин…</span>';
     const canvas=root.querySelector('canvas'),ground=root.querySelector('.skin-preview-ground'),status=root.querySelector('.skin-preview-status');let scene;
-    try{scene=new Scene(canvas);}catch(error){status.textContent=error.message;onError(error);return {set(){},resume(){},destroy(){}};}
-    let yaw=-22.5,pitch=0,zoom=1,layers=true,playing=true,time=0,waveAt=0,last=0,frame=0,closed=false,focused=true,pointer=null,dragged=false;
+    try{scene=new Scene(canvas,{preserveDrawingBuffer:false});}catch(error){status.textContent=error.message;onError(error);return {set(){},resume(){},destroy(){}};}
+    let yaw=-22.5,pitch=0,zoom=1,layers=true,playing=true,time=0,waveAt=0,last=0,frame=0,interactiveUntil=0,closed=false,focused=true,pointer=null,dragged=false;
     const abort=new AbortController(),opts={signal:abort.signal};
-    function reset(){yaw=-22.5;pitch=0;zoom=1;resume();}
-    function tick(now){frame=0;if(closed||!focused||document.hidden||!canvas.isConnected||!canvas.getClientRects().length)return;const delta=Math.min(.1,(now-(last||now))/1000);if(now-last>=32){if(playing)time+=delta;last=now;scene.draw({model,yaw,pitch,zoom,layers,time,wave:waveAt?Math.min(1,(now-waveAt)/1600):0});const w=canvas.clientWidth,h=canvas.clientHeight,f=h/2/Math.tan(35*PI/360),distance=Math.max(17/.76,11.3/(w/h*.8))/Math.tan(35*PI/360)/zoom,scale=f/distance,p=rotate([0,-16.7,0],yaw*PI/180,pitch*PI/180),floor=h*.47-(p[1]+1.1)*f/(distance-p[2]);ground.style.width=20*scale+'px';ground.style.height=4.8*scale+'px';ground.style.transform=`translate(-50%,${floor-2.4*scale}px)`;if(waveAt&&now-waveAt>=1600)waveAt=0;}if(playing||waveAt)frame=requestAnimationFrame(tick);}
+    function interact(){interactiveUntil=performance.now()+250;resume();}
+    function reset(){yaw=-22.5;pitch=0;zoom=1;interact();}
+    function tick(now){frame=0;if(closed||!focused||document.hidden||!canvas.isConnected||!canvas.getClientRects().length)return;const delta=Math.min(.1,(now-(last||now))/1000);if(now-last>=(now<interactiveUntil?12:32)){if(playing)time+=delta;last=now;scene.draw({model,yaw,pitch,zoom,layers,time,wave:waveAt?Math.min(1,(now-waveAt)/1600):0});const w=canvas.clientWidth,h=canvas.clientHeight,f=h/2/Math.tan(35*PI/360),distance=Math.max(17/.76,11.3/(w/h*.8))/Math.tan(35*PI/360)/zoom,scale=f/distance,p=rotate([0,-16.7,0],yaw*PI/180,pitch*PI/180),floor=h*.47-(p[1]+1.1)*f/(distance-p[2]);ground.style.width=20*scale+'px';ground.style.height=4.8*scale+'px';ground.style.transform=`translate(-50%,${floor-2.4*scale}px)`;if(waveAt&&now-waveAt>=1600)waveAt=0;}if(playing||waveAt)frame=requestAnimationFrame(tick);}
     function resume(){if(!frame&&!closed){last=0;frame=requestAnimationFrame(tick);}}
-    function resize(){const r=canvas.getBoundingClientRect(),scale=Math.min(devicePixelRatio||1,2);canvas.width=Math.max(1,Math.round(r.width*scale));canvas.height=Math.max(1,Math.round(r.height*scale));resume();}
+    function resize(){const r=canvas.getBoundingClientRect(),scale=Math.min(devicePixelRatio||1,1.5);const width=Math.max(1,Math.round(r.width*scale)),height=Math.max(1,Math.round(r.height*scale));if(canvas.width!==width)canvas.width=width;if(canvas.height!==height)canvas.height=height;resume();}
     const observer=new ResizeObserver(resize);observer.observe(canvas);
     canvas.addEventListener('pointerdown',e=>{pointer=[e.clientX,e.clientY];dragged=false;canvas.setPointerCapture(e.pointerId);canvas.focus();},opts);
-    canvas.addEventListener('pointermove',e=>{if(!pointer)return;const dx=e.clientX-pointer[0],dy=e.clientY-pointer[1];if(Math.abs(dx)+Math.abs(dy)>1)dragged=true;yaw=(yaw+dx*.65)%360;pitch=Math.max(-35,Math.min(35,pitch+dy*.35));pointer=[e.clientX,e.clientY];resume();},opts);
+    canvas.addEventListener('pointermove',e=>{if(!pointer)return;const dx=e.clientX-pointer[0],dy=e.clientY-pointer[1];if(Math.abs(dx)+Math.abs(dy)>1)dragged=true;yaw=(yaw+dx*.65)%360;pitch=Math.max(-35,Math.min(35,pitch+dy*.35));pointer=[e.clientX,e.clientY];interact();},opts);
     canvas.addEventListener('pointerup',()=>{if(!dragged){waveAt=performance.now();resume();}pointer=null;},opts);
     canvas.addEventListener('pointercancel',()=>pointer=null,opts);canvas.addEventListener('dblclick',reset,opts);
-    canvas.addEventListener('wheel',e=>{e.preventDefault();zoom=Math.max(.7,Math.min(1.5,zoom-e.deltaY*.0007));resume();},{...opts,passive:false});
-    canvas.addEventListener('keydown',e=>{if(['ArrowLeft','ArrowRight'].includes(e.key))yaw+=(e.key==='ArrowLeft'?-12:12);else if(['ArrowUp','ArrowDown'].includes(e.key))pitch=Math.max(-35,Math.min(35,pitch+(e.key==='ArrowUp'?6:-6)));else if(['+','=','-'].includes(e.key))zoom=Math.max(.7,Math.min(1.5,zoom+(e.key==='-'?-.1:.1)));else if(e.key==='Home')reset();else return;e.preventDefault();resume();},opts);
+    canvas.addEventListener('wheel',e=>{e.preventDefault();zoom=Math.max(.7,Math.min(1.5,zoom-e.deltaY*.0007));interact();},{...opts,passive:false});
+    canvas.addEventListener('keydown',e=>{if(['ArrowLeft','ArrowRight'].includes(e.key))yaw+=(e.key==='ArrowLeft'?-12:12);else if(['ArrowUp','ArrowDown'].includes(e.key))pitch=Math.max(-35,Math.min(35,pitch+(e.key==='ArrowUp'?6:-6)));else if(['+','=','-'].includes(e.key))zoom=Math.max(.7,Math.min(1.5,zoom+(e.key==='-'?-.1:.1)));else if(e.key==='Home')reset();else return;e.preventDefault();interact();},opts);
     root.querySelector('.skin-preview-tools').addEventListener('click',e=>{const action=e.target.closest('[data-preview]')?.dataset.preview;if(action==='layers'){layers=!layers;const b=e.target.closest('button');b.classList.toggle('off',!layers);b.setAttribute('aria-pressed',String(layers));}if(action==='animation'){playing=!playing;e.target.closest('button').innerHTML=playing?'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h4v14H6zm8 0h4v14h-4z"/></svg>':'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>';e.target.closest('button').setAttribute('aria-pressed',String(playing));}if(action==='reset')reset();resume();},opts);
     document.addEventListener('visibilitychange',resume,opts);window.addEventListener('focus',()=>{focused=true;resume();},opts);window.addEventListener('blur',()=>{focused=false;cancelAnimationFrame(frame);frame=0;},opts);
     async function set(value){try{if(value.model)model=value.model;if('png'in value&&value.png){status.hidden=false;await scene.setSkin(value.png);status.hidden=true;}if('cape'in value)await scene.setCape(value.cape);resize();}catch(error){status.textContent=error.message;status.hidden=false;onError(error);}}

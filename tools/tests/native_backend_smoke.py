@@ -40,6 +40,37 @@ with tempfile.TemporaryDirectory(prefix='aw-native-smoke-') as folder:
  options=json.loads((game/'aw-instance.json').read_text(encoding='utf-8'));assert options['memoryMb']==2048 and options['favorite'] is True
  restored=run(dict(op='restore',target=target,snapshot=history['data'][-1]['id']));assert restored['type']=='done',restored
  renamed=run(dict(op='rename',target=target,title='Renamed test'));assert renamed['type']=='done',renamed
+ editor=run(dict(op='buildEditor',target=target));assert editor['type']=='done',editor
+ assert editor['data']['canRename'] and editor['data']['memoryLimit']>=512 and editor['data']['memoryPresets']
+ bad_args=run(dict(op='saveOptions',target=target,options=dict(jvmArgs='-Dtest="unclosed')));assert bad_args['type']=='failed',bad_args
+ bad_window=run(dict(op='saveOptions',target=target,options=dict(windowWidth=800,windowHeight=None)));assert bad_window['type']=='failed',bad_window
+ loader=run(dict(op='saveOptions',target=target,options=dict(loaderVersion='0.16.14',javaPath=str(java),windowWidth=800,windowHeight=200)));assert loader['type']=='done',loader
+ bad_loader=run(dict(op='saveOptions',target=target,options=dict(loaderVersion='../bad')));assert bad_loader['type']=='failed',bad_loader
+ created_group=run(dict(op='buildGroups',title='Smoke group',options=dict(action='create')));assert created_group['type']=='done',created_group
+ group_id=created_group['data'][0]['id']
+ assert run(dict(op='saveOptions',target=target,options=dict(groupId=group_id)))['type']=='done'
+ renamed_group=run(dict(op='buildGroups',project=group_id,title='Renamed group',options=dict(action='rename')));assert renamed_group['type']=='done' and renamed_group['data'][0]['name']=='Renamed group',renamed_group
+ removed_group=run(dict(op='buildGroups',project=group_id,options=dict(action='remove')));assert removed_group['type']=='done' and removed_group['data']==[],removed_group
+ assert json.loads((game/'aw-instance.json').read_text(encoding='utf-8')).get('groupId') is None
+ icon=run(dict(op='buildSaveIcon',target=target,options=dict(symbol='fox',background='amber')));assert icon['type']=='done' and icon['data']['iconPreset']=='fox',icon
+ icon_reset=run(dict(op='buildSaveIcon',target=target,options=dict(reset=True,symbol='grass',background='emerald')));assert icon_reset['type']=='done' and icon_reset['data'].get('iconPreset') is None,icon_reset
+ config=game/'config';config.mkdir(exist_ok=True);(config/'smoke.txt').write_text('config preserved')
+ world=game/'saves/SmokeWorld';world.mkdir(parents=True);(world/'level.dat').write_bytes(b'world-preserved')
+ choices=run(dict(op='buildExportChoices',target=target));assert choices['type']=='done' and 'saves' in choices['data'] and 'aw-instance.json' not in choices['data'],choices
+ exported=home/'selected.mrpack'
+ export_result=run(dict(op='buildExport',target=target,title='Smoke export',file=str(exported),options=dict(selected=['config'])));assert export_result['type']=='done',export_result
+ with zipfile.ZipFile(exported) as archive:
+  assert archive.read('overrides/config/smoke.txt')==b'config preserved'
+  assert not any('saves/' in name for name in archive.namelist())
+ overwrite=run(dict(op='buildExport',target=target,title='Smoke export',file=str(exported),options=dict(selected=['config'])));assert overwrite['type']=='failed',overwrite
+ invalid_export=run(dict(op='buildExport',target=target,title='Invalid',file=str(home/'invalid.mrpack'),options=dict(selected=['../outside'])));assert invalid_export['type']=='failed',invalid_export
+ legacy=run(dict(op='instanceWindow',target=target,kind='settings'));assert legacy['type']=='failed',legacy
+ denied_delete=run(dict(op='buildDelete',target=target));assert denied_delete['type']=='failed' and (world/'level.dat').read_bytes()==b'world-preserved',denied_delete
+ plan_dir=root/'cache/native-migrations';plan_dir.mkdir(parents=True,exist_ok=True);plan_id='00000000-0000-4000-8000-000000000088'
+ (plan_dir/(plan_id+'.json')).write_text(json.dumps(dict(key=target,source='obsolete',target='1.22',loader='FABRIC',mods=[],fingerprint={})),encoding='utf-8')
+ plan=run(dict(op='buildMigrationGet',target=target,snapshot=plan_id));assert plan['type']=='done' and plan['data']['target']=='1.22',plan
+ denied_migration=run(dict(op='buildMigrationApply',target=target,snapshot=plan_id,options=dict(keep=[])));assert denied_migration['type']=='failed' and (world/'level.dat').read_bytes()==b'world-preserved',denied_migration
+ print('Embedded build operations: settings validation, loader, groups, icons, selected export, stale migration and deletion guards passed')
  account=run(dict(op='accountOffline',title='SmokePlayer'));assert account['type']=='done',account
  state=run(dict(op='launcherState'));assert state['type']=='done',state
  assert state['data']['accounts'][0]['name']=='SmokePlayer'

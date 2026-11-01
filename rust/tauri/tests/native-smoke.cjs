@@ -77,6 +77,13 @@ const assert = require("node:assert/strict");
     if (builds) {
       await page.locator(".open-build").first().click();
       await page.locator(".content-table").waitFor({ timeout: 120000 });
+      await page.locator('.instance-header [data-action=build-settings]').click();
+      const buildSettings=page.locator('.build-settings-window');await buildSettings.locator('form').waitFor({timeout:30000});
+      await buildSettings.locator('[data-build-tab="1"]').click();
+      assert.equal(await page.locator('#main').isVisible(),true);
+      assert.equal(page.context().pages().length,1);
+      await page.screenshot({path:path.join(out,'native-tauri-build-settings.png')});
+      await page.keyboard.press('Escape');
       await page.locator("#main [data-tab=screenshots]").click();
       await page.locator("#shot-content").waitFor({ timeout: 30000 });
       assert.equal(await page.locator(".instance-header").count(), 1);

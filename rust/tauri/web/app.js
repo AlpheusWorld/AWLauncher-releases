@@ -519,7 +519,7 @@ async function catalogPage() {
   }</div><div class="pagination">${btn("←", "catalog-page", "", `data-offset="${Math.max(0, c.offset - 20)}" ${c.offset === 0 ? "disabled" : ""}`)}<span class="badge">${Math.floor(c.offset / 20) + 1}</span><small>/ ${Math.max(1, Math.ceil(page.total_hits / 20))}</small>${btn("→", "catalog-page", "", `data-offset="${c.offset + 20}" ${c.offset + 20 >= page.total_hits ? "disabled" : ""}`)}</div></section>`;
 }
 function downloadsPage() {
-  return `<section class="stack grow"><h1>Загрузки</h1><div class="toolbar">${btn(icon("play") + (state.paused ? "Продолжить очередь" : "Приостановить очередь"), "pause", "", state.queue.some((x) => x.status === "waiting") ? "" : "disabled")}${btn("Очистить завершённые", "clear-downloads", "", state.queue.some((x) => ["done", "failed", "cancelled"].includes(x.status)) ? "" : "disabled")}</div><div class="row"><h2>Очередь</h2><small>${state.queue.filter((x) => x.status === "running").length} активных</small></div>${state.queue.length ? state.queue.map((x) => `<article class="panel stack"><div class="row spread"><strong>${esc(x.title)}</strong><span class="badge">${{ waiting: "В очереди", running: "Загружаю", done: "Готово", failed: "Ошибка", cancelled: "Отменено" }[x.status]}</span></div><p class="${x.status === "failed" ? "error" : ""}">${esc(x.error || x.stage || "")}</p>${x.status === "running" ? `<div class="track"><i style="width:${Math.round((x.fraction || 0) * 100)}%"></i></div><small>${Math.round((x.fraction || 0) * 100)}%　${x.speed ? Math.round(x.speed / 1048576) + " МБ/с" : ""}</small>${btn("Отменить", "cancel", "", `data-id="${x.id}"`)}` : x.status === "failed" ? btn("Повторить", "retry", "", `data-id="${x.id}"`) : ""}${x.login ? `<div class="high"><p>Открой ${esc(x.login.url)} и введи код</p><h2>${esc(x.login.code)}</h2>${btn("Скопировать код", "copy-code", "", `data-code="${esc(x.login.code)}"`)}</div>` : ""}</article>`).join("") : `<div class="empty grow">${icon("download")}<h3>Загрузок пока нет</h3><p>Добавляй моды и сборки из каталога — они загрузятся по очереди</p></div>`}</section>`;
+  return `<section class="stack grow"><h1>Загрузки</h1><div class="toolbar">${btn(icon("play") + (state.paused ? "Продолжить очередь" : "Приостановить очередь"), "pause", "", state.queue.some((x) => x.status === "waiting") ? "" : "disabled")}${btn("Очистить завершённые", "clear-downloads", "", state.queue.some((x) => ["done", "failed", "cancelled"].includes(x.status)) ? "" : "disabled")}</div><div class="row"><h2>Очередь</h2><small>${state.queue.filter((x) => x.status === "running").length} активных</small></div>${state.queue.length ? state.queue.map((x) => `<article class="panel stack"><div class="row spread"><strong>${esc(x.title)}</strong><span class="badge">${{ waiting: "В очереди", running: "Загружаю", done: "Готово", failed: "Ошибка", cancelled: "Отменено" }[x.status]}</span></div><p class="${x.status === "failed" ? "error" : ""}">${esc(x.error || x.stage || "")}</p>${x.status === "running" ? `<div class="track"><i style="width:${Math.round((x.fraction || 0) * 100)}%"></i></div><small>${Math.round((x.fraction || 0) * 100)}%　${x.speed ? Math.round(x.speed / 1048576) + " МБ/с" : ""}</small>${btn("Отменить", "cancel", "", `data-id="${x.id}" ${x.cancellable===false?'disabled':''}`)}` : x.status === "failed" ? btn("Повторить", "retry", "", `data-id="${x.id}"`) : ""}${x.login ? `<div class="high"><p>Открой ${esc(x.login.url)} и введи код</p><h2>${esc(x.login.code)}</h2>${btn("Скопировать код", "copy-code", "", `data-code="${esc(x.login.code)}"`)}</div>` : ""}</article>`).join("") : `<div class="empty grow">${icon("download")}<h3>Загрузок пока нет</h3><p>Добавляй моды и сборки из каталога — они загрузятся по очереди</p></div>`}</section>`;
 }
 let catalogSequence = 0;
 async function updateCatalog() {
@@ -1121,11 +1121,12 @@ function pumpImages() {
       });
   }
 }
-async function enqueue(title, request) {
+async function enqueue(title, request, callbacks = {}) {
   state.queue.push({
     id: `task-${++state.serial}`,
     title,
     request,
+    callbacks,
     status: "waiting",
     fraction: 0,
   });
@@ -1146,6 +1147,7 @@ async function pump() {
       item.request,
       (event) => {
         if (event.type === "stage") item.stage = event.data;
+        if (event.type === "cancellable") item.cancellable = event.data;
         if (event.type === "progress") {
           item.fraction = event.data.fraction;
           item.speed = event.data.bytesPerSecond;
@@ -1158,6 +1160,7 @@ async function pump() {
       },
       item.id,
     );
+    if (item.result?.failed) throw new Error(item.result.message || "Операция не завершена");
     item.status = "done";
     if (item.request.op === "launch") {
       state.games = state.games || [];
@@ -1171,6 +1174,7 @@ async function pump() {
     );
     await refresh();
     invalidateViews(item.request.target || "");
+    await item.callbacks?.onSuccess?.(item.result);
     if (
       state.route.page === "instance" &&
       state.route.target === item.request.target
@@ -1180,6 +1184,7 @@ async function pump() {
     item.error = String(error);
     item.status = item.error.includes("отмен") ? "cancelled" : "failed";
     fail(error);
+    await item.callbacks?.onFailure?.(error,item.result);
   } finally {
     state.running = false;
     updateQueue();
@@ -1602,12 +1607,24 @@ window.addEventListener("resize", () => {
   hideTooltip();
 });
 
-async function openOriginalWindow(request){
- if(state.originalWindow)return;state.originalWindow=true;state.originalWindowReady=false;state.originalWindowTaskId=`read-${++state.serial}`;closePopover();closeAccountMenu();if($('#settings').open)$('#settings').close();
- try{const accounts=await rpc(request,event=>{if(event.type==='originalWindowReady')state.originalWindowReady=true;if(event.type==='gameStarted'){state.games=state.games||[];state.games.push(event.data);}},state.originalWindowTaskId);if(Array.isArray(accounts))applyAccounts(accounts);await refresh();invalidateViews();await render({refresh:true});}
- catch(error){if(!String(error).includes('отмен'))throw error;}
- finally{state.originalWindow=false;state.originalWindowReady=false;}
+function syncBuildUi(key, patch) {
+  const build=state.data.builds.find(b=>b.key===key);if(!build)return;
+  Object.assign(build,patch);invalidateViews(key);
+  for(const row of document.querySelectorAll('.build-row'))if(row.querySelector('.open-build')?.dataset.target===key){row.querySelector('.name').textContent=build.name;row.querySelector('.build-icon')?.replaceWith(new DOMParser().parseFromString(buildIcon(build),'text/html').body.firstElementChild);const star=row.querySelector('.star');if(star)star.textContent=build.options.favorite?'★':'☆';}
+  if(state.route.target===key){const head=$('.instance-header');if(head){head.querySelector('h1').textContent=build.name;head.querySelector('.build-icon')?.replaceWith(new DOMParser().parseFromString(buildIcon(build),'text/html').body.firstElementChild);}}
+  if(current()?.key===key&&$('.hero')){$('.hero h2').textContent=build.name;$('.hero-art .build-icon')?.replaceWith(new DOMParser().parseFromString(buildIcon(build),'text/html').body.firstElementChild);}
+  renderChrome();loadImages();
 }
+const buildDialogs=AWBuildDialogs.create({
+  esc,icon,art:buildIcon,rpc,toast,finish:finishView,closePopover,update:syncBuildUi,
+  defaults:()=>state.data.settings,build:key=>state.data.builds.find(b=>b.key===key),
+  button:(label,action,target)=>btn(label,action,'',`data-target="${esc(target)}"`),
+  read:(request,onEvent=()=>{})=>{const id=`read-${++state.serial}`;return {promise:rpc(request,onEvent,id),cancel:()=>invoke('cancel',{id}).catch(()=>{})};},
+  enqueue:(title,request,callbacks)=>enqueue(title,request,callbacks),settings:openSettings,
+  updateGroups:(groups,removed)=>{state.data.settings.libraryGroups=groups;if(removed)for(const b of state.data.builds)if(b.options.groupId===removed)b.options.groupId=null;invalidateViews();},
+  bytes:value=>new Intl.NumberFormat('ru',{notation:'compact',maximumFractionDigits:1}).format(value||0)+' Б',
+  deleted:key=>{if(state.route.target===key)navigate('library');else if(state.route.page==='library'||state.route.page==='home')render({refresh:true}).catch(fail);},
+});
 function editAccountIcon(){return '<svg class="account-control-icon material-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a.996.996 0 0 0 0-1.41l-2.34-2.34a.996.996 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>';}
 function deleteAccountIcon(){return '<svg class="account-control-icon material-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>';}
 function accountCheck() {
@@ -1760,13 +1777,14 @@ const actions = {
     });
   },
   "build-menu":el=>{
- const build=state.data.builds.find(b=>b.key===el.dataset.target),target=esc(build.key);const item=(label,action,i,extra='')=>btn(icon(i)+`<span>${label}</span>`,action,'',`data-target="${target}" ${extra}`);
- const native=(label,i,kind,danger=false)=>btn(icon(i)+`<span>${label}</span>`,'original-instance',danger?'menu-danger':'',`data-target="${target}" data-kind="${kind}"`);
- openPopover(el,native('Настройки','settings','settings')+item(build.options.favorite?'Убрать из избранного':'В избранное','favorite','trophy')+native('Изменить иконку','image','icon')+native('Изменить группу','folder','groups')+native('Экспортировать в .mrpack','download','export')+native('Дублировать','layers','duplicate')+native('Изменить версию Minecraft','refresh','migrate')+'<hr>'+item('Играть','launch','play')+item('Открыть папку','open-folder','folder')+item('Логи','open-journal','file')+item('Ярлык на рабочем столе','shortcut','forward')+'<hr>'+native('Скачать файлы','download','download')+native('Переустановить','refresh','reinstall')+item('Сохранить состояние','snapshot','history')+native('Удалить…','delete','delete',true),'build-actions',290);
- },
- "original-instance":el=>openOriginalWindow({op:'instanceWindow',target:el.dataset.target,kind:el.dataset.kind}),
- "open-journal":el=>navigate({page:'instance',target:el.dataset.target,tab:'log'}),
-  "build-settings":el=>openOriginalWindow({op:'instanceWindow',target:el.dataset.target,kind:'settings'}),
+    const build=state.data.builds.find(b=>b.key===el.dataset.target),target=esc(build.key);
+    const item=(label,action,i,extra='')=>btn(icon(i)+`<span>${label}</span>`,action,'',`data-target="${target}" ${extra}`);
+    const edit=(label,i,kind,danger=false)=>btn(icon(i)+`<span>${label}</span>`,'build-dialog',danger?'menu-danger':'',`data-target="${target}" data-kind="${kind}"`);
+    openPopover(el,edit('Настройки','settings','settings')+item(build.options.favorite?'Убрать из избранного':'В избранное','favorite','trophy')+edit('Изменить иконку','image','icon')+edit('Изменить группу','folder','groups')+edit('Экспортировать в .mrpack','download','export')+edit('Дублировать','layers','duplicate')+edit('Изменить версию Minecraft','refresh','migrate')+'<hr>'+item('Играть','launch','play')+item('Открыть папку','open-folder','folder')+item('Логи','open-journal','file')+item('Ярлык на рабочем столе','shortcut','forward')+'<hr>'+edit('Скачать файлы','download','download')+edit('Переустановить','refresh','reinstall')+item('Сохранить состояние','snapshot','history')+edit('Удалить…','delete','delete',true),'build-actions',290);
+  },
+  "build-dialog":el=>buildDialogs.open(state.data.builds.find(b=>b.key===el.dataset.target),el.dataset.kind),
+  "open-journal":el=>navigate({page:'instance',target:el.dataset.target,tab:'log'}),
+  "build-settings":el=>buildDialogs.open(state.data.builds.find(b=>b.key===el.dataset.target),'settings'),
   "create-build": async () => {
     showModal(
       "Новая сборка",
@@ -1791,18 +1809,7 @@ const actions = {
   filters: () => {
     $("#library-filters").hidden = !$("#library-filters").hidden;
   },
-  groups: () =>
-    showModal(
-      "Группы сборок",
-      `<div class="stack">${(state.data.settings.libraryGroups || []).map((g) => `<div class="row"><span class="grow">${esc(g.name)}</span>${btn("Удалить", "remove-group", "danger", `data-id="${esc(g.id)}"`)}</div>`).join("")}<form id="new-group" class="row"><input name="name" maxlength="80" required placeholder="Название группы"><button>Добавить</button></form></div>`,
-    ),
-  "remove-group": async (el) => {
-    await saveSetting(
-      "libraryGroups",
-      state.data.settings.libraryGroups.filter((g) => g.id !== el.dataset.id),
-    );
-    actions.groups();
-  },
+  groups: () => buildDialogs.groups(),
   "catalog-kind": (el) => {
     state.catalog.kind = el.dataset.kind;
     state.catalog.installed = false;
@@ -1862,7 +1869,7 @@ const actions = {
   cancel: (el) => invoke("cancel", { id: el.dataset.id }),
   retry: (el) => {
     const item = state.queue.find((x) => x.id === el.dataset.id);
-    return enqueue(item.title, item.request);
+    return enqueue(item.title, item.request, item.callbacks);
   },
   "copy-code": (el) =>
     navigator.clipboard
@@ -2033,8 +2040,8 @@ const actions = {
     );
   },
   shortcut: (el) => buildTask(el, "shortcut", "Создание ярлыка"),
-  export: (el) => buildTask(el, "export", "Экспорт сборки"),
-  duplicate: (el) => buildTask(el, "duplicate", "Копирование сборки"),
+  export: el=>buildDialogs.open(state.data.builds.find(b=>b.key===el.dataset.target),'export'),
+  duplicate: el=>buildDialogs.open(state.data.builds.find(b=>b.key===el.dataset.target),'duplicate'),
   "close-modal": () => $("#modal").close(),
   "close-settings": () => $("#settings").close(),
   confirm: async () => {
@@ -2109,21 +2116,7 @@ const actions = {
       () => removeAccount(id),
     );
   },
-  "icon-editor": (el) => {
-    state.iconTarget = el.dataset.target;
-    showModal(
-      "Иконка сборки",
-      `<p>Выбери рисунок</p><div class="toolbar">${["cube", "grass", "crystal", "craft", "fox", "anvil", "compass", "flame", "planet"].map((id) => btn(`<img src="assets/icons/${id}.png" width="48" height="48" alt="${id}">`, "icon-preset", "", `data-preset="${id}"`)).join("")}</div><p>Изменение иконок сохраняется через существующий менеджер сборок</p>`,
-    );
-  },
-  "icon-preset": (el) =>
-    enqueue("Иконка сборки", {
-      op: "saveOptions",
-      target: state.iconTarget,
-      options: {
-        iconPreset: el.dataset.preset === "cube" ? null : el.dataset.preset,
-      },
-    }),
+  "icon-editor":el=>buildDialogs.open(state.data.builds.find(b=>b.key===el.dataset.target),'icon'),
 };
 function buildTask(el, op, title) {
   $("#modal").close();

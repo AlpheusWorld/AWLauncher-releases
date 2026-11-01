@@ -19,11 +19,13 @@ import kotlin.concurrent.thread
 
 /** Local JSON-lines adapter; game files continue to use the verified installation engine. */
 object NativeTasks {
+    @Volatile private var cancellable=true
     private var protocolOut:java.io.PrintStream=System.out
     @Serializable data class Request(val op:String, val target:String="", val project:String="", val title:String="", val slug:String="", val kind:String="mod", val version:String?=null, val file:String="", val enabled:Boolean=false, val world:String="", val snapshot:String="",val options:JsonObject=JsonObject(emptyMap()))
-    private data class Target(val dir:Path,val game:String,val loader:LoaderKind,val loaderVersion:String?)
+    internal data class Target(val dir:Path,val game:String,val loader:LoaderKind,val loaderVersion:String?)
     @Synchronized private fun send(type:String, data:JsonElement=JsonNull) { protocolOut.println("AW_RPC "+buildJsonObject { put("type",type);put("data",data) });protocolOut.flush() }
-    private fun stage(text:String)=send("stage",JsonPrimitive(text))
+    private fun stage(text:String){send("stage",JsonPrimitive(text));if(text=="Применяю новую версию сборки"){cancellable=false;send("cancellable",JsonPrimitive(false))}}
+    internal fun progressFraction(value:Float)=send("progress",buildJsonObject { put("fraction",value) })
     private fun progress(p:DownloadProgress)=send("progress",buildJsonObject{put("fraction",p.fraction);put("completedBytes",p.completedBytes);put("totalBytes",p.totalBytes);put("bytesPerSecond",p.bytesPerSecond);put("currentFile",p.currentFile)})
     internal fun accountsData():JsonArray=buildJsonArray {
         AccountManager.accounts.value.forEach { a->add(buildJsonObject {
@@ -46,12 +48,12 @@ object NativeTasks {
                 }
             }
     }
-    private fun target(key:String):Target {
+    internal fun target(key:String):Target {
         if(key.startsWith("build:")){val b=LocalBuilds.list().firstOrNull{it.id==key.removePrefix("build:")}?:throw IOException("Сборка больше не найдена");return Target(LocalBuilds.dirOf(b),b.versionId,b.loader,b.loaderVersion)}
         if(key.startsWith("pack:")){val p=Modpacks.list().firstOrNull{it.id==key.removePrefix("pack:")}?:throw IOException("Модпак больше не найден");return Target(Modpacks.dirOf(p),p.gameVersion,p.loader,p.loaderVersion)}
         throw IOException("Выбери сборку")
     }
-    private fun editable(t:Target){
+    internal fun editable(t:Target){
         val root=t.dir.toAbsolutePath().normalize().toString()
         val playing=ProcessHandle.allProcesses().use { stream->stream.anyMatch { p->val args=p.info().arguments().orElse(emptyArray());args.indices.any{args[it]=="--gameDir"&&args.getOrNull(it+1)?.let { Path.of(it).toAbsolutePath().normalize().toString().equals(root,ignoreCase=true) }==true} } }
         if(playing)throw IOException("Закрой Minecraft перед изменением сборки")
@@ -68,10 +70,10 @@ object NativeTasks {
         if(line.length>65536){send("failed",JsonPrimitive("Слишком большой запрос"));return}
         try {
             val request=ru.aw.launcher.core.Json.decodeFromString<Request>(line)
-            val verifiesFiles=!request.op.startsWith("account")&&request.op!="launcherState"
-            Paths.ensureBaseDirs();Settings.load();java.util.Locale.setDefault(java.util.Locale.forLanguageTag(Settings.current.language.tag));javax.swing.JComponent.setDefaultLocale(java.util.Locale.getDefault());Log.init("native-engine");if(verifiesFiles)VerifyCache.load()
+            val verifiesFiles=!request.op.startsWith("account")&&request.op!="launcherState"&&request.op !in NativeBuilds.reads
+            Paths.ensureBaseDirs();Settings.load();java.util.Locale.setDefault(java.util.Locale.forLanguageTag(Settings.current.language.tag));Log.init("native-engine");if(verifiesFiles)VerifyCache.load()
             val lockFile=java.nio.channels.FileChannel.open(Paths.root.resolve("native-operation.lock"),StandardOpenOption.CREATE,StandardOpenOption.WRITE)
-            lockFile.use { channel->val readOnly=request.op in setOf("ping","launcherState","content","history","project","versions","accountFace","accountSkinState","accountSkinTextures","accountSkinRead");val lock=if(readOnly)null else channel.tryLock()?:throw IOException("Дождись завершения другой операции лаунчера");lock.use {
+            lockFile.use { channel->val readOnly=request.op in setOf("ping","launcherState","content","history","project","versions","accountFace","accountSkinState","accountSkinTextures","accountSkinRead")||request.op in NativeBuilds.reads;val lock=if(readOnly)null else channel.tryLock()?:throw IOException("Дождись завершения другой операции лаунчера");lock.use {
                 val legacyChannel=if(readOnly)null else java.nio.channels.FileChannel.open(Paths.root.resolve("launcher.lock"),StandardOpenOption.CREATE,StandardOpenOption.WRITE)
                 legacyChannel.use { oldChannel ->
                 val oldLock=if(readOnly)null else oldChannel!!.tryLock()?:throw IOException("Закрой установленный AWLauncher перед изменением сборок в новой версии")
@@ -83,7 +85,7 @@ object NativeTasks {
                         catch(e:Exception){Log.warn("Native task failed: ${request.op}",e);send("failed",JsonPrimitive(e.message?:"Операция не выполнена"))}
                     }
                     job.invokeOnCompletion { failure -> if(failure is CancellationException)send("cancelled") }
-                    if(request.op!="ping")thread(isDaemon=true,name="native-task-control") {try {while(true){val control=reader.readLine();if(control==null||control=="cancel"){job.cancel();ru.aw.launcher.net.Http.client.dispatcher.cancelAll();break}}}catch(_:Exception){job.cancel();ru.aw.launcher.net.Http.client.dispatcher.cancelAll()}}
+                    if(request.op!="ping")thread(isDaemon=true,name="native-task-control") {try {while(true){val control=reader.readLine();if(control==null||control=="cancel"){if(cancellable){job.cancel();ru.aw.launcher.net.Http.client.dispatcher.cancelAll()};break}}}catch(_:Exception){job.cancel();ru.aw.launcher.net.Http.client.dispatcher.cancelAll()}}
                     job.join()
                 }
                 }}
@@ -94,13 +96,8 @@ object NativeTasks {
     private suspend fun execute(r:Request):JsonElement {
         if(r.op=="ping")return buildJsonObject{put("protocol",1);put("version",ru.aw.launcher.launch.ArgumentBuilder.LAUNCHER_VERSION)}
         if(r.op.startsWith("accountSkin"))return NativeSkins.execute(r)
-        if(r.op=="instanceWindow") {
-            AccountManager.load()
-            if(r.kind !in setOf("settings","icon","groups","export","duplicate","migrate","download","reinstall","delete"))throw IOException("Неизвестное действие сборки")
-            editable(target(r.target))
-            NativeWindow.openOriginal(r,onReady={send("originalWindowReady")},onGameStarted={send("gameStarted",JsonPrimitive(it.pid()))})
-            return accountsData()
-        }
+        if(r.op in NativeBuilds.operations)return NativeBuilds.execute(r,::stage,::progress)
+        if(r.op=="export")return NativeBuilds.execute(r.copy(op="buildExport"),::stage,::progress)
         if(r.op=="accountSelect"){AccountManager.selectSaved(r.file);return JsonPrimitive("Аккаунт выбран")}
         if(r.op=="launcherState") {
             AccountManager.load()
@@ -208,22 +205,23 @@ object NativeTasks {
             val memory=o["memoryMb"]?.jsonPrimitive?.intOrNull
             if(memory!=null&&memory !in 512..SettingsDefaults.memoryLimit(SettingsDefaults.totalSystemMemoryMb()))throw IOException("Некорректный объём памяти")
             val width=o["windowWidth"]?.jsonPrimitive?.intOrNull;val height=o["windowHeight"]?.jsonPrimitive?.intOrNull
-            if(width!=null&&width !in 320..16384||height!=null&&height !in 240..16384)throw IOException("Некорректное разрешение окна")
+            if(width!=null&&width !in 320..16384||height!=null&&height !in 200..16384)throw IOException("Некорректное разрешение окна")
+            o["jvmArgs"]?.jsonPrimitive?.contentOrNull?.let { ru.aw.launcher.launch.ArgumentBuilder.parseJvmArguments(it) }
+            o["javaPath"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }?.let { ru.aw.launcher.runtime.JavaManager.customExecutable(it) }
+            if(("windowWidth" in o || "windowHeight" in o) && ((width==null)!=(height==null)))throw IOException("Укажи ширину и высоту окна")
+            val loader=o["loaderVersion"]?.jsonPrimitive?.contentOrNull
+            if("loaderVersion" in o && loader!=null && (t.loader !in setOf(LoaderKind.FABRIC,LoaderKind.QUILT)||!Regex("^[0-9A-Za-z][0-9A-Za-z.+_-]{0,79}$").matches(loader)))throw IOException("Некорректная версия Loader")
             InstanceStore.update(t.dir){old->old.copy(memoryMb=if("memoryMb" in o)memory else old.memoryMb,jvmArgs=if("jvmArgs" in o)o["jvmArgs"]?.jsonPrimitive?.contentOrNull?.takeIf{it.isNotBlank()} else old.jvmArgs,
                 javaPath=if("javaPath" in o)o["javaPath"]?.jsonPrimitive?.contentOrNull?.takeIf{it.isNotBlank()} else old.javaPath,
                 windowWidth=if("windowWidth" in o)width else old.windowWidth,windowHeight=if("windowHeight" in o)height else old.windowHeight,
                 fullscreen=if("fullscreen" in o)o["fullscreen"]?.jsonPrimitive?.booleanOrNull else old.fullscreen,
                 favorite=o["favorite"]?.jsonPrimitive?.booleanOrNull?:old.favorite,historyIncludeWorlds=o["historyIncludeWorlds"]?.jsonPrimitive?.booleanOrNull?:old.historyIncludeWorlds,
                 iconPreset=if("iconPreset" in o)preset else old.iconPreset,iconBackground=if("iconBackground" in o)background else old.iconBackground,
-                iconImage=if("iconPreset" in o)null else old.iconImage,iconUrl=if("iconPreset" in o)null else old.iconUrl,groupId=if("groupId" in o)group else old.groupId)}
+                loaderVersion=if("loaderVersion" in o)loader else old.loaderVersion,iconImage=if("iconPreset" in o)null else old.iconImage,iconUrl=if("iconPreset" in o)null else old.iconUrl,groupId=if("groupId" in o)group else old.groupId)}
             return JsonPrimitive("Настройки сборки сохранены")
         }
         if(r.op=="importIcon") {
-            var source:Path?=null
-            javax.swing.SwingUtilities.invokeAndWait {
-                val chooser=javax.swing.JFileChooser().apply{dialogTitle="Иконка сборки";fileFilter=javax.swing.filechooser.FileNameExtensionFilter("PNG, JPEG, WebP","png","jpg","jpeg","webp")}
-                if(chooser.showOpenDialog(null)==javax.swing.JFileChooser.APPROVE_OPTION)source=chooser.selectedFile.toPath()
-            }
+            val source=NativeBuilds.chooseFiles("Иконка сборки").firstOrNull()
             val image=InstanceImages.import(t.dir,source?:throw CancellationException("Выбор изображения отменён"))
             InstanceStore.update(t.dir){it.copy(iconImage=image,iconPreset=null,iconUrl=null)}
             return JsonPrimitive("Иконка обновлена")
@@ -240,8 +238,7 @@ object NativeTasks {
         if(r.op=="importFiles"){
             val kind=ContentKind.entries.firstOrNull{it.projectType==r.kind}?:ContentKind.MOD
             val destination=if(kind==ContentKind.DATA_PACK){val world=ModManager.dataPackWorlds(t.dir).firstOrNull{it.fileName.toString()==r.world}?:throw IOException("Выбери мир для датапаков");kind.dir(world)}else kind.dir(t.dir)
-            var files:List<Path> = emptyList()
-            javax.swing.SwingUtilities.invokeAndWait{val chooser=javax.swing.JFileChooser().apply{isMultiSelectionEnabled=true;dialogTitle=I18n.text("Добавить файлы");fileFilter=javax.swing.filechooser.FileNameExtensionFilter("Minecraft (${kind.extension})",kind.extension.removePrefix("."))};if(chooser.showOpenDialog(null)==javax.swing.JFileChooser.APPROVE_OPTION)files=chooser.selectedFiles.map{it.toPath()}}
+            val files=NativeBuilds.chooseFiles("Добавить файлы",multiple=true)
             if(files.isEmpty())throw CancellationException("Выбор файлов отменён")
             BuildHistory.record(t.dir,t.game,t.loader,"Добавление локальных файлов",t.loaderVersion){
                 if(kind==ContentKind.MOD)ModManager.importMods(t.dir,t.loader,t.game,files,::progress)
@@ -259,20 +256,6 @@ object NativeTasks {
                     for((source,target)in incoming){currentCoroutineContext().ensureActive();if(kind==ContentKind.DATA_PACK){val staged=target.resolveSibling("${target.fileName}.download");try{Files.copy(source,staged,StandardCopyOption.REPLACE_EXISTING);ModManager.normalizeDataPack(staged);Files.move(staged,target)}finally{Files.deleteIfExists(staged)}}else Files.copy(source,target)}
                 }
             };return JsonPrimitive("Файлы добавлены")
-        }
-        if(r.op=="export"){
-            var output:Path?=null
-            javax.swing.SwingUtilities.invokeAndWait{
-                val chooser=javax.swing.JFileChooser().apply{dialogTitle=I18n.text("Экспортировать в .mrpack");selectedFile=java.io.File("AWLauncher-build.mrpack");fileFilter=javax.swing.filechooser.FileNameExtensionFilter("Modrinth modpack","mrpack")}
-                if(chooser.showSaveDialog(null)==javax.swing.JFileChooser.APPROVE_OPTION){
-                    val path=chooser.selectedFile.toPath().let{if(it.fileName.toString().endsWith(".mrpack",true))it else it.resolveSibling("${it.fileName}.mrpack")}
-                    if(!Files.exists(path)||javax.swing.JOptionPane.showConfirmDialog(null,I18n.text("Заменить существующий файл?"),I18n.text("Экспорт сборки"),javax.swing.JOptionPane.YES_NO_OPTION)==javax.swing.JOptionPane.YES_OPTION)output=path
-                }
-            }
-            val path=output?:throw CancellationException("Экспорт отменён")
-            val selected=Files.list(t.dir).use{paths->paths.map{it.fileName.toString()}.filter{it in setOf("mods","config","defaultconfigs","resourcepacks","shaderpacks","options.txt","optionsof.txt","optionsshaders.txt")}.toList().toSet()}
-            Modpacks.export(t.dir,path,r.title.ifBlank{t.game},t.game,t.loader,InstanceStore.get(t.dir).launchLoaderVersion(t.loaderVersion),selected,onProgress={fraction->send("progress",buildJsonObject{put("fraction",fraction)})})
-            return JsonPrimitive("Сборка экспортирована")
         }
         if(r.op=="install"){
             val kind=ContentKind.entries.firstOrNull{it.projectType==r.kind}?:throw IOException("Неизвестный тип контента")

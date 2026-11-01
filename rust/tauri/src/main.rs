@@ -125,7 +125,7 @@ fn run_task(
     request: &Value,
     events: &Channel<Value>,
 ) -> Result<Value, String> {
-    let _engine = if request["op"] == "accountSkinTextures" { None } else { Some(state.engine.lock().map_err(|e| e.to_string())?) };
+    let _engine = if matches!(request["op"].as_str(),Some("accountSkinTextures" | "buildEditor" | "buildLoaderVersions" | "buildVersions" | "buildDeleteInfo" | "buildExportChoices" | "buildMigrationGet")) { None } else { Some(state.engine.lock().map_err(|e| e.to_string())?) };
     if id.len() > 128 || id.is_empty() {
         return Err("Некорректный номер операции".into());
     }
@@ -218,24 +218,7 @@ async fn request(
 ) -> Result<Value, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let state = app.state::<State>();
-        let original_window = matches!(
-            request["op"].as_str(),
-            Some("instanceWindow")
-        );
-        let window = if original_window {
-            app.get_webview_window("main")
-        } else {
-            None
-        };
-        if let Some(window) = &window {
-            let _ = window.hide();
-        }
-        let outcome = run_task(&state, &id, &request, &events);
-        if let Some(window) = &window {
-            let _ = window.show();
-            let _ = window.set_focus();
-        }
-        let mut result = outcome?;
+        let mut result = run_task(&state, &id, &request, &events)?;
         if request["op"] == "launcherState" {
             let mut profiles = state.profiles.lock().map_err(|e| e.to_string())?;
             profiles.clear();

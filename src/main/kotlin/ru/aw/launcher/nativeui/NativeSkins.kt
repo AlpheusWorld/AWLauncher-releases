@@ -61,9 +61,7 @@ internal object NativeSkins {
         if(r.op=="accountSkinRead") {
             val source=r.options["png"]?.jsonPrimitive?.contentOrNull
             val image=if(source!=null)decode(source) else {
-                var path: java.nio.file.Path?=null
-                javax.swing.SwingUtilities.invokeAndWait { path=ru.aw.launcher.ui.dialogs.chooseSkinFile() }
-                path?.let(MinecraftSkins::read) ?: return JsonNull
+                NativeBuilds.chooseFiles("Выбрать PNG скина").firstOrNull()?.let(MinecraftSkins::read) ?: return JsonNull
             }
             return buildJsonObject { put("png",png(image));put("model",MinecraftSkins.modelOf(image.image).name) }
         }

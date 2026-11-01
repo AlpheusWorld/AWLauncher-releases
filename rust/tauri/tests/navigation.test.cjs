@@ -150,7 +150,27 @@ beforeEach(async () => {
         if (command === "request") {
           const r = args.request;
           if (r.op === "launcherState") return structuredClone(snapshot);
-          if(r.op==='instanceWindow')return structuredClone(snapshot.accounts);
+          const build=snapshot.builds.find(b=>b.key===r.target);
+          if(r.op==='buildEditor')return {options:structuredClone(build.options),loader:'FABRIC',game:build.version,canRename:true,groups:structuredClone(snapshot.settings.libraryGroups),memoryLimit:15298,recommendedMemory:4096,memoryPresets:[2048,4096,8192],downloadAllowed:true};
+          if(r.op==='buildLoaderVersions')return [{version:'0.16.14',label:'0.16.14 · стабильная',stable:true},{version:'0.16.10',label:'0.16.10',stable:true}];
+          if(r.op==='buildVersions')return ['1.22','1.21.4'];
+          if(r.op==='saveOptions'){Object.assign(build.options,r.options);return 'Настройки сборки сохранены';}
+          if(r.op==='rename'){build.name=r.title;return 'Название сохранено';}
+          if(r.op==='buildPickIcon')return {image:'aw-icon-0123456789abcdef01234567.img',preview:imageData};
+          if(r.op==='buildSaveIcon'){Object.assign(build.options,{iconPreset:r.options.reset?null:r.options.symbol,iconBackground:r.options.reset?null:r.options.background,iconImage:r.options.image||null});return structuredClone(build.options);}
+          if(r.op==='buildExportChoices')return ['mods','config','saves'];
+          if(r.op==='buildPickPath')return {path:r.kind==='export'?'C:\\Exports\\test.mrpack':'C:\\Java\\bin\\java.exe',exists:!!window.exportExists};
+          if(r.op==='buildDeleteInfo')return {bytes:1234567,worlds:true,trash:true};
+          if(r.op==='buildDelete'){snapshot.builds=snapshot.builds.filter(b=>b.key!==r.target);return 'Сборка удалена';}
+          if(r.op==='buildGroups'){
+            let groups=snapshot.settings.libraryGroups;const action=r.options.action;
+            if(action==='create')groups.push({id:'group-new',name:r.title});
+            if(action==='rename')groups.find(g=>g.id===r.project).name=r.title;
+            if(action==='remove'){groups=snapshot.settings.libraryGroups=groups.filter(g=>g.id!==r.project);for(const b of snapshot.builds)if(b.options.groupId===r.project)b.options.groupId=null;}
+            return structuredClone(groups);
+          }
+          if(r.op==='buildMigrationAnalyze'){window.testMigration={id:'plan-one',source:build.version,target:r.version,mods:[{file:'sodium.jar',title:'Sodium',version:'0.5',replacement:'0.6',enabled:true,compatible:true},{file:'unknown.jar',title:'Unknown mod',reason:'Совместимость не подтверждена',enabled:true,compatible:false}]};return structuredClone(window.testMigration);}
+          if(r.op==='buildMigrationApply'){if(window.failMigration){window.failMigration=false;window.testMigration.failure={file:'sodium.jar',title:'Sodium',message:'Ошибка загрузки'};return {failed:true,message:'Ошибка загрузки',plan:structuredClone(window.testMigration)};}build.version=window.testMigration.target;return 'Версия обновлена';}
           if(r.op==='accountSkinState'){if(window.failSkinStateOnce){window.failSkinStateOnce=false;throw Error('Не удалось открыть библиотеку скинов');}return {profile:structuredClone(skinProfile),saved:structuredClone(skinSaved),presets:skinPresets};}
           if(r.op==='accountSkinProfile')return {profile:structuredClone(skinProfile),accounts:structuredClone(snapshot.accounts)};
           if(r.op==='accountSkinTextures')return r.options.ids.map(id=>({id,png:id.startsWith('cape:')?capePng:skinPng}));
@@ -671,7 +691,7 @@ test("журнал начинается под панелью поиска и ф
       .evaluate((el) => el.classList.contains("wrap-lines")),
   );
 });
-test("меню сборки сохраняет все действия Kotlin",async()=>{await openBuild();await page.locator('.instance-header [data-action=build-menu]').click();const menu=page.locator('.build-actions');await menu.waitFor();for(const label of ['Настройки','Изменить иконку','Изменить группу','Экспортировать в .mrpack','Дублировать','Изменить версию Minecraft','Играть','Логи','Скачать файлы','Переустановить','Удалить…'])assert.equal(await menu.getByRole('button',{name:label,exact:true}).count(),1);await menu.getByRole('button',{name:'Настройки',exact:true}).click();await page.waitForFunction(()=>window.calls.some(x=>x.command==='request'&&x.args.request.op==='instanceWindow'&&x.args.request.kind==='settings'));});
+test("меню сборки сохраняет все действия Kotlin",async()=>{await openBuild();await page.locator('.instance-header [data-action=build-menu]').click();const menu=page.locator('.build-actions');await menu.waitFor();for(const label of ['Настройки','Изменить иконку','Изменить группу','Экспортировать в .mrpack','Дублировать','Изменить версию Minecraft','Играть','Логи','Скачать файлы','Переустановить','Удалить…'])assert.equal(await menu.getByRole('button',{name:label,exact:true}).count(),1);await menu.getByRole('button',{name:'Настройки',exact:true}).click();await page.locator('.build-settings-window form').waitFor();assert.equal(page.context().pages().length,1);assert.equal(await page.evaluate(()=>window.calls.some(x=>x.args?.request?.op==='instanceWindow')),false);});
 test("статистика показывает подписи календаря и оформленные подсказки", async () => {
   await page.locator("#navigation [data-page=activity]").click();
   await page.locator(".activity-view").waitFor();
@@ -681,6 +701,88 @@ test("статистика показывает подписи календар�
   await page.locator(".bar-day").first().hover();
   await page.getByRole("tooltip").waitFor();
   assert.equal(await page.locator(".bar-day[title]").count(), 0);
+});
+async function buildDialog(kind) {
+  await openBuild();
+  if(kind==='settings')await page.locator('.instance-header [data-action=build-settings]').click();
+  else {await page.locator('.instance-header [data-action=build-menu]').click();await page.locator(`.build-actions [data-kind=${kind}]`).click();}
+  await page.locator('.build-dialog').waitFor();
+}
+test("настройки сборки сохраняют память JVM и окно в Tauri",async()=>{
+  await buildDialog('settings');const d=page.locator('.build-settings-window');await d.locator('[data-build-tab="1"]').click();
+  await d.locator('[data-build-toggle=memory]').click();await d.locator('[name=memoryMb]').fill('6144');
+  await d.locator('[data-build-toggle=args]').click();await d.locator('[name=jvmArgs]').fill('-Dtitle="My game"');
+  await d.locator('[data-build-tab="2"]').click();await d.locator('[data-build-toggle=window]').click();
+  await d.locator('[name=windowWidth]').fill('1920');await d.locator('[name=windowHeight]').fill('200');await d.locator('[data-build-fullscreen=true]').click();
+  await d.getByRole('button',{name:'Применить настройки',exact:true}).click();
+  await page.waitForFunction(()=>window.calls.some(x=>x.args?.request?.op==='saveOptions'&&x.args.request.options.memoryMb===6144));
+  const options=await page.evaluate(()=>window.calls.find(x=>x.args?.request?.options?.memoryMb===6144).args.request.options);
+  assert.equal(options.jvmArgs,'-Dtitle="My game"');assert.equal(options.windowHeight,200);assert.equal(options.fullscreen,true);assert.equal(options.javaPath,null);
+  assert.equal(await d.isVisible(),true);assert.equal(page.context().pages().length,1);
+  await d.getByRole('button',{name:'Использовать общие настройки',exact:true}).click();
+  await page.waitForFunction(()=>window.calls.some(x=>x.args?.request?.op==='saveOptions'&&x.args.request.options.memoryMb===null));
+  assert.equal(await d.locator('[name=memoryMb]').inputValue(),'4096');
+  assert.equal(await page.evaluate(()=>window.calls.filter(x=>x.args?.request?.op==='launcherState').length),1);
+  const out=path.resolve(__dirname,'../test-results');await fs.mkdir(out,{recursive:true});await page.screenshot({path:path.join(out,'tauri-build-settings.png')});
+});
+test("версия Loader и имя изменяются в настройках без нового окна",async()=>{
+  await buildDialog('settings');const d=page.locator('.build-settings-window');await d.locator('[name=title]').fill('Моя сборка');await d.locator('[data-build-command=rename]').click();
+  await page.waitForFunction(()=>document.querySelector('.instance-header h1').textContent==='Моя сборка');
+  await d.locator('[data-build-command=latest-loader]').click();await d.locator('[data-build-command=save-loader]').click();
+  await page.waitForFunction(()=>window.calls.some(x=>x.args?.request?.options?.loaderVersion==='0.16.14'));
+  assert.equal(await page.locator('#main').isVisible(),true);assert.equal(page.context().pages().length,1);
+});
+test("редактор иконок содержит фон случайный выбор импорт и сброс",async()=>{
+  await buildDialog('icon');const d=page.locator('.build-icon-editor');assert.equal(await d.locator('[data-symbol]').count(),8);assert.equal(await d.locator('[data-background]').count(),7);
+  await d.locator('[data-build-command=random]').click();assert.equal(await d.locator('[data-symbol].selected').count(),1);assert.equal(await d.locator('[data-background].selected').count(),1);
+  await page.evaluate(()=>window.savedContent=document.querySelector('.content-table'));
+  await d.locator('[data-build-command=pick]').click();await page.waitForFunction(()=>window.calls.some(x=>x.args?.request?.op==='buildPickIcon'));
+  await d.locator('[data-symbol=fox]').click();await d.locator('[data-background=amber]').click();await d.locator('[data-build-command=save]').click();
+  await d.waitFor({state:'detached'});const request=await page.evaluate(()=>window.calls.find(x=>x.args?.request?.op==='buildSaveIcon').args.request);
+  assert.equal(request.options.symbol,'fox');assert.equal(request.options.background,'amber');assert.equal(request.options.image,null);
+  assert.equal(await page.evaluate(()=>document.querySelector('.content-table')===window.savedContent),true);
+  await page.locator('.instance-header [data-action=build-menu]').click();await page.locator('.build-actions [data-kind=icon]').click();await page.locator('.build-icon-editor [data-build-command=reset]').click();
+  await page.waitForFunction(()=>window.calls.some(x=>x.args?.request?.op==='buildSaveIcon'&&x.args.request.options.reset===true));
+});
+test("группы создаются переименовываются назначаются и удаляются в Tauri",async()=>{
+  await buildDialog('groups');const d=page.locator('.build-dialog');await d.locator('.build-group-create input').fill('Тестовая');await d.locator('.build-group-create button').click();
+  await d.locator('[data-group-name=group-new]').waitFor();await d.locator('[data-group-name=group-new]').fill('Переименована');await d.locator('[data-build-command=rename]').click();
+  await page.waitForFunction(()=>window.calls.some(x=>x.args?.request?.op==='buildGroups'&&x.args.request.options.action==='rename'));
+  await d.locator('[data-build-command=assign]').click();await d.waitFor({state:'detached'});
+  assert.equal(await page.evaluate(()=>window.calls.some(x=>x.args?.request?.options?.groupId==='group-new')),true);
+  await page.locator('.instance-header [data-action=build-menu]').click();await page.locator('.build-actions [data-kind=groups]').click();await page.locator('.build-dialog [data-build-command=remove]').click();
+  await page.waitForFunction(()=>window.calls.some(x=>x.args?.request?.op==='buildGroups'&&x.args.request.options.action==='remove'));
+});
+test("экспорт предлагает выбор миров и файлов до сохранения",async()=>{
+  await buildDialog('export');const d=page.locator('.build-dialog');await d.locator('[data-export-index="2"]').uncheck();await d.locator('[data-build-command=save]').click();
+  await page.waitForFunction(()=>window.calls.some(x=>x.args?.request?.op==='buildExport'));
+  const request=await page.evaluate(()=>window.calls.find(x=>x.args?.request?.op==='buildExport').args.request);
+  assert.deepEqual(request.options.selected.sort(),['config','mods']);assert.equal(request.file,'C:\\Exports\\test.mrpack');assert.equal(page.context().pages().length,1);
+});
+test("экспорт отдельно подтверждает замену существующего файла",async()=>{
+  await page.evaluate(()=>window.exportExists=true);await buildDialog('export');const d=page.locator('.build-dialog');await d.locator('[data-export-index="0"]').waitFor();await d.locator('[data-build-command=save]').click();
+  await d.getByRole('button',{name:'Заменить файл',exact:true}).waitFor();assert.equal(await page.evaluate(()=>window.calls.some(x=>x.args?.request?.op==='buildExport')),false);
+  await d.getByRole('button',{name:'Заменить файл',exact:true}).click();await page.waitForFunction(()=>window.calls.some(x=>x.args?.request?.op==='buildExport'&&x.args.request.options.overwrite===true));
+});
+test("копирование скачивание и переустановка используют встроенную очередь",async()=>{
+  await buildDialog('duplicate');const d=page.locator('.build-dialog');await d.locator('[name=title]').fill('Независимая копия');await d.getByRole('button',{name:'Создать копию',exact:true}).click();
+  await page.waitForFunction(()=>window.calls.some(x=>x.args?.request?.op==='duplicate'&&x.args.request.title==='Независимая копия'));
+  for(const [kind,op]of [['download','buildDownload'],['reinstall','buildReinstall']]){await page.waitForFunction(()=>state.running===false);await page.locator('.instance-header [data-action=build-menu]').click();await page.locator(`.build-actions [data-kind=${kind}]`).click();await page.waitForFunction(op=>window.calls.some(x=>x.args?.request?.op===op),op);}
+  assert.equal(page.context().pages().length,1);assert.equal(await page.evaluate(()=>window.calls.some(x=>x.args?.request?.op==='instanceWindow')),false);
+});
+test("ошибка миграции возвращает проверку и позволяет отключить мод",async()=>{
+  await page.evaluate(()=>window.failMigration=true);await buildDialog('migrate');let d=page.locator('.build-dialog');
+  await d.locator('[data-build-command=save]:not([disabled])').click();await d.locator('.build-migration-mod').first().waitFor();
+  await d.locator('[data-keep=all]').click();await d.locator('[data-build-command=save]').click();
+  await page.locator('[data-build-command=disable-failed]').waitFor();assert.equal(page.context().pages().length,1);
+  await page.locator('[data-build-command=disable-failed]').click();
+  await page.waitForFunction(()=>window.calls.some(x=>x.args?.request?.op==='buildMigrationApply'&&x.args.request.options.disableFailed==='sodium.jar'));
+});
+test("удаление сборки ждёт подтверждения в Tauri",async()=>{
+  await buildDialog('delete');const d=page.locator('.build-dialog');await d.locator('[data-build-command=delete]:not([disabled])').waitFor();
+  assert.equal(await page.evaluate(()=>window.calls.some(x=>x.args?.request?.op==='buildDelete')),false);
+  await d.locator('[data-build-command=delete]').click();await page.locator('#main #build-list').waitFor();
+  assert.equal(await page.locator('.build-row').count(),1);assert.equal(page.context().pages().length,1);
 });
 test("смена языка не оставляет старый перевод в верхней панели", async () => {
   await page.locator("#settings-button").click();
