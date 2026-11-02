@@ -131,6 +131,51 @@ async function refresh() {
   applyTheme();
   renderChrome();
 }
+const launcherUpdate = { version: null, status: "idle", fraction: 0, error: null, pending: null };
+function updateControls() {
+  const u = launcherUpdate;
+  const busy = ["checking", "downloading", "installing"].includes(u.status);
+  const label = u.status === "checking" ? "Проверяю обновления…"
+    : u.status === "downloading" ? `Скачиваю ${Math.floor(u.fraction * 100)}%`
+    : u.status === "installing" ? `Устанавливаю ${u.version}`
+    : u.error && u.version ? "Не обновилось · ещё раз" : `Обновить до ${u.version}`;
+  const button = (compact) => btn(esc(label), "install-update", `${compact ? "update-pill" : "primary"}`, `${busy ? "disabled" : ""} title="${esc(u.error || `Скачать и установить ${u.version}`)}"`);
+  $("#launcher-update").innerHTML = u.version || busy ? button(true) : "";
+  $("#version").hidden = !!u.version || busy;
+  const about = $("#about-update");
+  if (about) about.innerHTML = `${btn(u.status === "checking" ? "Проверяю обновления…" : "Проверить обновления", "check-update", "", busy ? "disabled" : "")}${u.version ? button(false) : ""}${u.error ? `<p class="error" role="alert">${esc(u.error)}</p>` : ""}`;
+}
+function launcherUpdateOperation(install = false, silent = false) {
+  if (launcherUpdate.pending) return launcherUpdate.pending;
+  if (install && state.games?.length) { fail("Закрой Minecraft перед обновлением"); return; }
+  launcherUpdate.status = install ? "downloading" : "checking";
+  launcherUpdate.fraction = 0;
+  launcherUpdate.error = null;
+  updateControls();
+  const operation = (async () => {
+    try {
+      const result = await rpc({op: install ? "installUpdate" : "checkUpdate", games: state.games?.length || 0}, event => {
+        if (event.type === "progress") {
+          launcherUpdate.fraction = Math.max(0, Math.min(1, Number(event.data.fraction) || 0));
+          updateControls();
+        }
+      });
+      if (result?.available) launcherUpdate.version = result.available;
+      else if (!install) launcherUpdate.version = null;
+      launcherUpdate.status = result?.installing ? "installing" : "idle";
+      updateControls();
+      if (result?.installing) await T.window.getCurrentWindow().close();
+      else if (!silent) toast(result?.message || "Проверка завершена");
+    } catch (error) {
+      launcherUpdate.status = "idle";
+      launcherUpdate.error = String(error?.message || error);
+      updateControls();
+      if (!silent) fail(error);
+    } finally { launcherUpdate.pending = null; }
+  })();
+  launcherUpdate.pending = operation;
+  return operation;
+}
 function applyTheme() {
   let theme = state.data.settings.themeMode || "SYSTEM";
   if (theme === "SYSTEM")
@@ -145,6 +190,7 @@ matchMedia("(prefers-color-scheme: light)").addEventListener(
 );
 function renderChrome() {
   $("#version").textContent = `v${state.data.version || "1.0.50"}`;
+  updateControls();
   renderAccountSummary();
   if (!$("#navigation").children.length)
     $("#navigation").innerHTML = [
@@ -1274,6 +1320,7 @@ function openSettings(tab = state.settingsTab) {
       .forEach((el) => el.classList.toggle("active", el.dataset.tab === tab));
     const body = current.querySelector(".settings-body");
     body.innerHTML = settingsBody(tab);
+    updateControls();
     body.scrollTop = 0;
     if (tab === "language") renderLanguages();
     finishView(body);
@@ -1285,6 +1332,7 @@ function openSettings(tab = state.settingsTab) {
   const dialog = $("#settings");
   dialog.innerHTML = `<div class="settings-layout"><aside class="settings-nav"><h2>Настройки</h2><input id="settings-query" type="search" placeholder="Найти раздел" aria-label="Найти раздел"><nav>${settingsTabs.map(([id, i, title, subtitle]) => btn(`${icon(i)}<span>${title}<small>${subtitle}</small></span>`, "settings-tab", id === tab ? "active" : "", `data-tab="${id}"`)).join("")}</nav><small>AWLauncher ${esc(state.data.version)}</small></aside><section class="settings-content"><div class="settings-heading"><div><h2>${settingsTabs.find((x) => x[0] === tab)[2]}</h2><small>${settingsTabs.find((x) => x[0] === tab)[3]}</small></div>${btn("×", "close-settings", "icon-button", 'aria-label="Закрыть настройки"')}</div><div class="settings-body">${settingsBody(tab)}</div></section></div>`;
   if (!dialog.open) dialog.showModal();
+  updateControls();
   if (tab === "language") renderLanguages();
   finishView(dialog);
 }
@@ -1320,7 +1368,7 @@ function settingsBody(tab) {
     case "discord":
       return `<h3>Discord Rich Presence</h3><p>Покажи друзьям, во что играешь</p><div class="high"><div class="row"><img src="assets/mark.png" width="64" height="64" alt=""><div><h3>AWLauncher</h3><p>В лаунчере</p><small>Выбирает следующую сборку</small></div></div><hr><small>С таймером текущей сессии и кнопкой сайта</small></div><div class="high">${switchRow("Показывать активность в Discord", "discordPresence", s.discordPresence, "Сборка, версия Minecraft и время игры")}${switchRow("Показывать открытый лаунчер", "discordShowLauncher", s.discordShowLauncher, "Если выключить, активность появится только во время игры")}${switchRow("Показывать название сборки", "discordShowInstance", s.discordShowInstance, "Для сборок из каталога добавится кнопка их страницы")}${switchRow("Показывать адрес сервера", "discordShowServer", s.discordShowServer, "Друзья увидят адрес сервера")}</div><small>Параметры используются существующим игровым движком</small>`;
     case "about":
-      return `<h3>О лаунчере</h3><div class="row" style="margin:8px 0"><img src="assets/mark.png" width="40" height="40" alt=""><h1><span class="accent">AW</span>Launcher</h1></div><p>Версия лаунчера: ${esc(state.data.version)}</p>${btn("Проверить обновления", "check-update")}<hr>${btn(icon("folder") + "Открыть папку лаунчера", "open-root")}`;
+      return `<h3>О лаунчере</h3><div class="row" style="margin:8px 0"><img src="assets/mark.png" width="40" height="40" alt=""><h1><span class="accent">AW</span>Launcher</h1></div><p>Версия лаунчера: ${esc(state.data.version)}</p><div id="about-update" class="row wrap">${btn("Проверить обновления", "check-update")}</div><hr>${btn(icon("folder") + "Открыть папку лаунчера", "open-root")}`;
   }
 }
 function renderLanguages() {
@@ -2113,11 +2161,8 @@ const actions = {
     }).then(() => toast("Кэш проверки сброшен")),
   "open-root": () =>
     invoke("local_data", { kind: "openRoot", target: null, relative: null }),
-  "check-update": () =>
-    enqueue("Проверка обновлений", {
-      op: "checkUpdate",
-      games: state.games?.length || 0,
-    }),
+  "check-update": () => launcherUpdateOperation(),
+  "install-update": () => launcherUpdateOperation(true),
   "account-mode": (el) => {
     state.accountMode = el.dataset.mode;
     openSettings("accounts");
@@ -2526,6 +2571,7 @@ for (const dialog of document.querySelectorAll("dialog"))
   state.languages = await fetch("assets/languages.json").then((r) => r.json());
   await refresh();
   await render();
+  launcherUpdateOperation(false, true);
 })().catch((error) => {
   $("#main").innerHTML =
     `<div class="empty"><h2>Не удалось загрузить лаунчер</h2><p class="error">${esc(error?.message || error)}</p>${btn("Повторить", "restart")}</div>`;

@@ -149,6 +149,13 @@ beforeEach(async () => {
         window.calls.push({ command, args: JSON.parse(JSON.stringify(args)) });
         if (command === "request") {
           const r = args.request;
+          if(r.op === 'checkUpdate') return {available:'1.0.53',message:'Доступна версия 1.0.53'};
+          if(r.op === 'installUpdate') {
+            if(window.rejectUpdate) throw 'Ошибка загрузки обновления';
+            args.events.onmessage({type:'progress',data:{fraction:0.42,bytesPerSecond:2048}});
+            await new Promise(resolve => window.finishUpdate = resolve);
+            return {installing:true};
+          }
           if (r.op === "launcherState") return structuredClone(snapshot);
           const build=snapshot.builds.find(b=>b.key===r.target);
           if(r.op==='buildEditor')return {options:structuredClone(build.options),loader:'FABRIC',game:build.version,canRename:true,groups:structuredClone(snapshot.settings.libraryGroups),memoryLimit:15298,recommendedMemory:4096,memoryPresets:[2048,4096,8192],downloadAllowed:true};
@@ -290,7 +297,7 @@ beforeEach(async () => {
             toggleMaximize: async () => {
               window.windowMaximized = !window.windowMaximized;
             },
-            close: async () => {},
+            close: async () => { window.closedForUpdate = true; },
           }),
         },
       };
@@ -1089,4 +1096,30 @@ test("карточка времени открывает активность м
   await page
     .getByRole("heading", { name: "Активность", exact: true })
     .waitFor();
+});
+
+test('launcher update stays actionable in titlebar and about, reports progress and closes after handoff', async () => {
+  await page.waitForFunction(() => document.querySelector('#launcher-update button')?.textContent === 'Обновить до 1.0.53');
+  await page.locator('#settings-button').click();
+  await page.locator('[data-action=settings-tab][data-tab=about]').click();
+  assert.equal(await page.locator('#about-update [data-action=install-update]').textContent(), 'Обновить до 1.0.53');
+  await page.locator('#about-update [data-action=install-update]').click();
+  await page.waitForFunction(() => document.querySelector('#launcher-update button')?.textContent === 'Скачиваю 42%');
+  assert.equal(await page.locator('#about-update [data-action=install-update]').isDisabled(), true);
+  assert.equal(await page.evaluate(() => window.calls.filter(c => c.args?.request?.op === 'installUpdate').length), 1);
+  await page.evaluate(() => window.finishUpdate());
+  await page.waitForFunction(() => window.closedForUpdate);
+});
+
+test('failed update keeps a retry button and does not close the launcher', async () => {
+  await page.waitForFunction(() => document.querySelector('#launcher-update button'));
+  await page.evaluate(() => window.rejectUpdate = true);
+  await page.locator('#launcher-update button').click();
+  await page.waitForFunction(() => document.querySelector('#launcher-update button')?.textContent === 'Не обновилось · ещё раз');
+  assert.equal(await page.evaluate(() => !!window.closedForUpdate), false);
+  await page.evaluate(() => window.rejectUpdate = false);
+  await page.locator('#launcher-update button').click();
+  await page.waitForFunction(() => typeof window.finishUpdate === 'function');
+  await page.evaluate(() => window.finishUpdate());
+  await page.waitForFunction(() => window.closedForUpdate);
 });

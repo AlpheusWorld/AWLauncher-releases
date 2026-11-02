@@ -125,7 +125,7 @@ fn run_task(
     request: &Value,
     events: &Channel<Value>,
 ) -> Result<Value, String> {
-    let _engine = if matches!(request["op"].as_str(),Some("accountSkinTextures" | "buildEditor" | "buildLoaderVersions" | "buildVersions" | "buildDeleteInfo" | "buildExportChoices" | "buildMigrationGet")) { None } else { Some(state.engine.lock().map_err(|e| e.to_string())?) };
+    let _engine = if matches!(request["op"].as_str(),Some("checkUpdate" | "accountSkinTextures" | "buildEditor" | "buildLoaderVersions" | "buildVersions" | "buildDeleteInfo" | "buildExportChoices" | "buildMigrationGet")) { None } else { Some(state.engine.lock().map_err(|e| e.to_string())?) };
     if id.len() > 128 || id.is_empty() {
         return Err("Некорректный номер операции".into());
     }
