@@ -204,7 +204,7 @@ beforeEach(async () => {
               snapshot.accounts[0].selected = true;
             return structuredClone(snapshot.accounts);
           }
-          if (r.op === "launch") return { pid: 123, message: "Игра запущена" };
+          if (r.op === "launch") { if(window.rejectLaunch) throw "Не удалось запустить игру"; if(window.deferLaunch) await new Promise(resolve => window.finishLaunch = resolve); return { pid: 123, message: "Игра запущена" }; }
           if (r.op === "content") {
             if (window.deferContent)
               await new Promise((resolve) => (window.finishContent = resolve));
@@ -1122,4 +1122,25 @@ test('failed update keeps a retry button and does not close the launcher', async
   await page.waitForFunction(() => typeof window.finishUpdate === 'function');
   await page.evaluate(() => window.finishUpdate());
   await page.waitForFunction(() => window.closedForUpdate);
+});
+
+test('launch starts outside a paused downloads queue and restores controls after failure', async () => {
+  await page.evaluate(() => state.paused = true);
+  await page.evaluate(() => window.deferLaunch = true);
+  const play = page.locator('.hero [data-action=launch]');
+  await play.click();
+  await page.waitForFunction(() => typeof window.finishLaunch === 'function');
+  assert.equal(await play.isDisabled(), true);
+  assert.equal(await page.locator('#game-status').textContent(), 'Подготовка к запуску…');
+  assert.equal(await page.locator('#toast').textContent().then(s => s.includes('Добавлено в очередь')), false);
+  await page.evaluate(() => window.finishLaunch());
+  await page.waitForFunction(() => !document.querySelector('.hero [data-action=launch]').disabled);
+  await page.locator('#navigation [data-page=downloads]').click();
+  assert.equal(await page.evaluate(() => state.queue.length), 0);
+  await page.locator('#navigation [data-page=home]').click();
+  await page.evaluate(() => { window.deferLaunch = false; window.rejectLaunch = true; });
+  await page.locator('.hero [data-action=launch]').click();
+  await page.waitForFunction(() => document.querySelector('#toast').textContent === 'Не удалось запустить игру');
+  assert.equal(await page.locator('.hero [data-action=launch]').isDisabled(), false);
+  assert.equal(await page.evaluate(() => state.queue.length), 0);
 });

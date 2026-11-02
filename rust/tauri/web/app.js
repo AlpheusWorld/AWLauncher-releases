@@ -61,6 +61,7 @@ const state = {
   queue: [],
   paused: false,
   running: false,
+  launching: new Map(),
   serial: 0,
   epoch: 0,
   content: [],
@@ -225,11 +226,12 @@ function renderChrome() {
   document
     .querySelectorAll("#navigation [data-page]")
     .forEach((el) => el.classList.toggle("active", el.dataset.page === page));
-  $("#game-status").textContent = state.games?.length
+  $("#game-status").textContent = state.launching.size ? state.launching.values().next().value.stage : state.games?.length
     ? "● Игра запущена"
     : "● Нет активных сборок";
   translateVisible($(".titlebar")).catch(() => {});
   translateVisible($("#sidebar")).catch(() => {});
+  renderLaunchControls();
 }
 function navigate(route, history = true) {
   if (history) {
@@ -379,6 +381,7 @@ function animateView(node) {
     );
 }
 function finishView(root) {
+  renderLaunchControls(root);
   const activity = root.querySelector("#home-activity");
   if (activity && state.homeStats)
     activity.innerHTML = `<small>Время в игре</small><h2 style="margin:6px 0">${ms(state.homeStats.week_ms)}</h2><small>Эта неделя</small>${miniBars(state.homeStats)}`;
@@ -1191,7 +1194,45 @@ async function runImmediate(title, request, callbacks) {
   immediateOperations.set(key,operation);
   try{return await operation;}finally{immediateOperations.delete(key);}
 }
+const launchLabels = new WeakMap();
+function renderLaunchControls(root = document) {
+  root.querySelectorAll('[data-action="launch"][data-target]').forEach(button => {
+    const pending = state.launching.has(button.dataset.target);
+    if (pending) {
+      if (!launchLabels.has(button)) launchLabels.set(button, button.innerHTML);
+      button.disabled = true;
+      button.textContent = "Подготовка…";
+    } else if (launchLabels.has(button)) {
+      button.innerHTML = launchLabels.get(button);
+      button.disabled = false;
+      launchLabels.delete(button);
+    }
+  });
+}
+async function launchGame(target) {
+  if (state.launching.has(target)) return;
+  const pending = {stage: "Подготовка к запуску…"};
+  state.launching.set(target, pending);
+  renderChrome();
+  try {
+    if (state.accountSelection) await state.accountSelection.promise;
+    const result = await rpc({op: "launch", target}, event => {
+      if (event.type === "stage") pending.stage = String(event.data);
+      if (event.type === "progress") pending.stage = `Подготовка файлов: ${Math.floor(Math.max(0, Math.min(1, Number(event.data.fraction) || 0)) * 100)}%`;
+      $("#game-status").textContent = pending.stage;
+    });
+    if (result?.failed) throw Error(result.message || "Не удалось запустить игру");
+    state.games = [...(state.games || []), result.pid];
+    toast(result.message || "Игра запущена");
+    await refresh();
+    invalidateViews(target);
+  } finally {
+    state.launching.delete(target);
+    renderChrome();
+  }
+}
 async function enqueue(title, request, callbacks = {}) {
+  if (request.op === "launch") return launchGame(request.target);
   if(localOperations.has(request.op))return runImmediate(title,request,callbacks);
   state.queue.push({
     id: `task-${++state.serial}`,
