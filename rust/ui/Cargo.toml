@@ -1,6 +1,6 @@
 [package]
 name = "awlauncher-ui"
-version = "1.0.52"
+version = "1.0.54"
 edition = "2021"
 publish = false
 
