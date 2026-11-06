@@ -910,7 +910,7 @@ impl App {
             project_image_index: None,
             project_release: None,
             catalog_datapack_request: None,
-            remote_images: remote_images::Images::new(cc.egui_ctx.clone(), backend_path()),
+            remote_images: remote_images::Images::new(cc.egui_ctx.clone()),
             catalog_offset: 0,
             catalog_sort: "downloads",
             catalog_installed: false,

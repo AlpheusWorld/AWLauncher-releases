@@ -72,7 +72,7 @@ $hashes = (@('AWLauncher-Setup.exe','AWLauncher.msi','update.json','update.json.
 }
 [IO.File]::WriteAllText((Join-Path $output 'SHA256SUMS.txt'), ($hashes -join "`n") + "`n", [Text.UTF8Encoding]::new($false))
 if ($PrepareOnly) { Write-Output "Prepared and verified $tag at $output"; return }
-$files=@('AWLauncher-Setup.exe','AWLauncher.msi','update.json','update.json.sig','SHA256SUMS.txt','AWLauncher-third-party-sources.zip','OpenJDK-sources.part01','OpenJDK-sources.part02','OpenJDK-SOURCES.md') + $linuxAssets
+$files=@('AWLauncher-Setup.exe','AWLauncher.msi','update.json','update.json.sig','SHA256SUMS.txt') + $linuxAssets
 foreach ($name in $files) { if (-not (Test-Path -LiteralPath (Join-Path $output $name) -PathType Leaf)) { throw "A required public release asset is missing: $name" } }
 
 # Credentials stay in memory and are only sent to GitHub's API/upload hosts.

@@ -6,7 +6,7 @@ use std::{
     sync::{mpsc, Arc, Mutex},
 };
 
-pub use crate::backend::{backend_command, java_base_command};
+pub use crate::backend::backend_command;
 
 pub enum Event {
     Data(Value),

@@ -127,7 +127,6 @@ fn read(path: &Path) -> io::Result<Map<String, Value>> {
 fn validate(key: &str, value: &Value, total: i64) -> io::Result<()> {
     let valid = match key {
         "keepLauncherOpen"
-        | "friendsEnabled"
         | "showSnapshots"
         | "showOldVersions"
         | "discordPresence"
@@ -285,9 +284,9 @@ mod tests {
             .unwrap();
         lock.try_lock().unwrap();
         let mut store = Store::load(dir.join("launcher.json"));
-        assert!(!store.set("friendsEnabled", Value::from(false)));
+        assert!(!store.set("keepLauncherOpen", Value::from(false)));
         drop(lock);
-        assert!(store.set("friendsEnabled", Value::from(false)));
+        assert!(store.set("keepLauncherOpen", Value::from(false)));
         fs::remove_dir_all(dir).unwrap();
     }
 }

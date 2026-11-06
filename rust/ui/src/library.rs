@@ -187,7 +187,6 @@ fn scan_data_packs(game_dir: &Path, found: &mut Vec<ContentFile>) -> io::Result<
 static TEMP_ID: AtomicU64 = AtomicU64::new(0);
 
 /// Update only the resourcePacks option, preserving all other Minecraft options.
-#[cfg(test)]
 pub fn set_resource_pack(game_dir: &Path, name: &str, enable: bool) -> io::Result<()> {
     if !safe_name(name) {
         return Err(io::Error::new(
@@ -287,7 +286,6 @@ pub(crate) fn atomic_write(file: &Path, bytes: &[u8]) -> io::Result<()> {
 }
 
 /// Keep all other Iris properties and mirror the existing launcher's shader selection.
-#[cfg(test)]
 pub fn set_shader(game_dir: &Path, name: &str, enable: bool) -> io::Result<()> {
     if !safe_name(name) {
         return Err(io::Error::new(
@@ -330,7 +328,6 @@ pub fn set_shader(game_dir: &Path, name: &str, enable: bool) -> io::Result<()> {
     atomic_write(&file, output.as_bytes())
 }
 
-#[cfg(test)]
 fn ensure_content_exists(game_dir: &Path, category: &str, name: &str) -> io::Result<()> {
     let path = game_dir.join(category).join(name);
     let metadata = fs::symlink_metadata(path)?;
@@ -343,7 +340,6 @@ fn ensure_content_exists(game_dir: &Path, category: &str, name: &str) -> io::Res
     Ok(())
 }
 
-#[cfg(test)]
 fn escape_property(value: &str) -> String {
     let mut output = String::new();
     for code in value.encode_utf16() {

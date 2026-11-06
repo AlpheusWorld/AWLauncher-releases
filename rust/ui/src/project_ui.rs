@@ -688,7 +688,7 @@ impl App {
         let base = self.project_base(hit);
         let document = self
             .project_markup
-            .get(ui.ctx(), self.backend.as_ref(), body, &base);
+            .get(ui.ctx(), body, &base);
         match document {
             None => {
                 ui.label(self.tr("Загружаю…"));

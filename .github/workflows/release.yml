@@ -59,12 +59,7 @@ jobs:
           sudo dpkg --install build/compose/binaries/main/deb/*.deb
           app_binary=$(dpkg -L awlauncher | awk '/\/bin\/AWLauncher$/ { print; exit }')
           test -n "$app_binary"
-          set +e
-          timeout -k 5s 45s xvfb-run -a dbus-run-session -- "$app_binary"
-          status=$?
-          set -e
-          test "$status" -eq 124 -o "$status" -eq 0
-          grep -R -F 'startup: native launcher ready' "$HOME/.aw/logs"
+          xvfb-run -a dbus-run-session -- python3 -u tools/tests/rust_linux_smoke.py "$app_binary"
 
       - name: Stage verified Linux installers in a draft release
         shell: bash
@@ -180,7 +175,6 @@ jobs:
         run: |
           $version = [regex]::Match((Get-Content 'build.gradle.kts' -Raw), '(?m)^version = "([^"]+)"').Groups[1].Value
           $notes = Join-Path $PWD "releases/$version.md"
-          .\tools\prepare_release_sources.ps1 -Version $version
           .\tools\publish_release.ps1 -Version $version -Artifacts 'build/compose/binaries/main' -LinuxArtifacts 'build/linux-artifacts' -Notes $notes -PrepareOnly
 
       - name: Retain verified release assets in the draft release
@@ -189,7 +183,7 @@ jobs:
           $version = [regex]::Match((Get-Content 'build.gradle.kts' -Raw), '(?m)^version = "([^"]+)"').Groups[1].Value
           $stage = "ci-$version-$($env:GITHUB_SHA.Substring(0, 7))"
           $folder = "build/publication/v$version"
-          $names = @('AWLauncher-Setup.exe', 'AWLauncher.msi', 'update.json', 'update.json.sig', 'SHA256SUMS.txt', 'AWLauncher-third-party-sources.zip', 'OpenJDK-sources.part01', 'OpenJDK-sources.part02', 'OpenJDK-SOURCES.md', 'AWLauncher-linux-x64.deb', 'AWLauncher-linux-x64.rpm', 'update-linux-deb-x64.json', 'update-linux-deb-x64.json.sig', 'update-linux-rpm-x64.json', 'update-linux-rpm-x64.json.sig')
+          $names = @('AWLauncher-Setup.exe', 'AWLauncher.msi', 'update.json', 'update.json.sig', 'SHA256SUMS.txt', 'AWLauncher-linux-x64.deb', 'AWLauncher-linux-x64.rpm', 'update-linux-deb-x64.json', 'update-linux-deb-x64.json.sig', 'update-linux-rpm-x64.json', 'update-linux-rpm-x64.json.sig')
           $assetPaths = $names | ForEach-Object {
             $path = Join-Path $folder $_
             if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "Missing verified asset: $_" }

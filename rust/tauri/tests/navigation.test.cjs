@@ -157,6 +157,11 @@ beforeEach(async () => {
             return {installing:true};
           }
           if (r.op === "launcherState") return structuredClone(snapshot);
+          if (r.op === "accountMicrosoft") {
+            args.events.onmessage({type: "login", data: {code: "AW-TEST", url: "https://microsoft.com/devicelogin"}});
+            await new Promise(resolve => window.finishMicrosoftLogin = resolve);
+            return "Аккаунт добавлен";
+          }
           const build=snapshot.builds.find(b=>b.key===r.target);
           if(r.op==='buildEditor')return {options:structuredClone(build.options),loader:'FABRIC',game:build.version,canRename:true,groups:structuredClone(snapshot.settings.libraryGroups),memoryLimit:15298,recommendedMemory:4096,memoryPresets:[2048,4096,8192],downloadAllowed:true};
           if(r.op==='buildLoaderVersions')return [{version:'0.16.14',label:'0.16.14 · стабильная',stable:true},{version:'0.16.10',label:'0.16.10',stable:true}];
@@ -1143,4 +1148,36 @@ test('launch starts outside a paused downloads queue and restores controls after
   await page.waitForFunction(() => document.querySelector('#toast').textContent === 'Не удалось запустить игру');
   assert.equal(await page.locator('.hero [data-action=launch]').isDisabled(), false);
   assert.equal(await page.evaluate(() => state.queue.length), 0);
+});
+
+test('only downloads wait while the download queue is paused', async () => {
+  const outcome = await page.evaluate(async () => {
+    state.paused = true;
+    for (const op of ['toggle', 'importFiles', 'remove', 'saveOptions', 'duplicate', 'buildExport']) {
+      await enqueue(op, { op, target: state.data.builds[0].key });
+    }
+    for (const op of ['install', 'updateItem', 'buildDownload', 'buildReinstall', 'buildMigrationApply']) {
+      await enqueue(op, { op, target: state.data.builds[0].key });
+    }
+    return {
+      sent: window.calls.map(call => call.args?.request?.op),
+      queued: state.queue.map(item => [item.request.op, item.status]),
+    };
+  });
+  for (const op of ['toggle', 'importFiles', 'remove', 'saveOptions', 'duplicate', 'buildExport']) {
+    assert.ok(outcome.sent.includes(op), op);
+  }
+  assert.deepEqual(outcome.queued, ['install', 'updateItem', 'buildDownload', 'buildReinstall', 'buildMigrationApply'].map(op => [op, 'waiting']));
+  assert.ok(outcome.queued.every(([op]) => !outcome.sent.includes(op)));
+});
+
+test('Microsoft sign-in displays its code while downloads are paused', async () => {
+  await page.evaluate(() => {
+    state.paused = true;
+    actions.login().catch(fail);
+  });
+  await page.locator('#modal').getByRole('heading', { name: 'AW-TEST' }).waitFor();
+  assert.equal(await page.evaluate(() => state.queue.length), 0);
+  await page.evaluate(() => window.finishMicrosoftLogin());
+  await page.locator('#modal').waitFor({ state: 'hidden' });
 });

@@ -12,4 +12,4 @@ To regenerate, install `translatepy==2.3` and `opencc-python-reimplemented==0.1.
 
 `tools/generate_fonts.py` builds script-specific subsets from the [Google Fonts repository](https://github.com/google/fonts), with SIL OFL licenses alongside each font. It requires a JDK in JAVA_HOME, `fonttools` and `requests`. It includes locale display names and UI glyphs; missing Latin/Cyrillic symbols are sourced from bundled Onest. Modified families use an AW prefix. Regenerate fonts after adding translated characters.
 
-Verification: `gradlew test -PnoDeploy` checks all dictionary keys and placeholders. The `renderScreens` task can render settings and language lists without opening the desktop launcher.
+Verification: `gradlew test -PnoDeploy` checks all dictionary keys and placeholders.

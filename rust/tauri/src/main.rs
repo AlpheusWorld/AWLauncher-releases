@@ -22,10 +22,10 @@ use std::{
     fs,
     io::{BufRead, BufReader, Write},
     path::{Component, Path, PathBuf},
-    process::{ChildStdin, Stdio},
     sync::{Arc, Mutex},
 };
 use tauri::{ipc::Channel, Manager};
+mod discord;
 #[path = "../../ui/src/translation_core.rs"]
 mod translation_core;
 
@@ -76,9 +76,10 @@ fn running_games(pids: Vec<u32>) -> Vec<u32> {
 }
 #[derive(Default)]
 struct State {
-    backend: Option<PathBuf>,
+    discord: discord::Presence,
+    startup_target: Mutex<Option<String>>,
     profiles: Mutex<HashMap<String, Value>>,
-    tasks: Mutex<HashMap<String, Arc<Mutex<ChildStdin>>>>,
+    tasks: Mutex<HashMap<String, Arc<std::sync::atomic::AtomicBool>>>,
     engine: Mutex<()>,
     image_decoder: Mutex<()>,
 }
@@ -125,90 +126,58 @@ fn run_task(
     request: &Value,
     events: &Channel<Value>,
 ) -> Result<Value, String> {
-    let _engine = if matches!(request["op"].as_str(),Some("checkUpdate" | "accountSkinTextures" | "buildEditor" | "buildLoaderVersions" | "buildVersions" | "buildDeleteInfo" | "buildExportChoices" | "buildMigrationGet")) { None } else { Some(state.engine.lock().map_err(|e| e.to_string())?) };
-    if id.len() > 128 || id.is_empty() {
+    if id.is_empty() || id.len() > 128 {
         return Err("Некорректный номер операции".into());
     }
-    let mut tasks = state.tasks.lock().map_err(|e| e.to_string())?;
-    if tasks.contains_key(id) {
-        return Err("Такая операция уже выполняется".into());
+    if serde_json::to_vec(request)
+        .map_err(|e| e.to_string())?
+        .len()
+        > 65536
+    {
+        return Err("Слишком большой запрос".into());
     }
-    let path = state
-        .backend
-        .as_ref()
-        .ok_or("Не найден JVM-движок. Запусти лаунчер из собранной папки приложения")?;
-    let mut command = backend::backend_command(path)?;
-    command
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null());
-    command.env(
-        "AW_NATIVE_GAMES",
-        request["games"].as_u64().unwrap_or(1).to_string(),
-    );
-    let mut child = command.spawn().map_err(|e| e.to_string())?;
-    let mut registered = false;
-    let result = (|| {
-        let mut input = child.stdin.take().ok_or("Движок не открыл входной поток")?;
-        let bytes = serde_json::to_vec(request).map_err(|e| e.to_string())?;
-        if bytes.len() > 65536 {
-            return Err("Слишком большой запрос".into());
+    let read_only = aw_engine::ops::read_only(request["op"].as_str().unwrap_or(""));
+    let _engine = if read_only {
+        None
+    } else {
+        Some(state.engine.lock().map_err(|e| e.to_string())?)
+    };
+    let root = data_root()?;
+    let _locks = if read_only {
+        Vec::new()
+    } else {
+        aw_engine::operation_locks(&root)?
+    };
+    let cancelled = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    {
+        let mut tasks = state.tasks.lock().map_err(|e| e.to_string())?;
+        if tasks.contains_key(id) {
+            return Err("Такая операция уже выполняется".into());
         }
-        input
-            .write_all(&bytes)
-            .and_then(|_| input.write_all(b"\n"))
-            .and_then(|_| input.flush())
-            .map_err(|e| e.to_string())?;
-        let input = Arc::new(Mutex::new(input));
-        tasks.insert(id.into(), input.clone());
-        registered = true;
-        drop(tasks);
-        let stdout = child
-            .stdout
-            .take()
-            .ok_or("Движок не открыл выходной поток")?;
-        let mut result = None;
-        for line in BufReader::new(stdout).lines() {
-            let line = line.map_err(|e| e.to_string())?;
-            let Some(line) = line.strip_prefix("AW_RPC ") else {
-                continue;
-            };
-            let event: Value = serde_json::from_str(line).map_err(|e| e.to_string())?;
-            match event["type"].as_str() {
-                Some("done") => result = Some(Ok(event["data"].clone())),
-                Some("failed") => {
-                    result = Some(Err(event["data"]
-                        .as_str()
-                        .unwrap_or("Операция не выполнена")
-                        .to_owned()))
-                }
-                Some("cancelled") => result = Some(Err("Операция отменена".into())),
-                _ => {}
-            }
-            if events.send(event).is_err() {
-                if let Ok(mut input) = input.lock() {
-                    let _ = input.write_all(b"cancel\n");
-                    let _ = input.flush();
-                }
-                return Err("Окно операции закрыто".into());
-            }
+        tasks.insert(id.to_owned(), cancelled.clone());
+    }
+    let event = |value| {
+        if events.send(value).is_err() {
+            cancelled.store(true, std::sync::atomic::Ordering::Relaxed);
         }
-        result.unwrap_or_else(|| Err("Движок завершился без результата".into()))
-    })();
-    if registered {
-        if let Ok(mut tasks) = state.tasks.lock() {
-            tasks.remove(id);
+    };
+    let context = aw_engine::Context {
+        root,
+        cancelled: cancelled.clone(),
+        event: &event,
+    };
+    let result = aw_engine::ops::execute(&context, request);
+    state.tasks.lock().map_err(|e| e.to_string())?.remove(id);
+    let _ = events.send(match &result {
+        Ok(value) => json!({"type":"done","data":value}),
+        Err(_) if cancelled.load(std::sync::atomic::Ordering::Relaxed) => {
+            json!({"type":"cancelled"})
         }
-    }
-    if result.is_err() {
-        let _ = child.kill();
-    }
-    let status = child.wait().map_err(|e| e.to_string())?;
-    if !status.success() && result.is_ok() {
-        return Err("Движок завершился с ошибкой".into());
-    }
+        Err(message) => json!({"type":"failed","data":message}),
+    });
     result
 }
+
 #[tauri::command]
 async fn request(
     app: tauri::AppHandle,
@@ -220,6 +189,14 @@ async fn request(
         let state = app.state::<State>();
         let mut result = run_task(&state, &id, &request, &events)?;
         if request["op"] == "launcherState" {
+            if let Some(target) = state
+                .startup_target
+                .lock()
+                .map_err(|e| e.to_string())?
+                .take()
+            {
+                result["startupTarget"] = json!(target);
+            }
             let mut profiles = state.profiles.lock().map_err(|e| e.to_string())?;
             profiles.clear();
             if let Some(builds) = result["builds"].as_array_mut() {
@@ -241,8 +218,18 @@ async fn request(
             let store = settings::Store::load(data_root()?.join("launcher.json"));
             result["totalMemory"] = json!(store.total_mb);
             result["recommendedMemory"] = json!(settings::recommended(store.total_mb));
+            if std::env::var_os("AW_SMOKE_READY").as_deref() == Some(std::ffi::OsStr::new("1")) {
+                eprintln!("AW_SMOKE: launcher state returned to WebView");
+            }
         }
         if request["op"] == "launch" {
+            if let Some(pid) = result["pid"].as_u64().and_then(|id| u32::try_from(id).ok()) {
+                if let Some(key) = request["target"].as_str() {
+                    if let Ok(build) = profile(&state, key) {
+                        state.discord.game_started(pid, build);
+                    }
+                }
+            }
             let keep_open = settings::Store::load(data_root()?.join("launcher.json"))
                 .boolean("keepLauncherOpen", false);
             if !keep_open {
@@ -270,12 +257,8 @@ async fn request(
 }
 #[tauri::command]
 fn cancel(state: tauri::State<State>, id: String) -> Result<(), String> {
-    if let Some(input) = state.tasks.lock().map_err(|e| e.to_string())?.get(&id) {
-        let mut input = input.lock().map_err(|e| e.to_string())?;
-        input
-            .write_all(b"cancel\n")
-            .and_then(|_| input.flush())
-            .map_err(|e| e.to_string())?;
+    if let Some(cancelled) = state.tasks.lock().map_err(|e| e.to_string())?.get(&id) {
+        cancelled.store(true, std::sync::atomic::Ordering::Relaxed);
     }
     Ok(())
 }
@@ -415,14 +398,27 @@ async fn search(
 }
 fn main() {
     let args: Vec<_> = std::env::args_os().collect();
-    let backend = args
-        .windows(2)
-        .find(|a| a[0] == "--backend")
-        .map(|a| PathBuf::from(&a[1]))
-        .or_else(|| std::env::var_os("AW_LAUNCHER_BACKEND").map(PathBuf::from));
+    if args.get(1).is_some_and(|a| a == "--native-task") {
+        native_cli();
+        return;
+    }
+    let value_after = |flag: &str| {
+        args.windows(2)
+            .find(|a| a[0] == flag)
+            .map(|a| a[1].to_string_lossy().to_string())
+    };
+    let startup_target = value_after("--launch-build")
+        .or_else(|| value_after("--build").map(|v| format!("build:{v}")))
+        .or_else(|| value_after("--pack").map(|v| format!("pack:{v}")));
     tauri::Builder::default()
+        .setup(|app| {
+            if let Ok(root) = data_root() {
+                app.state::<State>().discord.start(root);
+            }
+            Ok(())
+        })
         .manage(State {
-            backend,
+            startup_target: Mutex::new(startup_target),
             ..Default::default()
         })
         .invoke_handler(tauri::generate_handler![
@@ -438,18 +434,63 @@ fn main() {
         ])
         .on_window_event(|window, event| {
             if matches!(event, tauri::WindowEvent::Destroyed) {
+                window.state::<State>().discord.stop();
                 if let Ok(tasks) = window.state::<State>().tasks.lock() {
-                    for input in tasks.values() {
-                        if let Ok(mut input) = input.lock() {
-                            let _ = input.write_all(b"cancel\n");
-                            let _ = input.flush();
-                        }
+                    for cancelled in tasks.values() {
+                        cancelled.store(true, std::sync::atomic::Ordering::Relaxed);
                     }
                 }
             }
         })
         .run(tauri::generate_context!())
         .expect("Run AWLauncher");
+}
+fn native_cli() {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    let mut reader = BufReader::new(std::io::stdin());
+    let mut line = String::new();
+    if reader.read_line(&mut line).is_err() || line.len() > 65536 {
+        return;
+    }
+    let cancelled = Arc::new(AtomicBool::new(false));
+    let signal = cancelled.clone();
+    std::thread::spawn(move || {
+        let mut command = String::new();
+        while reader.read_line(&mut command).unwrap_or(0) > 0 {
+            if command.trim() == "cancel" {
+                signal.store(true, Ordering::Relaxed);
+                break;
+            }
+            command.clear();
+        }
+    });
+    let event = |value: Value| {
+        let _ = writeln!(std::io::stdout().lock(), "AW_RPC {value}");
+    };
+    let result = (|| {
+        let request: Value = serde_json::from_str(&line).map_err(|_| "Некорректный запрос")?;
+        let root = std::env::var_os("AW_NATIVE_DATA_HOME")
+            .map(PathBuf::from)
+            .or_else(home_dir)
+            .ok_or("Нет домашней папки")?
+            .join(".aw");
+        let _locks = if aw_engine::ops::read_only(request["op"].as_str().unwrap_or("")) {
+            Vec::new()
+        } else {
+            aw_engine::operation_locks(&root)?
+        };
+        let context = aw_engine::Context {
+            root,
+            cancelled: cancelled.clone(),
+            event: &event,
+        };
+        aw_engine::ops::execute(&context, &request)
+    })();
+    event(match result {
+        Ok(data) => json!({"type":"done","data":data}),
+        Err(_) if cancelled.load(Ordering::Relaxed) => json!({"type":"cancelled"}),
+        Err(error) => json!({"type":"failed","data":error}),
+    });
 }
 
 #[cfg(test)]

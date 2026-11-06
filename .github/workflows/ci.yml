@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, codex/retire-jvm]
   pull_request:
   workflow_dispatch:
 
@@ -28,6 +28,7 @@ jobs:
 
       - name: Test native UI
         run: |
+          cargo test --locked --manifest-path rust/engine/Cargo.toml
           cargo test --locked --manifest-path rust/ui/Cargo.toml
           cargo test --locked --manifest-path rust/tauri/Cargo.toml
           cd rust/tauri
@@ -43,6 +44,7 @@ jobs:
 
   verify-linux:
     runs-on: ubuntu-24.04
+    timeout-minutes: 40
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -58,17 +60,30 @@ jobs:
           cache: gradle
 
       - name: Install desktop and packaging dependencies
+        timeout-minutes: 8
         run: |
           sudo apt-get update
           sudo apt-get install -y libsecret-tools gnome-keyring dbus-x11 xvfb libgl1 libegl1 libgtk-3-dev libwebkit2gtk-4.1-dev libxrender1 libxtst6 libxi6 libxkbcommon-dev libxkbcommon-x11-dev libxcb-shape0-dev libxcb-xfixes0-dev libwayland-dev libx11-dev libxrandr-dev libxcursor-dev libxinerama-dev libegl1-mesa-dev pkg-config rpm fakeroot desktop-file-utils pkexec
 
-      - name: Test Linux integrations and build DEB and RPM
+      - name: Test Rust and Secret Service on Linux
+        timeout-minutes: 12
+        env:
+          CARGO_PROFILE_DEV_DEBUG: '0'
+        run: |
+          xvfb-run -a dbus-run-session -- bash -euc '
+            printf "awlauncher-ci-keyring" | gnome-keyring-daemon --unlock --components=secrets >/dev/null
+            export AW_ENGINE_TEST_JDK="$JAVA_HOME"
+            cargo test --locked --manifest-path rust/engine/Cargo.toml -- --include-ignored
+          '
+
+      - name: Build DEB and RPM without a JVM payload
         run: |
           chmod +x gradlew
-          dbus-run-session -- bash -euc '
-            printf "awlauncher-ci-keyring" | gnome-keyring-daemon --unlock --components=secrets >/dev/null
-            xvfb-run -a ./gradlew test packageDistributionForCurrentOS -PnoDeploy --no-daemon --max-workers=2 "-Dorg.gradle.jvmargs=-Xmx2g -Dfile.encoding=UTF-8"
-          '
+          ./gradlew packageDistributionForCurrentOS -PnoDeploy --no-daemon --max-workers=2 "-Dorg.gradle.jvmargs=-Xmx2g -Dfile.encoding=UTF-8"
+          if dpkg-deb -c build/compose/binaries/main/deb/*.deb | grep -E '\.jar$|/lib/runtime/'; then
+            echo "Unexpected JVM payload in DEB"
+            exit 1
+          fi
 
       - name: Verify the installed Linux application starts
         env:
@@ -81,12 +96,7 @@ jobs:
           sudo dpkg --install build/compose/binaries/main/deb/*.deb
           app_binary=$(dpkg -L awlauncher | awk '/\/bin\/AWLauncher$/ { print; exit }')
           test -n "$app_binary"
-          set +e
-          timeout -k 5s 45s xvfb-run -a dbus-run-session -- "$app_binary"
-          status=$?
-          set -e
-          test "$status" -eq 124 -o "$status" -eq 0
-          grep -R -F 'startup: native launcher ready' "$HOME/.aw/logs"
+          xvfb-run -a dbus-run-session -- python3 -u tools/tests/rust_linux_smoke.py "$app_binary" --minecraft
 
       - name: Retain Linux packages and test results
         continue-on-error: true

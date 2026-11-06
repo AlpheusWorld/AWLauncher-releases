@@ -1,0 +1,36 @@
+[package]
+name = "aw-engine"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+serde_json = "1"
+serde = { version = "1", features = ["derive"] }
+chrono = { version = "0.4", default-features = false, features = ["std"] }
+rusqlite = { version = "0.37", features = ["bundled"] }
+javaproperties = "0.1"
+pulldown-cmark = "0.13"
+ammonia = "4"
+trash = "5"
+ring = "0.17"
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls", "multipart"] }
+base64 = "0.22"
+sha1 = "0.10"
+sha2 = "0.10"
+md-5 = "0.10"
+uuid = { version = "1", features = ["v3", "v4"] }
+regex = "1"
+zip = { version = "2", default-features = false, features = ["deflate"] }
+image = { version = "0.25", default-features = false, features = ["png"] }
+aes-gcm = "0.10"
+getrandom = "0.2"
+fs2 = "0.4"
+p256 = { version = "0.13", features = ["ecdsa"] }
+rfd = { version = "0.15", default-features = false, features = ["xdg-portal", "async-std"] }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Security_Cryptography", "Win32_Foundation", "Win32_System_Memory", "Win32_Storage_FileSystem", "Win32_System_SystemInformation"] }

@@ -208,7 +208,7 @@ function renderChrome() {
       .map(([page, i, label]) =>
         page === "caption"
           ? '<span class="caption">ДРУГОЕ</span>'
-          : `<button data-page="${page}" class="${page === (state.route.page === "instance" ? "library" : state.route.page === "project" ? "catalog" : state.route.page) ? "active" : ""}" ${page === "friends" ? 'disabled title="Раздел не перенесён в версии 1.0.50"' : ""}>${icon(i)}<span>${label}</span></button>`,
+          : `<button data-page="${page}" class="${page === (state.route.page === "instance" ? "library" : state.route.page === "project" ? "catalog" : state.route.page) ? "active" : ""}" ${page === "friends" ? 'disabled' : ""}>${icon(i)}<span>${label}</span></button>`,
       )
       .join("");
   $("#crumb").textContent =
@@ -476,7 +476,7 @@ async function homePage() {
   const pending = state.queue.filter((x) =>
     ["waiting", "running"].includes(x.status),
   );
-  return `<section class="home constrained"><div class="row spread"><h1>Играть</h1>${btn("Все сборки　→", "library", "link")}</div><div class="home-grid"><article class="hero"><div class="row spread"><small>Выбранная сборка</small><small>${b ? (b.ready ? "Готова к игре" : "Не установлена") : ""}</small></div><div class="hero-middle"><div class="grow"><h2>${esc(b?.name || "Начни новую игру")}</h2><p>${b ? (b.lastPlayed ? "Последний запуск: " + date(b.lastPlayed) : "Ещё не запускалась") : "Создай сборку или выбери модпак из каталога"}</p><div class="row">${b ? btn(icon("play") + (b.ready ? "Играть" : "Установить и играть"), "launch", "primary", `data-target="${esc(b.key)}"`) + btn("Настроить", "build-settings", "", `data-target="${esc(b.key)}"`) : btn("Новая сборка", "create-build", "primary")}</div></div>${b ? `<div class="hero-art">${buildIcon(b)}${btn("Изменить иконку", "icon-editor", "", `data-target="${esc(b.key)}"`)}</div>` : ""}</div>${b ? `<div class="hero-meta"><div><small>Версия</small>${esc(b.version)}</div><div><small>Загрузчик</small>${esc(b.loader)}</div><div><small>Содержимое</small>Проектов: ${b.contentCount ?? b.options.catalogMods?.length ?? 0}</div>${btn("›", "open-build", "quiet", `data-target="${esc(b.key)}"`)}</div>` : ""}</article><aside class="home-side"><div class="panel"><div class="row spread"><h3>Загрузки</h3>${btn(icon("download"), "downloads", "icon-button")}</div><p>${pending.length ? `В очереди: ${pending.length}` : "Загрузок пока нет"}</p>${pending[0] ? `<div class="track"><i style="width:${(pending[0].fraction || 0) * 100}%"></i></div>` : ""}</div><div class="panel activity-card" id="home-activity" role="button" tabindex="0" data-action="activity" aria-label="Открыть активность"><small>Время в игре</small><h2 style="margin:6px 0">${stats ? ms(stats.week_ms) : "…"}</h2><small>Эта неделя</small>${stats ? miniBars(stats) : ""}</div></aside></div><div class="row spread"><h2>Мои сборки</h2>${btn("Все сборки　→", "library", "link")}</div><div class="home-builds">${
+  return `<section class="home constrained"><div class="row spread"><h1>Играть</h1>${btn("Все сборки　→", "library", "link")}</div><div class="home-grid"><article class="hero"><div class="row spread"><small>Выбранная сборка</small><small>${b ? (b.ready ? "Готова к игре" : "Не установлена") : ""}</small></div><div class="hero-middle"><div class="grow"><h2>${esc(b?.name || "Начни новую игру")}</h2><p>${b ? (b.lastPlayed ? "Последний запуск: " + date(b.lastPlayed) : "Ещё не запускалась") : "Создай сборку или выбери модпак из каталога"}</p><div class="row">${b ? btn(icon("play") + (b.ready ? "Играть" : "Установить и играть"), "launch", "primary", `data-target="${esc(b.key)}"`) + btn("Настроить", "build-settings", "", `data-target="${esc(b.key)}"`) : btn("Новая сборка", "create-build", "primary")}${btn("Импорт модпака", "import-pack")}${btn("Импорт профиля", "import-profile")}</div></div>${b ? `<div class="hero-art">${buildIcon(b)}${btn("Изменить иконку", "icon-editor", "", `data-target="${esc(b.key)}"`)}</div>` : ""}</div>${b ? `<div class="hero-meta"><div><small>Версия</small>${esc(b.version)}</div><div><small>Загрузчик</small>${esc(b.loader)}</div><div><small>Содержимое</small>Проектов: ${b.contentCount ?? b.options.catalogMods?.length ?? 0}</div>${btn("›", "open-build", "quiet", `data-target="${esc(b.key)}"`)}</div>` : ""}</article><aside class="home-side"><div class="panel"><div class="row spread"><h3>Загрузки</h3>${btn(icon("download"), "downloads", "icon-button")}</div><p>${pending.length ? `В очереди: ${pending.length}` : "Загрузок пока нет"}</p>${pending[0] ? `<div class="track"><i style="width:${(pending[0].fraction || 0) * 100}%"></i></div>` : ""}</div><div class="panel activity-card" id="home-activity" role="button" tabindex="0" data-action="activity" aria-label="Открыть активность"><small>Время в игре</small><h2 style="margin:6px 0">${stats ? ms(stats.week_ms) : "…"}</h2><small>Эта неделя</small>${stats ? miniBars(stats) : ""}</div></aside></div><div class="row spread"><h2>Мои сборки</h2>${btn("Все сборки　→", "library", "link")}</div><div class="home-builds">${
     state.data.builds
       .slice(0, 3)
       .map((b) => buildRow(b, true))
@@ -484,7 +484,7 @@ async function homePage() {
   }</div></section>`;
 }
 async function libraryPage() {
-  return `<section class="constrained stack"><div class="row spread"><h1>Мои сборки</h1><div class="row">${btn(icon("folder") + "Группы", "groups")}${btn(icon("add") + "Новая сборка", "create-build", "primary")}</div></div><div class="toolbar">${searchField("build-query", "Поиск сборок…")}${btn("Фильтры", "filters")}</div><div class="row spread"><select id="build-sort" style="width:180px"><option value="recent">Недавнее</option><option value="name">По названию</option><option value="favorite">Избранное</option></select>${btn("Активность →", "activity", "link")}</div><div id="library-filters" hidden><div class="row"><select id="loader-filter"><option value="">Все загрузчики</option>${[...new Set(state.data.builds.map((b) => b.loader))].map((x) => `<option>${esc(x)}</option>`).join("")}</select><select id="group-filter"><option value="">Все группы</option>${(state.data.settings.libraryGroups || []).map((g) => `<option value="${esc(g.id)}">${esc(g.name)}</option>`).join("")}</select></div></div><div class="row spread"><strong>Все сборки</strong><small id="build-count">${state.data.builds.length}</small></div><div class="build-list" id="build-list">${state.data.builds.map((b) => buildRow(b)).join("")}</div></section>`;
+  return `<section class="constrained stack"><div class="row spread"><h1>Мои сборки</h1><div class="row">${btn(icon("folder") + "Группы", "groups")}${btn(icon("add") + "Новая сборка", "create-build", "primary")}${btn("Импорт модпака", "import-pack")}${btn("Импорт профиля", "import-profile")}</div></div><div class="toolbar">${searchField("build-query", "Поиск сборок…")}${btn("Фильтры", "filters")}</div><div class="row spread"><select id="build-sort" style="width:180px"><option value="recent">Недавнее</option><option value="name">По названию</option><option value="favorite">Избранное</option></select>${btn("Активность →", "activity", "link")}</div><div id="library-filters" hidden><div class="row"><select id="loader-filter"><option value="">Все загрузчики</option>${[...new Set(state.data.builds.map((b) => b.loader))].map((x) => `<option>${esc(x)}</option>`).join("")}</select><select id="group-filter"><option value="">Все группы</option>${(state.data.settings.libraryGroups || []).map((g) => `<option value="${esc(g.id)}">${esc(g.name)}</option>`).join("")}</select></div></div><div class="row spread"><strong>Все сборки</strong><small id="build-count">${state.data.builds.length}</small></div><div class="build-list" id="build-list">${state.data.builds.map((b) => buildRow(b)).join("")}</div></section>`;
 }
 async function catalogPage() {
   const c = { ...state.catalog },
@@ -568,7 +568,7 @@ async function catalogPage() {
   }</div><div class="pagination">${btn("←", "catalog-page", "", `data-offset="${Math.max(0, c.offset - 20)}" ${c.offset === 0 ? "disabled" : ""}`)}<span class="badge">${Math.floor(c.offset / 20) + 1}</span><small>/ ${Math.max(1, Math.ceil(page.total_hits / 20))}</small>${btn("→", "catalog-page", "", `data-offset="${c.offset + 20}" ${c.offset + 20 >= page.total_hits ? "disabled" : ""}`)}</div></section>`;
 }
 function downloadsPage() {
-  return `<section class="stack grow"><h1>Загрузки</h1><div class="toolbar">${btn(icon("play") + (state.paused ? "Продолжить очередь" : "Приостановить очередь"), "pause", "", state.queue.some((x) => x.status === "waiting") ? "" : "disabled")}${btn("Очистить завершённые", "clear-downloads", "", state.queue.some((x) => ["done", "failed", "cancelled"].includes(x.status)) ? "" : "disabled")}</div><div class="row"><h2>Очередь</h2><small>${state.queue.filter((x) => x.status === "running").length} активных</small></div>${state.queue.length ? state.queue.map((x) => `<article class="panel stack"><div class="row spread"><strong>${esc(x.title)}</strong><span class="badge">${{ waiting: "В очереди", running: "Загружаю", done: "Готово", failed: "Ошибка", cancelled: "Отменено" }[x.status]}</span></div><p class="${x.status === "failed" ? "error" : ""}">${esc(x.error || x.stage || "")}</p>${x.status === "running" ? `<div class="track"><i style="width:${Math.round((x.fraction || 0) * 100)}%"></i></div><small>${Math.round((x.fraction || 0) * 100)}%　${x.speed ? Math.round(x.speed / 1048576) + " МБ/с" : ""}</small>${btn("Отменить", "cancel", "", `data-id="${x.id}" ${x.cancellable===false?'disabled':''}`)}` : x.status === "failed" ? btn("Повторить", "retry", "", `data-id="${x.id}"`) : ""}${x.login ? `<div class="high"><p>Открой ${esc(x.login.url)} и введи код</p><h2>${esc(x.login.code)}</h2>${btn("Скопировать код", "copy-code", "", `data-code="${esc(x.login.code)}"`)}</div>` : ""}</article>`).join("") : `<div class="empty grow">${icon("download")}<h3>Загрузок пока нет</h3><p>Добавляй моды и сборки из каталога — они загрузятся по очереди</p></div>`}</section>`;
+  return `<section class="stack grow"><h1>Загрузки</h1><div class="toolbar">${btn(icon("play") + (state.paused ? "Продолжить очередь" : "Приостановить очередь"), "pause", "", state.queue.some((x) => x.status === "waiting") ? "" : "disabled")}${btn("Очистить завершённые", "clear-downloads", "", state.queue.some((x) => ["done", "failed", "cancelled"].includes(x.status)) ? "" : "disabled")}</div><div class="row"><h2>Очередь</h2><small>${state.queue.filter((x) => x.status === "running").length} активных</small></div>${state.queue.length ? state.queue.map((x) => `<article class="panel stack"><div class="row spread"><strong>${esc(x.title)}</strong><span class="badge">${{ waiting: "В очереди", running: "Загружаю", done: "Готово", failed: "Ошибка", cancelled: "Отменено" }[x.status]}</span></div><p class="${x.status === "failed" ? "error" : ""}">${esc(x.error || x.stage || "")}</p>${x.status === "running" ? `<div class="track"><i style="width:${Math.round((x.fraction || 0) * 100)}%"></i></div><small>${Math.round((x.fraction || 0) * 100)}%　${x.speed ? Math.round(x.speed / 1048576) + " МБ/с" : ""}</small>${btn("Отменить", "cancel", "", `data-id="${x.id}" ${x.cancellable===false?'disabled':''}`)}` : x.status === "failed" ? btn("Повторить", "retry", "", `data-id="${x.id}"`) : ""}</article>`).join("") : `<div class="empty grow">${icon("download")}<h3>Загрузок пока нет</h3><p>Добавляй моды и сборки из каталога — они загрузятся по очереди</p></div>`}</section>`;
 }
 let catalogSequence = 0;
 async function updateCatalog() {
@@ -1170,9 +1170,9 @@ function pumpImages() {
       });
   }
 }
-const localOperations = new Set(["saveOptions", "rename", "shortcut", "createBuild", "accountOffline", "checkUpdate", "snapshot", "restore", "duplicate", "buildDelete", "remove", "buildExport"]);
+const downloadOperations = new Set(["importPack", "install", "updateItem", "buildDownload", "buildReinstall", "buildMigrationApply"]);
 const immediateOperations = new Map();
-async function runImmediate(title, request, callbacks) {
+async function runImmediate(request, callbacks) {
   const key=JSON.stringify(request);
   if(immediateOperations.has(key))return immediateOperations.get(key);
   const operation=(async()=>{
@@ -1233,7 +1233,7 @@ async function launchGame(target) {
 }
 async function enqueue(title, request, callbacks = {}) {
   if (request.op === "launch") return launchGame(request.target);
-  if(localOperations.has(request.op))return runImmediate(title,request,callbacks);
+  if (!downloadOperations.has(request.op)) return runImmediate(request, callbacks);
   state.queue.push({
     id: `task-${++state.serial}`,
     title,
@@ -1253,8 +1253,6 @@ async function pump() {
   state.running = true;
   item.status = "running";
   try {
-    if (item.request.op === "launch" && state.accountSelection)
-      await state.accountSelection.promise;
     item.result = await rpc(
       item.request,
       (event) => {
@@ -1264,21 +1262,12 @@ async function pump() {
           item.fraction = event.data.fraction;
           item.speed = event.data.bytesPerSecond;
         }
-        if (event.type === "login") {
-          item.login = event.data;
-          navigate("downloads");
-        }
         updateQueue();
       },
       item.id,
     );
     if (item.result?.failed) throw new Error(item.result.message || "Операция не завершена");
     item.status = "done";
-    if (item.request.op === "launch") {
-      state.games = state.games || [];
-      state.games.push(item.result.pid);
-      $("#game-status").textContent = "● Игра запущена";
-    }
     toast(
       typeof item.result === "string"
         ? item.result
@@ -1345,7 +1334,7 @@ const settingsTabs = [
   ["appearance", "image", "Внешний вид", "Внешний вид"],
   ["language", "file", "Язык", "Язык приложения"],
   ["downloads", "download", "Загрузки", "Загрузка и целостность"],
-  ["discord", "friends", "Discord", "Discord Rich Presence"],
+  ["discord", "settings", "Discord", "Discord Rich Presence"],
   ["about", "file", "О лаунчере", "Версия лаунчера"],
 ];
 function openSettings(tab = state.settingsTab) {
@@ -1383,7 +1372,7 @@ function settingsBody(tab) {
     case "accounts":
       return `<div class="high" data-account-rows>${accountRows(false)}</div><hr><h3>Добавить аккаунт</h3><div class="chips">${btn("Microsoft", "account-mode", state.accountMode === "MICROSOFT" ? "active" : "", 'data-mode="MICROSOFT"')}${btn("Офлайн", "account-mode", state.accountMode === "OFFLINE" ? "active" : "", 'data-mode="OFFLINE"')}</div>${state.accountMode === "MICROSOFT" ? `<p>Подтверди вход по коду в браузере Microsoft</p><small>Нужен аккаунт с Minecraft Java Edition</small>${btn("Войти через Microsoft", "login", "primary")}` : `<form id="offline-account" class="stack"><input name="name" placeholder="Никнейм" pattern="[A-Za-z0-9_]{3,16}" minlength="3" maxlength="16" required aria-label="Никнейм"><small>От 3 до 16 латинских букв, цифр или символов подчёркивания</small><button class="primary">Добавить аккаунт</button></form>`}`;
     case "general":
-      return `<div class="high"><h3>Поведение лаунчера</h3>${switchRow("Не закрывать лаунчер при запуске игры", "keepLauncherOpen", s.keepLauncherOpen)}${switchRow("Игра с друзьями", "friendsEnabled", s.friendsEnabled)}</div>`;
+      return `<div class="high"><h3>Поведение лаунчера</h3>${switchRow("Не закрывать лаунчер при запуске игры", "keepLauncherOpen", s.keepLauncherOpen)}</div>`;
     case "game":
       return `<div class="high"><h3>Память</h3><p style="margin-top:8px">${Math.round(((s.memoryMb || 4096) / 1024) * 10) / 10} ГБ для игры · в компьютере ${Math.round(state.data.totalMemory / 1024)} ГБ</p><p class="accent" style="margin-top:10px">Рекомендуется для этого ПК: ${Math.round(state.data.recommendedMemory / 1024)} ГБ</p><input id="memory-range" type="range" min="512" max="${state.data.totalMemory - 1024}" step="256" value="${s.memoryMb || 4096}" aria-label="Память для игры"><form id="memory-form"><div class="field"><label for="memory-value">Своя память, МБ</label><input id="memory-value" type="number" min="512" max="${state.data.totalMemory - 1024}" value="${s.memoryMb || 4096}" required><small>От 512 до ${state.data.totalMemory - 1024} МБ · оставляем память системе</small></div><div class="row"><button class="quiet">Применить</button>${btn("Использовать рекомендуемую", "recommended", "quiet", 'type="button"')}</div></form></div><div class="high"><h3>Список версий</h3>${switchRow("Показывать снапшоты", "showSnapshots", s.showSnapshots)}${switchRow("Показывать alpha и beta", "showOldVersions", s.showOldVersions)}</div><form id="jvm-form" class="high stack"><h3>Аргументы JVM</h3><textarea id="jvm-args" rows="4" aria-label="Аргументы JVM">${esc(s.jvmArgs || "")}</textarea><button>Сохранить</button></form>`;
     case "appearance":
@@ -1407,7 +1396,7 @@ function settingsBody(tab) {
     case "downloads":
       return `<div class="high stack"><h3>Загрузка и целостность</h3><p id="threads-label">Потоков загрузки: ${s.downloadConcurrency || "Авто"}</p><input id="threads-range" type="range" min="4" max="32" step="1" value="${s.downloadConcurrency || 16}" aria-label="Потоки загрузки"><div class="row" style="flex-wrap:wrap">${btn("Сбросить кэш проверки", "reset-cache", "quiet")}${btn(icon("folder") + "Открыть папку лаунчера", "open-root", "quiet")}</div><small>Сброс кэша проверки помогает, когда игра вылетает из-за повреждённых файлов: лаунчер перепроверит и докачает всё, что не сходится</small></div>`;
     case "discord":
-      return `<h3>Discord Rich Presence</h3><p>Покажи друзьям, во что играешь</p><div class="high"><div class="row"><img src="assets/mark.png" width="64" height="64" alt=""><div><h3>AWLauncher</h3><p>В лаунчере</p><small>Выбирает следующую сборку</small></div></div><hr><small>С таймером текущей сессии и кнопкой сайта</small></div><div class="high">${switchRow("Показывать активность в Discord", "discordPresence", s.discordPresence, "Сборка, версия Minecraft и время игры")}${switchRow("Показывать открытый лаунчер", "discordShowLauncher", s.discordShowLauncher, "Если выключить, активность появится только во время игры")}${switchRow("Показывать название сборки", "discordShowInstance", s.discordShowInstance, "Для сборок из каталога добавится кнопка их страницы")}${switchRow("Показывать адрес сервера", "discordShowServer", s.discordShowServer, "Друзья увидят адрес сервера")}</div><small>Параметры используются существующим игровым движком</small>`;
+      return `<h3>Discord Rich Presence</h3><p>Покажи друзьям, во что играешь</p><div class="high"><div class="row"><img src="assets/mark.png" width="64" height="64" alt=""><div><h3>AWLauncher</h3><p>В лаунчере</p><small>Выбирает следующую сборку</small></div></div><hr><small>С таймером текущей сессии и кнопкой сайта</small></div><div class="high">${switchRow("Показывать активность в Discord", "discordPresence", s.discordPresence, "Сборка, версия Minecraft и время игры")}${switchRow("Показывать открытый лаунчер", "discordShowLauncher", s.discordShowLauncher, "Если выключить, активность появится только во время игры")}${switchRow("Показывать название сборки", "discordShowInstance", s.discordShowInstance, "Для сборок из каталога добавится кнопка их страницы")}${switchRow("Показывать адрес сервера", "discordShowServer", s.discordShowServer, "Друзья увидят адрес сервера")}</div>`;
     case "about":
       return `<h3>О лаунчере</h3><div class="row" style="margin:8px 0"><img src="assets/mark.png" width="40" height="40" alt=""><h1><span class="accent">AW</span>Launcher</h1></div><p>Версия лаунчера: ${esc(state.data.version)}</p><div id="about-update" class="row wrap">${btn("Проверить обновления", "check-update")}</div><hr>${btn(icon("folder") + "Открыть папку лаунчера", "open-root")}`;
   }
@@ -2075,6 +2064,39 @@ const actions = {
     state.catalog.installed = false;
     navigate("catalog");
   },
+  "import-profile": async () => {
+    const result = await rpc({op: "importProfile"});
+    if (result?.choose) {
+      state.profileImport = result;
+      showModal("Выбери профиль Minecraft", result.choose.map((item, index) =>
+        btn(esc(item.name) + " · " + esc(item.version || "Версия не определена") + " · " + esc(item.loader), "import-profile-choice", "", 'data-index="' + index + '"')).join(""));
+    } else if (result) {
+      await refresh();
+      await render();
+      toast(result);
+    }
+  },
+  "import-profile-choice": async (el) => {
+    const selection = state.profileImport;
+    const profile = selection?.choose[Number(el.dataset.index)];
+    if (!profile) return;
+    if (!profile.version && el.dataset.action !== "import-profile-version") {
+      const versions = (await rpc({op: "versions"})).filter(v => v.type === "release");
+      showModal("Выбери версию Minecraft", '<select id="profile-import-version">' +
+        versions.map(v => '<option value="' + esc(v.id) + '">' + esc(v.id) + '</option>').join("") +
+        '</select>' + btn("Импортировать", "import-profile-version", "primary", 'data-index="' + Number(el.dataset.index) + '"'));
+      return;
+    }
+    const version = profile.version || $("#profile-import-version")?.value;
+    const result = await rpc({op: "importProfile", file: selection.source, project: profile.id, version});
+    state.profileImport = null;
+    el.closest("dialog")?.close();
+    await refresh();
+    await render();
+    toast(result);
+  },
+  "import-profile-version": (el) => actions["import-profile-choice"](el),
+  "import-pack": () => enqueue("Импорт модпака", {op:"importPack"}),
   "import-files": () => {
     showModal(
       "Добавить файлы",
@@ -2208,10 +2230,36 @@ const actions = {
     state.accountMode = el.dataset.mode;
     openSettings("accounts");
   },
-  login: () => {
+  login: async () => {
     $("#settings").close();
-    navigate("downloads");
-    return enqueue("Вход через Microsoft", { op: "accountMicrosoft" });
+    showModal("Вход через Microsoft", "<p>Запрашиваю код входа…</p>");
+    const modal = $("#modal");
+    const id = `login-${++state.serial}`;
+    let cancelled = false;
+    const cancelLogin = () => {
+      cancelled = true;
+      invoke("cancel", { id }).catch(fail);
+    };
+    modal.addEventListener("close", cancelLogin, { once: true });
+    try {
+      await rpc({ op: "accountMicrosoft" }, event => {
+        if (event.type !== "login") return;
+        if (cancelled || !modal.open) {
+          invoke("cancel", { id }).catch(fail);
+          return;
+        }
+        const { url, code } = event.data;
+        showModal("Вход через Microsoft", `<p>Открой ${esc(url)} и введи код</p><h2>${esc(code)}</h2>${btn("Скопировать код", "copy-code", "", `data-code="${esc(code)}"`)}`);
+      }, id);
+      await refresh();
+      await render({ refresh: true });
+      toast("Аккаунт добавлен");
+    } catch (error) {
+      if (!cancelled) throw error;
+    } finally {
+      modal.removeEventListener("close", cancelLogin);
+      if (!cancelled) modal.close();
+    }
   },
   "select-account": (el) => selectAccount(el.dataset.id),
   "edit-account": el => {
@@ -2612,6 +2660,7 @@ for (const dialog of document.querySelectorAll("dialog"))
   state.languages = await fetch("assets/languages.json").then((r) => r.json());
   await refresh();
   await render();
+  if (state.data.startupTarget) launchGame(state.data.startupTarget).catch(fail);
   launcherUpdateOperation(false, true);
 })().catch((error) => {
   $("#main").innerHTML =

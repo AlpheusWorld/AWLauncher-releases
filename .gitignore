@@ -39,6 +39,7 @@ __pycache__/
 *.dpapi.json
 
 /rust/hash/target/
+/rust/engine/target/
 /rust/ui/target/
 /rust/tauri/dist/
 /rust/tauri/target/

@@ -3,50 +3,24 @@ import org.jetbrains.compose.desktop.application.tasks.AbstractJPackageTask
 import java.security.MessageDigest
 import java.util.Base64
 import java.util.UUID
-import java.util.zip.ZipFile
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 
 plugins {
+    // Required by the jpackage build plugin. No Kotlin launcher sources are compiled.
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.kotlin.compose)
-    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.compose)
 }
 
 group = "ru.aw"
-version = "1.0.54"
+version = "1.0.55"
 
-kotlin {
-    jvmToolchain(21)
+java {
+    toolchain.languageVersion.set(JavaLanguageVersion.of(21))
 }
 
-dependencies {
-    implementation(compose.desktop.currentOs)
-    implementation(compose.material3)
-
-    implementation(libs.coroutines.core)
-    implementation(libs.coroutines.swing)
-    implementation(libs.serialization.json)
-    implementation(libs.okhttp)
-    implementation(libs.jna)
-    implementation(libs.jna.platform)
-    implementation("org.xerial:sqlite-jdbc:3.53.4.0")
-    implementation("net.raphimc:MinecraftAuth:5.0.2")
-    implementation("org.commonmark:commonmark:0.30.0")
-    implementation("org.commonmark:commonmark-ext-gfm-tables:0.30.0")
-    implementation("org.jsoup:jsoup:1.23.2")
-
-    testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
-    testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.10.2")
-}
-
-tasks.test {
-    useJUnitPlatform()
-    systemProperty("user.home", temporaryDir.absolutePath)
-    systemProperty("aw.test.expectedVersion", project.version.toString())
-    systemProperty("aw.test.rustHash", providers.gradleProperty("awRustHash").orElse("false").get())
-}
+sourceSets["main"].java.setSrcDirs(listOf("tools/packaging/java"))
 
 val microsoftClientId = providers.environmentVariable("AW_MS_CLIENT_ID")
     .orElse(providers.gradleProperty("awMsClientId"))
@@ -57,60 +31,9 @@ val signerThumbprint = providers.environmentVariable("AW_SIGNER_THUMBPRINT")
 val updateFeedUrl = providers.environmentVariable("AW_UPDATE_URL")
     .orElse(providers.gradleProperty("awUpdateUrl"))
     .orElse("https://github.com/AlpheusWorld/AWLauncher-releases/releases/latest/download/update.json")
-val generatedLauncherConfig = layout.buildDirectory.dir("generated/awlauncher-config")
-val curseForgeApiKey = providers.environmentVariable("AW_CURSEFORGE_API_KEY").orElse("")
 val discordAppId = providers.environmentVariable("AW_DISCORD_APP_ID")
     .orElse(providers.gradleProperty("awDiscordAppId"))
     .map { it.trim().ifBlank { "1555994295134326945" } }.orElse("1555994295134326945")
-
-val generateLauncherConfig = tasks.register("generateLauncherConfig") {
-    inputs.property("launcherVersion", project.version.toString())
-    inputs.property("microsoftClientId", microsoftClientId)
-    inputs.property("signerThumbprint", signerThumbprint)
-    inputs.property("updateFeedUrl", updateFeedUrl)
-    inputs.property("curseForgeApiKey", curseForgeApiKey)
-    inputs.property("discordAppId", discordAppId)
-    outputs.dir(generatedLauncherConfig)
-    doLast {
-        val dir = generatedLauncherConfig.get().asFile.apply { mkdirs() }
-        dir.resolve("launcher-version.txt").writeText(project.version.toString())
-        dir.resolve("auth-client-id.txt").writeText(microsoftClientId.get().trim())
-        dir.resolve("signer-thumbprint.txt").writeText(signerThumbprint.get().replace(" ", "").uppercase())
-        dir.resolve("update-url.txt").writeText(updateFeedUrl.get().trim())
-        dir.resolve("curseforge-api-key.txt").writeText(curseForgeApiKey.get().trim())
-        val discordId = discordAppId.get().trim()
-        check(discordId.isBlank() || Regex("^[0-9]{17,20}$").matches(discordId)) { "Invalid AW_DISCORD_APP_ID" }
-        dir.resolve("discord-app-id.txt").writeText(discordId)
-    }
-}
-
-sourceSets["main"].resources.srcDir(generatedLauncherConfig)
-val rustHashEnabled = providers.gradleProperty("awRustHash").map { it.toBoolean() }.orElse(false)
-val buildRustHash = tasks.register<Exec>("buildRustHash") {
-    onlyIf { rustHashEnabled.get() }
-    doFirst {
-        val os = System.getProperty("os.name").lowercase()
-        val arch = System.getProperty("os.arch").lowercase()
-        require((os.contains("windows") || os.contains("linux")) && arch in setOf("amd64", "x86_64")) {
-            "The experimental Rust hash library supports Windows and Linux x64 only"
-        }
-    }
-    workingDir("rust/hash")
-    commandLine("cargo", "build", "--release", "--locked")
-    inputs.files(fileTree("rust/hash/src"), "rust/hash/Cargo.toml", "rust/hash/Cargo.lock")
-    outputs.dir("rust/hash/target/release")
-}
-tasks.processResources.configure {
-    dependsOn(generateLauncherConfig)
-    if (rustHashEnabled.get()) {
-        dependsOn(buildRustHash)
-        val windows = System.getProperty("os.name").lowercase().contains("win")
-        from("rust/hash/target/release/${if (windows) "aw_hash.dll" else "libaw_hash.so"}") {
-            into("native/${if (windows) "windows-x86_64" else "linux-x86_64"}")
-        }
-    }
-    from("branding/AWLauncher.ico") { into("update"); rename { "app.ico" } }
-}
 
 val validateReleaseConfiguration = tasks.register("validateReleaseConfiguration") {
     doLast {
@@ -136,18 +59,7 @@ tasks.matching { it.name == "packageReleaseDistributionForCurrentOS" }.configure
 
 compose.desktop {
     application {
-        mainClass = "ru.aw.launcher.MainKt"
-
-        jvmArgs += listOf(
-            "-Xms24m",
-            "-Xmx384m",
-            "-XX:+UseG1GC",
-            "-XX:MaxGCPauseMillis=50",
-            "-XX:+ExplicitGCInvokesConcurrent",
-            "-XX:MaxMetaspaceSize=192m",
-            "-Dfile.encoding=UTF-8",
-            "-Dsun.java2d.dpiaware=true",
-        )
+        mainClass = "ru.aw.launcher.packaging.JPackagePlaceholder"
 
         nativeDistributions {
             if (System.getProperty("os.name").lowercase().contains("linux")) targetFormats(TargetFormat.Deb, TargetFormat.Rpm)
@@ -157,22 +69,7 @@ compose.desktop {
             vendor = "AlpheusWorld"
             description = "Minecraft launcher"
 
-            modules(
-                "java.desktop",
-                "java.instrument",
-                "java.logging",
-                "java.management",
-                "java.naming",
-                "java.net.http",
-                "java.prefs",
-                "java.sql",
-                "java.xml",
-                "jdk.crypto.ec",
-                "jdk.management",
-                "jdk.naming.dns",
-                "jdk.unsupported",
-                "jdk.zipfs",
-            )
+            modules("java.base")
 
             windows {
                 menuGroup = "AlpheusWorld"
@@ -195,77 +92,45 @@ compose.desktop {
             }
         }
 
-        buildTypes.release.proguard {
-            version.set("7.7.0")
-            isEnabled.set(true)
-            obfuscate.set(false)
-            optimize.set(false)
-            configurationFiles.from(project.file("compose-desktop.pro"))
-        }
     }
-}
-
-tasks.register<JavaExec>("renderScreens") {
-    group = "verification"
-    description = "Renders the launcher screens to PNG files in build/preview"
-    classpath = sourceSets["test"].runtimeClasspath
-    mainClass.set("ru.aw.launcher.dev.RenderScreensKt")
-    systemProperty("user.home", temporaryDir.absolutePath)
-    args(layout.buildDirectory.dir("preview").get().asFile.absolutePath, "1.25", (findProperty("screens") as String?).orEmpty())
-}
-
-tasks.register<JavaExec>("benchmarkUi") {
-    group = "verification"
-    description = "Measures offscreen page creation and animation frame CPU time with synthetic data"
-    classpath = sourceSets["test"].runtimeClasspath
-    mainClass.set("ru.aw.launcher.dev.UiPerformanceKt")
-    systemProperty("user.home", temporaryDir.absolutePath)
-    args(layout.buildDirectory.file((findProperty("benchmarkReport") as String?) ?: "ui-performance.tsv").get().asFile.absolutePath,
-        (findProperty("benchmarkCases") as String?).orEmpty())
-}
-
-tasks.register<JavaExec>("smokeLoaders") {
-    group = "verification"
-    description = "Installs each version:loader from -Ptargets and starts the game up to the main menu"
-    classpath = sourceSets["test"].runtimeClasspath
-    mainClass.set("ru.aw.launcher.dev.LoaderSmokeKt")
-    (findProperty("smokeHome") as String?)?.let { systemProperty("user.home", it) }
-    args((findProperty("targets") as String? ?: "").split(',').filter { it.isNotBlank() })
-}
-
-tasks.register<JavaExec>("smokeMicrosoftAuth") {
-    group = "verification"
-    description = "Checks Microsoft sign-in and stores the confirmed Minecraft account securely"
-    classpath = sourceSets["test"].runtimeClasspath
-    mainClass.set("ru.aw.launcher.dev.MicrosoftAuthSmokeKt")
-    systemProperty("user.home", System.getProperty("user.home"))
-    systemProperty("file.encoding", "UTF-8")
-    environment("AW_DEBUG", "1")
-    if (project.hasProperty("authRefresh")) args("--refresh")
 }
 
 val desktopInstallDir = File(System.getProperty("user.home"), "AWLauncher")
 val nativeProfile = if (providers.gradleProperty("awNativeDebug").orNull == "true") "debug" else "release"
 val buildNativeUi = tasks.register<Exec>("buildNativeUi") {
     workingDir("rust/tauri")
+    environment("AW_MS_CLIENT_ID", microsoftClientId.get())
+    environment("AW_DISCORD_APP_ID", discordAppId.get())
+    inputs.property("nativeDiscordAppId", discordAppId)
+    environment("AW_UPDATE_URL", updateFeedUrl.get())
+    environment("AW_SIGNER_THUMBPRINT", signerThumbprint.get())
+    inputs.property("nativeUpdateUrl", updateFeedUrl)
+    inputs.property("nativeSigner", signerThumbprint)
+    inputs.property("nativeMicrosoftClientId", microsoftClientId)
     commandLine(listOf("cargo", "build", "--locked") + if (nativeProfile == "release") listOf("--release") else emptyList())
     inputs.files(fileTree("rust/tauri/src"),fileTree("rust/tauri/web"),fileTree("rust/ui/src"),fileTree("rust/ui/assets"),"rust/tauri/Cargo.toml","rust/tauri/Cargo.lock","rust/tauri/tauri.conf.json","rust/tauri/build.rs")
+    inputs.files(fileTree("rust/engine/src"), "rust/engine/Cargo.toml")
+    inputs.dir("src/main/resources/skins")
+    inputs.dir("src/main/resources/update")
+    inputs.dir("src/main/resources/brand")
+    inputs.file("branding/AWLauncher.ico")
     inputs.dir("src/main/resources/fonts")
     inputs.dir("src/main/resources/instance-icons")
     inputs.dir("src/main/resources/flags")
     inputs.dir("src/main/resources/i18n")
     outputs.file("rust/tauri/target/$nativeProfile/${if(System.getProperty("os.name").lowercase().contains("win"))"awlauncher-tauri.exe" else "awlauncher-tauri"}")
 }
-tasks.register<JavaExec>("nativeBackendSmoke") {
-    group="verification"
-    classpath=sourceSets["main"].runtimeClasspath
-    mainClass.set("ru.aw.launcher.MainKt")
-    args("--native-task")
-    systemProperty("user.home",temporaryDir.absolutePath)
-    standardInput=ByteArrayInputStream("{\"op\":\"ping\"}\n".toByteArray())
-    val captured=ByteArrayOutputStream()
-    standardOutput=captured
-    doLast {check(captured.toString().contains("\"protocol\":1")){"Native engine protocol handshake failed: $captured"}}
+tasks.register<Exec>("nativeBackendSmoke") {
+    group = "verification"
+    dependsOn(buildNativeUi)
+    val windows = System.getProperty("os.name").lowercase().contains("win")
+    val exe = file("rust/tauri/target/$nativeProfile/" + if (windows) "awlauncher-tauri.exe" else "awlauncher-tauri")
+    commandLine(exe, "--native-task")
+    environment("AW_NATIVE_DATA_HOME", temporaryDir.absolutePath)
+    standardInput = ByteArrayInputStream("{\"op\":\"ping\"}\n".toByteArray())
+    val captured = ByteArrayOutputStream()
+    standardOutput = captured
+    doLast { check(captured.toString().contains("\"protocol\":1")) { "Rust engine handshake failed: $captured" } }
 }
 
 val distributionLegal = layout.buildDirectory.dir("distribution-legal")
@@ -277,37 +142,19 @@ val collectNativeNotices=tasks.register<Exec>("collectNativeNotices"){
 }
 val generateDistributionLegal = tasks.register("generateDistributionLegal") {
     dependsOn(collectNativeNotices)
-    inputs.files(configurations.runtimeClasspath)
     inputs.dir("branding/legal")
     inputs.dir("src/main/resources/fonts")
     outputs.dir(distributionLegal)
     doLast {
         val output = distributionLegal.get().asFile.apply { mkdirs() }
-        val dependencies = configurations.runtimeClasspath.get().resolvedConfiguration.resolvedArtifacts.sortedBy { it.moduleVersion.id.toString() }
-        val rows = dependencies.map { artifact ->
-            val id = artifact.moduleVersion.id
-            ZipFile(artifact.file).use { jar ->
-                jar.entries().asSequence().filter { !it.isDirectory &&
-                    Regex("(?i)(?:^|/)(?:LICENSE|NOTICE|COPYING|COPYRIGHT)(?:[.-][^/]*)?$").containsMatchIn(it.name) }.forEach { entry ->
-                    val target = output.resolve("dependencies/${id.group}.${id.name}/${entry.name.substringAfterLast('/')}")
-                    target.parentFile.mkdirs()
-                    jar.getInputStream(entry).use { input -> target.outputStream().use { input.copyTo(it) } }
-                }
-            }
-            "| `${id.group}:${id.name}:${id.version}` | [Maven metadata](https://search.maven.org/artifact/${id.group}/${id.name}/${id.version}/jar) |"
-        }
         output.resolve("THIRD_PARTY_NOTICES.md").writeText(
-            "# Third-party components\n\nAWLauncher uses separately licensed libraries. Author notices remain in the JARs and are also copied alongside this file. " +
-                "MinecraftAuth is an LGPL-3.0 replaceable shared Java library; corresponding sources accompany the release. " +
-                "OpenJDK/Temurin notices remain under runtime/legal; its source archive accompanies the release.\n\n" +
-                "| Component | Upstream metadata |\n| --- | --- |\n" + rows.joinToString("\n") + "\n"
+            "# Third-party components\n\nRust dependency notices are under rust/. " +
+                "Minecraft downloads its required Java runtime separately.\n"
         )
         copy { from("branding/legal"); into(output) }
         copy { from("src/main/resources/fonts") { include("*OFL*.txt") }; into(output.resolve("fonts")) }
         copy { from("src/main/resources/flags/LICENSE.txt"); into(output.resolve("flags")) }
-        val inventory = layout.buildDirectory.file("publication/runtime-dependencies.tsv").get().asFile
-        inventory.parentFile.mkdirs()
-        inventory.writeText(dependencies.joinToString("\n") { "${it.moduleVersion.id.group}\t${it.moduleVersion.id.name}\t${it.moduleVersion.id.version}\t${it.file.absolutePath}" })
+
     }
 }
 
@@ -321,15 +168,18 @@ tasks.matching { it.name == "createDistributable" || it.name == "createReleaseDi
         check(launcher.exists()) { "Application image is missing" }
         copy { from(distributionLegal); into(image.resolve("legal")) }
         val windows=System.getProperty("os.name").lowercase().contains("win")
-        val app=image.resolve(if(windows)"app" else "lib/app")
         val native=file("rust/tauri/target/$nativeProfile/${if(windows)"awlauncher-tauri.exe" else "awlauncher-tauri"}")
         check(native.isFile){"Native UI executable is missing"}
-        native.copyTo(app.resolve(if(windows)"AWLauncher-native.exe" else "awlauncher-native"),overwrite=true).setExecutable(true,false)
-        app.resolve("native-ui-protocol.txt").writeText("1\n")
-        val javaHome=javaToolchains.launcherFor{languageVersion.set(JavaLanguageVersion.of(21))}.get().metadata.installationPath.asFile
-        val runtime=image.resolve(if(windows)"runtime/bin" else "lib/runtime/bin")
-        runtime.mkdirs()
-        File(javaHome,"bin/${if(windows)"java.exe" else "java"}").copyTo(runtime.resolve(if(windows)"java.exe" else "java"),overwrite=true).setExecutable(true,false)
+        native.copyTo(launcher,overwrite=true).setExecutable(true,false)
+        // jpackage creates these placeholders before we install the Rust binary.
+        val appDir = image.resolve(if (windows) "app" else "lib/app")
+        val runtime = image.resolve(if (windows) "runtime" else "lib/runtime")
+        val imageRoot = image.canonicalFile.toPath()
+        check(runtime.canonicalFile.toPath().startsWith(imageRoot) && runtime.canonicalFile.toPath() != imageRoot)
+        project.delete(runtime)
+        appDir.listFiles { candidate -> candidate.isFile && candidate.extension == "jar" }
+            ?.forEach { jar -> check(jar.canonicalFile.toPath().startsWith(imageRoot)); check(jar.delete()) }
+
     }
 }
 
@@ -538,43 +388,5 @@ fun ensureDesktopShortcut(exe: File, icon: File, rewrite: Boolean) {
 }
 
 afterEvaluate {
-    tasks.named("createRuntimeImage") {
-        doLast {
-            val image = layout.buildDirectory.dir("compose/tmp/main/runtime").get().asFile
-            val windows = System.getProperty("os.name").lowercase().contains("win")
-            val javaName = if (windows) "java.exe" else "java"
-            val borrowed = image.resolve("bin/$javaName")
-            borrowed.parentFile.mkdirs()
-            File(compose.desktop.application.javaHome, "bin/$javaName").copyTo(borrowed, overwrite = true)
-            if (!windows) check(borrowed.setExecutable(true, false)) { "Runtime launcher is not executable" }
-            try {
-                val dump = ProcessBuilder(borrowed.absolutePath, "-Xshare:dump")
-                    .redirectErrorStream(true)
-                    .start()
-                val output = dump.inputStream.bufferedReader().readText()
-                check(dump.waitFor() == 0) { "CDS dump failed:\n$output" }
-            } finally {
-                borrowed.delete()
-            }
-            check(image.resolve(if (windows) "bin/server/classes.jsa" else "lib/server/classes.jsa").exists()) { "CDS dump produced no archive" }
-        }
-    }
-
-    val classArchiveKey = provider {
-        val digest = MessageDigest.getInstance("SHA-1")
-        (listOf(tasks.jar.get().archiveFile.get().asFile) + configurations.runtimeClasspath.get().files.sortedBy { it.name })
-            .forEach { digest.update(it.readBytes()) }
-        digest.digest().joinToString("") { "%02x".format(it) }.take(10)
-    }
-
-    tasks.withType<AbstractJPackageTask>().configureEach {
-        // Linux packages install into a read-only system directory; use the bundled static CDS archive there.
-        if (System.getProperty("os.name").lowercase().contains("win")) {
-            launcherJvmArgs.addAll(classArchiveKey.map { key ->
-                listOf("-XX:SharedArchiveFile=\$APPDIR\\\\aw-$key.jsa", "-XX:+AutoCreateSharedArchive")
-            })
-        }
-    }
-
     tasks.named("createDistributable") { finalizedBy(deployDesktop) }
 }

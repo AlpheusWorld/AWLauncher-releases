@@ -1,9 +1,7 @@
 use eframe::egui;
 use std::{
     collections::{HashMap, HashSet, VecDeque},
-    io::{Read, Write},
-    path::{Path, PathBuf},
-    process::Stdio,
+    io::Read,
     sync::{mpsc, Arc, Mutex},
     time::Duration,
 };
@@ -68,27 +66,31 @@ pub struct Images {
     failed: HashSet<Key>,
     recent: VecDeque<Key>,
 }
-fn svg_png(backend: &Path, bytes: &[u8]) -> Option<Vec<u8>> {
-    let mut command = crate::tasks::java_base_command(backend).ok()?;
-    command
-        .arg("-Xmx256m")
-        .arg("ru.aw.launcher.nativeui.ProjectMarkup")
-        .arg("svg")
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null());
-    let mut child = command.spawn().ok()?;
-    let mut input = child.stdin.take()?;
-    input.write_all(bytes).ok()?;
-    drop(input);
-    let output = child.wait_with_output().ok()?;
-    if !output.status.success() || output.stdout.len() > 16 * 1024 * 1024 {
-        return None;
-    }
-    Some(output.stdout)
+fn svg_png(bytes: &[u8]) -> Option<Vec<u8>> {
+    use resvg::{
+        tiny_skia::{Pixmap, Transform},
+        usvg::{Options, Tree},
+    };
+    let mut options = Options::default();
+    // Project media may embed images but must not read local files.
+    options.image_href_resolver.resolve_string = Box::new(|_, _| None);
+    let tree = Tree::from_data(bytes, &options).ok()?;
+    let size = tree.size();
+    let ratio = (1280.0 / size.width().max(size.height())).min(1.0);
+    let mut pixmap = Pixmap::new(
+        (size.width() * ratio).ceil() as u32,
+        (size.height() * ratio).ceil() as u32,
+    )?;
+    resvg::render(
+        &tree,
+        Transform::from_scale(ratio, ratio),
+        &mut pixmap.as_mut(),
+    );
+    pixmap.encode_png().ok()
 }
+
 impl Images {
-    pub fn new(ctx: egui::Context, backend: Option<PathBuf>) -> Self {
+    pub fn new(ctx: egui::Context) -> Self {
         let (tx, input) = mpsc::sync_channel::<Key>(64);
         let (output, rx) = mpsc::channel();
         let input = Arc::new(Mutex::new(input));
@@ -96,7 +98,6 @@ impl Images {
             let input = input.clone();
             let output = output.clone();
             let ctx = ctx.clone();
-            let backend = backend.clone();
             std::thread::spawn(move || {
                 let client = reqwest::blocking::Client::builder()
                     .timeout(Duration::from_secs(20))
@@ -144,7 +145,7 @@ impl Images {
                         }
                         if String::from_utf8_lossy(&bytes[..bytes.len().min(1024)]).contains("<svg")
                         {
-                            bytes = svg_png(backend.as_ref()?, &bytes)?;
+                            bytes = svg_png(&bytes)?;
                         }
                         let mut reader = image::ImageReader::new(std::io::Cursor::new(bytes))
                             .with_guessed_format()

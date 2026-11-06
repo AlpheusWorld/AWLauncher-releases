@@ -105,7 +105,6 @@ impl App {
                     ui.set_min_width((ui.available_width()-32.0).max(0.0));
                     self.settings_heading(ui,"Поведение лаунчера");
                     self.setting_toggle(ui,"Не закрывать лаунчер при запуске игры",None,"keepLauncherOpen",false,true);
-                    self.setting_toggle(ui,"Игра с друзьями",None,"friendsEnabled",false,false);
                 });},
                 2=>{
                     let total=self.preferences.total_mb;let limit=(total-1024).max(512);let recommended=settings::recommended(total);

@@ -2,8 +2,6 @@ use super::*;
 use egui::{FontId, Sense, Stroke, TextFormat};
 use std::{
     hash::{Hash, Hasher},
-    io::Write,
-    process::Stdio,
     sync::{mpsc, Arc},
 };
 #[derive(Clone, Default, serde::Deserialize, Debug)]
@@ -26,7 +24,6 @@ impl Documents {
     pub fn get(
         &mut self,
         ctx: &egui::Context,
-        backend: Option<&PathBuf>,
         body: &str,
         base: &str,
     ) -> Option<Result<Arc<Vec<Node>>, String>> {
@@ -57,39 +54,10 @@ impl Documents {
                 _ => return None,
             }
         }
-        let Some(backend) = backend.cloned() else {
-            return Some(Err("Не найден встроенный движок".into()));
-        };
         let (body, base, ctx) = (body.to_owned(), base.to_owned(), ctx.clone());
         let (tx, rx) = mpsc::channel();
         std::thread::spawn(move || {
-            let result = (|| -> Result<Vec<Node>, String> {
-                let mut command = tasks::java_base_command(&backend)?;
-                command
-                    .arg("-Xmx256m")
-                    .arg("ru.aw.launcher.nativeui.ProjectMarkup")
-                    .arg(base)
-                    .stdin(Stdio::piped())
-                    .stdout(Stdio::piped())
-                    .stderr(Stdio::piped());
-                let mut child = command.spawn().map_err(|error| error.to_string())?;
-                let mut input = child
-                    .stdin
-                    .take()
-                    .ok_or("Не удалось подготовить описание проекта")?;
-                input
-                    .write_all(body.as_bytes())
-                    .map_err(|error| error.to_string())?;
-                drop(input);
-                let output = child
-                    .wait_with_output()
-                    .map_err(|error| error.to_string())?;
-                if !output.status.success() || output.stdout.len() > 16 * 1024 * 1024 {
-                    return Err("Не удалось подготовить описание проекта".into());
-                }
-                serde_json::from_slice(&output.stdout)
-                    .map_err(|_| "Не удалось подготовить описание проекта".into())
-            })();
+            let result = parse_document(&body, &base);
             let _ = tx.send(result);
             ctx.request_repaint();
         });
@@ -100,6 +68,68 @@ impl Documents {
         self.cache.retain(|_, value| value.is_ok());
     }
 }
+fn parse_document(body: &str, base: &str) -> Result<Vec<Node>, String> {
+    if body.len() > 16 * 1024 * 1024 {
+        return Err("Описание проекта слишком большое".into());
+    }
+    use scraper::{ElementRef, Html, Node as HtmlNode};
+    fn parse_element(element: ElementRef<'_>, depth: usize) -> Result<Node, String> {
+        if depth > 64 {
+            return Err("Описание проекта слишком глубокое".into());
+        }
+        let tag = element.value().name().to_owned();
+        let text = if tag == "pre" {
+            element.text().collect()
+        } else {
+            String::new()
+        };
+        let attrs = ["href", "src", "alt", "align", "width", "height"]
+            .into_iter()
+            .filter_map(|key| {
+                element
+                    .value()
+                    .attr(key)
+                    .map(|value| (key.to_owned(), value.to_owned()))
+            })
+            .collect();
+        let mut children = Vec::new();
+        for child in element.children() {
+            match child.value() {
+                HtmlNode::Text(text) => children.push(Node {
+                    tag: "#text".into(),
+                    text: text.to_string(),
+                    ..Node::default()
+                }),
+                HtmlNode::Element(_) => {
+                    children.push(parse_element(ElementRef::wrap(child).unwrap(), depth + 1)?)
+                }
+                _ => {}
+            }
+        }
+        Ok(Node {
+            tag,
+            text,
+            attrs,
+            children,
+        })
+    }
+    let mut html = String::new();
+    pulldown_cmark::html::push_html(
+        &mut html,
+        pulldown_cmark::Parser::new_ext(body, pulldown_cmark::Options::all()),
+    );
+    let base = reqwest::Url::parse(base).map_err(|_| "Неверный адрес проекта")?;
+    let clean = ammonia::Builder::default()
+        .url_relative(ammonia::UrlRelative::RewriteWithBase(base))
+        .clean(&html)
+        .to_string();
+    Html::parse_fragment(&clean)
+        .root_element()
+        .child_elements()
+        .map(|element| parse_element(element, 0))
+        .collect()
+}
+
 pub fn safe_url(value: &str) -> Option<String> {
     let url = reqwest::Url::parse(value).ok()?;
     if matches!(url.scheme(), "https" | "http")
