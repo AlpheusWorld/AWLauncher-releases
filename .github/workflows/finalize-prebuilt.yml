@@ -1,0 +1,72 @@
+name: Sign verified staged release
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Commit used to build all staged installers
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  sign:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    env:
+      SOURCE_SHA: ${{ inputs.source_sha }}
+      AW_UPDATE_SIGNING_PRIVATE_KEY: ${{ secrets.AW_UPDATE_SIGNING_PRIVATE_KEY }}
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Validate source commit
+        shell: pwsh
+        run: |
+          if ($env:SOURCE_SHA -notmatch '^[0-9a-f]{40}$') { throw 'Invalid source commit' }
+          if ([string]::IsNullOrWhiteSpace($env:AW_UPDATE_SIGNING_PRIVATE_KEY)) { throw 'Missing update signing key' }
+      - name: Checkout exact source
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.source_sha }}
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+      - name: Set up Java 21
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Retrieve staged installers
+        shell: pwsh
+        run: |
+          $version = [regex]::Match((Get-Content 'build.gradle.kts' -Raw), '(?m)^version = "([^"]+)"').Groups[1].Value
+          if ($version -notmatch '^\d+\.\d+\.\d+$') { throw 'Invalid version' }
+          $stage = "ci-$version-$($env:SOURCE_SHA.Substring(0, 7))"
+          $release = gh api "repos/$env:GH_REPO/releases?per_page=100" | ConvertFrom-Json | Where-Object { $_.tag_name -eq $stage -and $_.draft -and $_.target_commitish -eq $env:SOURCE_SHA } | Select-Object -First 1
+          if (-not $release) { throw 'Matching draft release not found' }
+          New-Item -ItemType Directory -Force -Path 'build/staged','build/compose/binaries/main/msi','build/compose/binaries/main/exe','build/linux-artifacts' | Out-Null
+          gh release download $stage --pattern 'AWLauncher-Setup.exe' --pattern 'AWLauncher.msi' --pattern 'AWLauncher-linux-x64.deb' --pattern 'AWLauncher-linux-x64.rpm' --dir build/staged
+          if ($LASTEXITCODE -ne 0) { throw 'Failed to download staged installers' }
+          Move-Item -LiteralPath 'build/staged/AWLauncher.msi' -Destination "build/compose/binaries/main/msi/AWLauncher-$version.msi"
+          Move-Item -LiteralPath 'build/staged/AWLauncher-Setup.exe' -Destination "build/compose/binaries/main/exe/AWLauncher-$version.exe"
+          foreach ($format in @('deb','rpm')) {
+            Move-Item -LiteralPath "build/staged/AWLauncher-linux-x64.$format" -Destination "build/linux-artifacts/AWLauncher-$version-linux-x64.$format"
+          }
+      - name: Sign and verify update manifests
+        shell: pwsh
+        run: |
+          $version = [regex]::Match((Get-Content 'build.gradle.kts' -Raw), '(?m)^version = "([^"]+)"').Groups[1].Value
+          .\tools\publish_release.ps1 -Version $version -Artifacts 'build/compose/binaries/main' -LinuxArtifacts 'build/linux-artifacts' -Notes "releases/$version.md" -PrepareOnly
+      - name: Stage signed metadata
+        shell: pwsh
+        run: |
+          $version = [regex]::Match((Get-Content 'build.gradle.kts' -Raw), '(?m)^version = "([^"]+)"').Groups[1].Value
+          $stage = "ci-$version-$($env:SOURCE_SHA.Substring(0, 7))"
+          $folder = "build/publication/v$version"
+          $names = @('update.json','update.json.sig','SHA256SUMS.txt','update-linux-deb-x64.json','update-linux-deb-x64.json.sig','update-linux-rpm-x64.json','update-linux-rpm-x64.json.sig')
+          $paths = $names | ForEach-Object { (Resolve-Path -LiteralPath (Join-Path $folder $_)).Path }
+          gh release upload $stage @paths --clobber
+          if ($LASTEXITCODE -ne 0) { throw 'Failed to upload signed metadata' }
