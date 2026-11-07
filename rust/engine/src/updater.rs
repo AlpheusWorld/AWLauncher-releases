@@ -152,7 +152,7 @@ fn manifest(cx: &Context) -> Result<Value> {
 pub fn execute(cx: &Context, r: &Value) -> Result<Value> {
     cx.stage("Проверяю обновления");
     let v = manifest(cx)?;
-    if !newer(v["version"].as_str().unwrap(), "1.0.55") {
+    if !newer(v["version"].as_str().unwrap(), "1.0.56") {
         return Ok(json!({"message":"Установлена последняя версия"}));
     }
     if r["op"] == "checkUpdate" {

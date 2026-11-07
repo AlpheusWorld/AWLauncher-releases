@@ -7,6 +7,30 @@ use std::{
     process::{Command, Stdio},
 };
 const MANIFEST: &str = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json";
+
+// Reuse a successful SHA-1 check only while the same file metadata is unchanged.
+// Missing, modified or replaced files are checked again by Context::download.
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+struct AssetStamp {
+    size: u64,
+    modified_ns: u64,
+    created_ns: Option<u64>,
+}
+
+fn asset_stamp(path: &Path, expected_size: Option<u64>) -> Option<AssetStamp> {
+    let metadata = fs::metadata(path).ok()?;
+    if !metadata.is_file() || expected_size.is_some_and(|size| size != metadata.len()) {
+        return None;
+    }
+    let timestamp = |time: std::time::SystemTime| {
+        u64::try_from(time.duration_since(std::time::UNIX_EPOCH).ok()?.as_nanos()).ok()
+    };
+    Some(AssetStamp {
+        size: metadata.len(),
+        modified_ns: timestamp(metadata.modified().ok()?)?,
+        created_ns: metadata.created().ok().and_then(timestamp),
+    })
+}
 pub fn os() -> &'static str {
     if cfg!(windows) {
         "windows"
@@ -396,7 +420,7 @@ fn java(cx: &Context, version: &Value, options: &Value) -> Result<PathBuf> {
         }
     }
 }
-fn installed_loader(cx: &Context, base: &Value, kind: &str, pin: Option<&str>) -> Option<Value> {
+pub(crate) fn installed_loader(cx: &Context, base: &Value, kind: &str, pin: Option<&str>) -> Option<Value> {
     let game = base["id"].as_str()?;
     let mut found = Vec::new();
     for entry in fs::read_dir(cx.root.join("versions")).ok()?.flatten() {
@@ -439,13 +463,20 @@ fn installed_loader(cx: &Context, base: &Value, kind: &str, pin: Option<&str>) -
         .max_by_key(|(time, _)| *time)
         .map(|(_, profile)| merge(profile, base.clone()))
 }
-fn loader(cx: &Context, base: &Value, kind: &str, pin: Option<&str>, java: &Path) -> Result<Value> {
+fn loader(
+    cx: &Context,
+    base: &Value,
+    kind: &str,
+    pin: Option<&str>,
+    java: &Path,
+    prefer_installed: bool,
+) -> Result<Value> {
     if kind == "VANILLA" {
         return Ok(base.clone());
     }
     let game = base["id"].as_str().ok_or("Нет ID версии")?;
     let cached = installed_loader(cx, base, kind, pin);
-    if pin.is_some() {
+    if pin.is_some() || prefer_installed {
         if let Some(profile) = &cached {
             return Ok(profile.clone());
         }
@@ -723,7 +754,12 @@ fn run(cx: &Context, profile: &Value, launch_game: bool) -> Result<Value> {
     cx.stage("Чтение версии Minecraft");
     let base = resolve(cx, game, &mut HashSet::new())?;
     let java = java(cx, &base, &options)?;
-    if matches!(kind.as_str(), "FORGE" | "NEOFORGE") {
+    let loader_pin = options["loaderVersion"]
+        .as_str()
+        .or(profile["loaderVersion"].as_str());
+    if matches!(kind.as_str(), "FORGE" | "NEOFORGE")
+        && (!launch_game || installed_loader(cx, &base, &kind, loader_pin).is_none())
+    {
         let mut vanilla = profile.clone();
         vanilla["loader"] = json!("VANILLA");
         run(cx, &vanilla, false)?;
@@ -732,10 +768,9 @@ fn run(cx: &Context, profile: &Value, launch_game: bool) -> Result<Value> {
         cx,
         &base,
         &kind,
-        options["loaderVersion"]
-            .as_str()
-            .or(profile["loaderVersion"].as_str()),
+        loader_pin,
         &java,
+        launch_game,
     )?;
     let id = version["id"].as_str().ok_or("Нет ID версии")?;
     let natives = relative(&cx.root.join("natives"), id)?;
@@ -852,6 +887,16 @@ fn run(cx: &Context, profile: &Value, launch_game: bool) -> Result<Value> {
             ));
         }
         let jobs: Vec<_> = jobs.into_iter().collect();
+        let verification_path = relative(
+            &cx.root.join("cache/verified-assets"),
+            &format!("{asset_id}.json"),
+        )?;
+        let verified: HashMap<String, AssetStamp> = fs::read(&verification_path)
+            .ok()
+            .filter(|bytes| bytes.len() <= 16 * 1024 * 1024)
+            .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+            .unwrap_or_default();
+        let verified_now = std::sync::Mutex::new(HashMap::with_capacity(jobs.len()));
         let defaults = (std::thread::available_parallelism()
             .map(usize::from)
             .unwrap_or(2)
@@ -871,15 +916,40 @@ fn run(cx: &Context, profile: &Value, launch_game: bool) -> Result<Value> {
                 let next = &next;
                 let complete = &complete;
                 let failure = &failure;
-                scope.spawn(move||loop{
-            if failure.lock().unwrap().is_some(){break;}let i=next.fetch_add(1,std::sync::atomic::Ordering::Relaxed);let Some((hash,(url,path,size)))=jobs.get(i)else{break;};
-            if let Err(error)=cx.download(url,path,Some(hash),*size){let mut first=failure.lock().unwrap();if first.is_none(){*first=Some(error);}break;}
-            let count=complete.fetch_add(1,std::sync::atomic::Ordering::Relaxed)+1;(cx.event)(json!({"type":"progress","data":{"fraction":count as f64/jobs.len() as f64,"currentFile":hash}}));
-        });
+                let verified = &verified;
+                let verified_now = &verified_now;
+                scope.spawn(move || loop {
+                    if failure.lock().unwrap().is_some() { break; }
+                    let i = next.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    let Some((hash, (url, path, size))) = jobs.get(i) else { break; };
+                    let before = asset_stamp(path, *size);
+                    if before.as_ref().is_none_or(|stamp| verified.get(hash) != Some(stamp)) {
+                        if let Err(error) = cx.download(url, path, Some(hash), *size) {
+                            let mut first = failure.lock().unwrap();
+                            if first.is_none() { *first = Some(error); }
+                            break;
+                        }
+                    }
+                    let after = asset_stamp(path, *size);
+                    if before.is_none() || before == after {
+                        if let Some(stamp) = after {
+                            verified_now.lock().unwrap().insert(hash.clone(), stamp);
+                        }
+                    }
+                    let count = complete.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
+                    if count % 64 == 0 || count == jobs.len() {
+                        (cx.event)(json!({"type":"progress","data":{"fraction":count as f64/jobs.len() as f64,"currentFile":hash}}));
+                    }
+                });
             }
         });
         if let Some(error) = failure.into_inner().map_err(err)? {
             return Err(error);
+        }
+        let verified_now = verified_now.into_inner().map_err(err)?;
+        if verified_now != verified {
+            // Failure to persist the optimisation must never prevent game launch.
+            let _ = write_json(&verification_path, &json!(verified_now));
         }
         for (name, obj) in objects {
             if let Some(target) = &materialized {
@@ -928,7 +998,7 @@ fn run(cx: &Context, profile: &Value, launch_game: bool) -> Result<Value> {
     let replacements: HashMap<String, String> = [
         ("natives_directory", natives.to_string_lossy().to_string()),
         ("launcher_name", "AWLauncher".into()),
-        ("launcher_version", "1.0.55".into()),
+        ("launcher_version", "1.0.56".into()),
         ("classpath", cp.clone()),
         (
             "classpath_separator",
@@ -1074,6 +1144,83 @@ fn run(cx: &Context, profile: &Value, launch_game: bool) -> Result<Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn verified_asset_stamp_changes_when_a_file_is_modified_or_replaced() {
+        let dir = std::env::temp_dir().join(format!("aw-asset-stamp-{}", uuid::Uuid::new_v4()));
+        fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("object");
+        fs::write(&file, b"first").unwrap();
+        let saved = asset_stamp(&file, Some(5)).unwrap();
+        assert_eq!(asset_stamp(&file, Some(5)), Some(saved.clone()));
+        assert!(asset_stamp(&file, Some(6)).is_none());
+        std::thread::sleep(std::time::Duration::from_millis(25));
+        fs::write(&file, b"other").unwrap();
+        assert_ne!(asset_stamp(&file, Some(5)), Some(saved));
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn install_persists_verified_asset_and_invalidates_changed_file() {
+        let root = std::env::temp_dir().join(format!("aw-asset-cache-{}", uuid::Uuid::new_v4()));
+        let version_dir = root.join("versions/fixture");
+        let runtime = root.join("runtimes/test-runtime");
+        fs::create_dir_all(runtime.join("bin")).unwrap();
+        fs::write(runtime.join(".aw-runtime"), b"ok").unwrap();
+        fs::write(runtime.join("release"), "JAVA_VERSION=\"21\"\n").unwrap();
+        fs::write(java_exe(&runtime), b"unused").unwrap();
+        fs::create_dir_all(&version_dir).unwrap();
+        fs::write(version_dir.join("fixture.jar"), b"game").unwrap();
+        let asset_temp = root.join("asset.tmp");
+        fs::write(&asset_temp, b"asset").unwrap();
+        let digest = crate::storage::hash(&asset_temp).unwrap();
+        let object = root.join("assets/objects").join(&digest[..2]).join(&digest);
+        fs::create_dir_all(object.parent().unwrap()).unwrap();
+        fs::rename(&asset_temp, &object).unwrap();
+        write_json(&root.join("assets/indexes/test.json"),
+            &json!({"objects":{"asset.dat":{"hash":digest,"size":5}}})).unwrap();
+        write_json(&version_dir.join("fixture.json"), &json!({
+            "id":"fixture", "javaVersion":{"majorVersion":8,"component":"test-runtime"},
+            "downloads":{"client":{"url":"https://unused.invalid/game.jar","size":4}},
+            "assetIndex":{"id":"test","url":"https://unused.invalid/assets.json"},
+            "libraries":[]
+        })).unwrap();
+        let cx = Context { root: root.clone(), cancelled: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)), event: &|_| {} };
+        install(&cx, &json!({"version":"fixture","loader":"VANILLA","dir":root.join("instance")})).unwrap();
+        let cache: HashMap<String, AssetStamp> = serde_json::from_slice(&fs::read(root.join("cache/verified-assets/test.json")).unwrap()).unwrap();
+        let stamp = cache.get(&digest).unwrap();
+        assert_eq!(asset_stamp(&object, Some(5)).as_ref(), Some(stamp));
+        std::thread::sleep(std::time::Duration::from_millis(25));
+        fs::write(&object, b"other").unwrap();
+        assert_ne!(asset_stamp(&object, Some(5)).as_ref(), Some(stamp));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn launch_reuses_installed_fabric_profile_without_network() {
+        let root = std::env::temp_dir().join(format!("aw-loader-cache-{}", uuid::Uuid::new_v4()));
+        let id = "fabric-loader-0.99-fixture";
+        write_json(
+            &root.join("versions").join(id).join(format!("{id}.json")),
+            &json!({"id":id,"inheritsFrom":"fixture","mainClass":"cached.Main"}),
+        )
+        .unwrap();
+        let cx = Context {
+            root: root.clone(),
+            cancelled: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            event: &|_| {},
+        };
+        let version = loader(
+            &cx,
+            &json!({"id":"fixture"}),
+            "FABRIC",
+            None,
+            Path::new("unused"),
+            true,
+        )
+        .unwrap();
+        assert_eq!(version["mainClass"], "cached.Main");
+        fs::remove_dir_all(root).unwrap();
+    }
     #[test]
     fn loader_identity_is_exact_and_handles_new_version_scheme() {
         assert_eq!(neoforge_game("21.1.265").as_deref(), Some("1.21.1"));

@@ -254,7 +254,7 @@ pub fn state(cx: &Context) -> Result<Value> {
         json!({"items":[]})
     };
     Ok(
-        json!({"version":"1.0.55","settings":settings(cx)?,"builds":profiles,"accounts":accounts::public(&accounts::store(cx)?),"notices":notices}),
+        json!({"version":"1.0.56","settings":settings(cx)?,"builds":profiles,"accounts":accounts::public(&accounts::store(cx)?),"notices":notices}),
     )
 }
 pub fn target(cx: &Context, key: &str) -> Result<Value> {

@@ -226,7 +226,7 @@ pub fn execute(cx: &Context, p: &Value, r: &Value) -> Result<Value> {
             }
         }
         crate::mod_compat::check(&stage)?;
-        crate::mod_compat::check_dependencies(&stage)?;
+        crate::mod_compat::check_dependencies(cx, &next)?;
         if fingerprint(&dir)? != expected {
             return Err("Сборка изменилась во время загрузки".into());
         }

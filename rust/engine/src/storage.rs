@@ -105,6 +105,16 @@ pub fn names(root: &Path) -> Result<Vec<String>> {
 }
 pub fn copy(cx: &Context, source: &Path, target: &Path, names: &[String]) -> Result<()> {
     let (files, dirs) = inventory(source, names)?;
+    copy_inventory(cx, source, target, &files, &dirs)
+}
+
+pub(crate) fn copy_inventory(
+    cx: &Context,
+    source: &Path,
+    target: &Path,
+    files: &BTreeMap<String, String>,
+    dirs: &[String],
+) -> Result<()> {
     for dir in dirs {
         cx.check()?;
         fs::create_dir_all(path(target, &dir)?).map_err(err)?;
@@ -114,7 +124,7 @@ pub fn copy(cx: &Context, source: &Path, target: &Path, names: &[String]) -> Res
         let dest = path(target, &name)?;
         fs::create_dir_all(dest.parent().unwrap()).map_err(err)?;
         fs::copy(path(source, &name)?, &dest).map_err(err)?;
-        if hash(&dest)? != expected {
+        if hash(&dest)? != *expected {
             return Err("Файл изменился при копировании".into());
         }
     }
@@ -202,8 +212,6 @@ pub fn overlay(
     let previous = tx.join("previous");
     fs::create_dir_all(&prepared).map_err(err)?;
     fs::create_dir_all(&previous).map_err(err)?;
-    copy(cx, source, &prepared, &names)?;
-    cx.check()?;
     let mut affected: std::collections::BTreeSet<String> = files
         .iter()
         .filter(|(name, expected)| {
@@ -215,6 +223,25 @@ pub fn overlay(
     for name in &affected {
         path(target, name)?;
     }
+    // Prepare only files that will actually change. The staging tree often
+    // contains every mod and config, even when installing just one project.
+    for name in &affected {
+        cx.check()?;
+        if let Some(expected) = files.get(name) {
+            let dest = path(&prepared, name)?;
+            fs::create_dir_all(dest.parent().unwrap()).map_err(err)?;
+            fs::copy(path(source, name)?, &dest).map_err(err)?;
+            if hash(&dest)? != *expected {
+                let _ = remove(target, &tx_name);
+                return Err("Файл изменился при копировании".into());
+            }
+        }
+    }
+    if inventory(source, &names)? != (files.clone(), dirs.clone()) {
+        let _ = remove(target, &tx_name);
+        return Err("Сборка изменилась при подготовке файлов".into());
+    }
+    cx.check()?;
     let mut moved = Vec::new();
     let mut placed = Vec::new();
     let result = (|| {

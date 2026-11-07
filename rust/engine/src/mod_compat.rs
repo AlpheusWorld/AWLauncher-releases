@@ -1,4 +1,4 @@
-use crate::{err, Result};
+use crate::{err, Context, Result};
 use serde_json::Value;
 use std::{cmp::Ordering, fs, io::Read, path::Path};
 #[derive(Debug)]
@@ -274,7 +274,8 @@ fn all_metadata(path: &Path) -> Result<Vec<Value>> {
             .map_err(err)?;
     parse(zip, 0, &mut 0, &mut 0)
 }
-pub fn check_dependencies(game: &Path) -> Result<()> {
+pub fn check_dependencies(cx: &Context, profile: &Value) -> Result<()> {
+    let game = Path::new(profile["dir"].as_str().ok_or("Нет папки сборки")?);
     let dir = game.join("mods");
     if !dir.is_dir() {
         return Ok(());
@@ -285,6 +286,43 @@ pub fn check_dependencies(game: &Path) -> Result<()> {
         if path.extension().is_some_and(|s| s == "jar") {
             if let Ok(values) = all_metadata(&path) {
                 mods.extend(values);
+            }
+        }
+    }
+    // Fabric and Quilt can ship mods inside their loader JAR. Use the same
+    // installed profile chosen by the launcher, including a pinned version.
+    let kind = profile["loader"]
+        .as_str()
+        .unwrap_or("")
+        .to_ascii_uppercase();
+    if matches!(kind.as_str(), "FABRIC" | "QUILT") {
+        let options = crate::builds::options(game)?;
+        let pin = options["loaderVersion"]
+            .as_str()
+            .or(profile["loaderVersion"].as_str());
+        if let Some(loader) = crate::game::installed_loader(
+            cx,
+            &serde_json::json!({"id":profile["version"]}),
+            &kind,
+            pin,
+        ) {
+            for library in loader["libraries"].as_array().into_iter().flatten() {
+                let Some(name) = library["name"].as_str() else {
+                    continue;
+                };
+                if !name.starts_with("net.fabricmc:fabric-loader:")
+                    && !name.starts_with("org.quiltmc:quilt-loader:")
+                {
+                    continue;
+                }
+                let relative = match library["downloads"]["artifact"]["path"].as_str() {
+                    Some(path) => path.to_owned(),
+                    None => crate::game::maven(name)?,
+                };
+                let path = crate::relative(&cx.root.join("libraries"), &relative)?;
+                if let Ok(values) = all_metadata(&path) {
+                    mods.extend(values);
+                }
             }
         }
     }
@@ -383,6 +421,58 @@ pub fn retire_managed(game: &Path) -> Result<()> {
 mod tests {
     use super::*;
     use serde_json::json;
+    use std::io::Write;
+
+    fn jar(entries: &[(&str, Vec<u8>)]) -> Vec<u8> {
+        let mut writer = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
+        for (name, data) in entries {
+            writer
+                .start_file(*name, zip::write::SimpleFileOptions::default())
+                .unwrap();
+            writer.write_all(data).unwrap();
+        }
+        writer.finish().unwrap().into_inner()
+    }
+
+    #[test]
+    fn fabric_loader_embedded_dependencies_use_the_installed_version() {
+        let root = std::env::temp_dir().join(format!("aw-loader-deps-{}", uuid::Uuid::new_v4()));
+        let game = root.join("instance");
+        fs::create_dir_all(game.join("mods")).unwrap();
+        let mod_jar = jar(&[("fabric.mod.json", serde_json::to_vec(&json!({
+            "id":"lithium", "name":"Lithium", "version":"1.0", "depends":{"mixinextras":">=0.5.5"}
+        })).unwrap())]);
+        fs::write(game.join("mods/lithium.jar"), mod_jar).unwrap();
+        let id = "fabric-loader-0.19.5-fixture";
+        crate::write_json(&root.join("versions").join(id).join(format!("{id}.json")), &json!({
+            "id":id, "inheritsFrom":"fixture", "libraries":[{"name":"net.fabricmc:fabric-loader:0.19.5"}]
+        })).unwrap();
+        let path =
+            root.join("libraries/net/fabricmc/fabric-loader/0.19.5/fabric-loader-0.19.5.jar");
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        let make_loader = |version: &str| {
+            let nested = jar(&[(
+                "fabric.mod.json",
+                serde_json::to_vec(&json!({"id":"mixinextras","version":version})).unwrap(),
+            )]);
+            jar(&[("fabric.mod.json", serde_json::to_vec(&json!({"id":"fabricloader","version":"0.19.5","jars":[{"file":"META-INF/jars/mixinextras.jar"}]})).unwrap()), ("META-INF/jars/mixinextras.jar", nested)])
+        };
+        let cx = Context {
+            root: root.clone(),
+            cancelled: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            event: &|_| {},
+        };
+        let profile = json!({"dir":game,"version":"fixture","loader":"FABRIC"});
+        fs::write(&path, make_loader("0.5.5")).unwrap();
+        assert!(check_dependencies(&cx, &profile).is_ok());
+        fs::write(&path, make_loader("0.5.4")).unwrap();
+        assert!(check_dependencies(&cx, &profile)
+            .unwrap_err()
+            .contains("mixinextras"));
+        fs::remove_file(&path).unwrap();
+        assert!(check_dependencies(&cx, &profile).is_err());
+        fs::remove_dir_all(root).unwrap();
+    }
     #[test]
     fn ranges_prerelease_and_aliases() {
         assert!(satisfies("1.2.3", ">=1.0 <2"));

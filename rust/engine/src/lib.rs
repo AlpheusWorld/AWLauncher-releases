@@ -91,7 +91,7 @@ impl Context<'_> {
         CLIENT
             .get_or_init(|| {
                 reqwest::blocking::Client::builder()
-                    .user_agent("AWLauncher/1.0.55")
+                    .user_agent("AWLauncher/1.0.56")
                     .connect_timeout(Duration::from_secs(20))
                     .timeout(Duration::from_secs(120))
                     .redirect(reqwest::redirect::Policy::none())
@@ -213,6 +213,7 @@ impl Context<'_> {
             let mut out = fs::File::create(&tmp).map_err(err)?;
             let mut buf = [0; 65536];
             let mut completed = 0u64;
+            let mut digest = Sha1::new();
             loop {
                 self.check()?;
                 let n = response.read(&mut buf).map_err(err)?;
@@ -220,11 +221,18 @@ impl Context<'_> {
                     break;
                 }
                 out.write_all(&buf[..n]).map_err(err)?;
+                if hash.is_some_and(|value| !value.is_empty()) {
+                    digest.update(&buf[..n]);
+                }
                 completed += n as u64;
             }
             out.sync_all().map_err(err)?;
             drop(out);
-            if !valid(&tmp) {
+            if size.is_some_and(|expected| expected > 0 && completed != expected)
+                || hash
+                    .filter(|value| !value.is_empty())
+                    .is_some_and(|expected| format!("{:x}", digest.finalize()) != expected)
+            {
                 return Err("Скачанный файл не прошёл проверку".into());
             }
             replace(&tmp, dest)?;

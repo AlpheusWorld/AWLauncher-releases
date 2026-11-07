@@ -169,7 +169,7 @@ pub fn create(cx: &Context, profile: &Value, title: &str, completed: bool) -> Re
     let data = pending.join("data");
     fs::create_dir_all(&data).map_err(err)?;
     let result = (|| {
-        storage::copy(cx, &dir, &data, &names)?;
+        storage::copy_inventory(cx, &dir, &data, &before.0, &before.1)?;
         if storage::inventory(&dir, &names)? != before
             || storage::inventory(&data, &names)? != before
         {

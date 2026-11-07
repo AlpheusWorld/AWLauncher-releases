@@ -355,6 +355,45 @@ pub fn normalize_datapack(cx: &Context, file: &Path) -> Result<()> {
     let _ = fs::remove_file(normalized);
     result
 }
+/// List local files without hashing large archives or waiting for catalog APIs.
+/// The full scan can enrich this preliminary list in the background.
+pub fn scan_local(cx: &Context, profile: &Value) -> Result<Vec<Value>> {
+    let dir = PathBuf::from(profile["dir"].as_str().ok_or("Нет папки сборки")?);
+    let options = builds::options(&dir)?;
+    let managed = options["catalogMods"].as_array();
+    let mut rows = Vec::new();
+    for item in library::scan_content(&dir).map_err(err)? {
+        cx.check()?;
+        storage::path(&dir, &item.relative)?;
+        let kind = match item.category {
+            "Моды" => "mod",
+            "Шейдеры" => "shader",
+            "Ресурспаки" => "resourcepack",
+            _ => "datapack",
+        };
+        let remembered = managed.into_iter().flatten().find(|m| {
+            m["fileName"].as_str().is_some_and(|name| {
+                name == item.relative || name == item.name
+                    || item.relative.strip_suffix(".disabled") == Some(name)
+                    || item.name.strip_suffix(".disabled") == Some(name)
+            })
+        });
+        rows.push(json!({
+            "file": item.relative,
+            "title": remembered.and_then(|m| m["title"].as_str()).unwrap_or(&item.name),
+            "kind": kind,
+            "version": remembered.map(|m| m["versionNumber"].clone()).unwrap_or(json!("")),
+            "enabled": item.enabled,
+            "project": remembered.map(|m| m["projectId"].clone()).unwrap_or(json!("")),
+            "icon": remembered.and_then(|m| icon_url(&m["icon"])).or_else(|| remembered.and_then(|m| icon_url(&m["iconUrl"]))),
+            "update": "",
+            "sha1": remembered.map(|m| m["sha1"].clone()).unwrap_or(json!("")),
+            "versionId": remembered.map(|m| m["versionId"].clone()).unwrap_or(Value::Null),
+        }));
+    }
+    Ok(rows)
+}
+
 pub fn scan(cx: &Context, profile: &Value, updates: bool, identify: bool) -> Result<Vec<Value>> {
     let dir = PathBuf::from(profile["dir"].as_str().ok_or("Нет папки сборки")?);
     let options = builds::options(&dir)?;
@@ -687,7 +726,7 @@ pub fn install_version(
         }
         let dir = PathBuf::from(profile["dir"].as_str().unwrap());
         crate::mod_compat::check(&dir)?;
-        return crate::mod_compat::check_dependencies(&dir);
+        return crate::mod_compat::check_dependencies(cx, profile);
     }
     if kind == "shader" {
         if !matches!(
@@ -770,7 +809,7 @@ pub fn install(cx: &Context, profile: &Value, r: &Value) -> Result<Value> {
     let stage = storage::path(&dir, &stage_name)?;
     let result = history::record(cx, profile, "Установка контента", || {
         fs::create_dir_all(&stage).map_err(err)?;
-        storage::copy(cx, &dir, &stage, &names)?;
+        storage::copy_inventory(cx, &dir, &stage, &before.0, &before.1)?;
         let mut staged = profile.clone();
         staged["dir"] = json!(stage);
         install_version(
@@ -852,7 +891,7 @@ pub fn toggle(cx: &Context, profile: &Value, r: &Value) -> Result<Value> {
                         fs::rename(&path, &dest).map_err(err)?;
                         if kind == "mod" && enabled {
                             if let Err(error) = crate::mod_compat::check(&dir)
-                                .and_then(|_| crate::mod_compat::check_dependencies(&dir))
+                                .and_then(|_| crate::mod_compat::check_dependencies(cx, profile))
                             {
                                 let _ = fs::rename(&dest, &path);
                                 let v = item["versionId"]

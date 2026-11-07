@@ -56,13 +56,18 @@ after(async () => {
 });
 beforeEach(async () => {
   page = await browser.newPage({ viewport: { width: 1920, height: 1040 } });
+  const dictionary = JSON.parse(await fs.readFile(path.resolve(__dirname, '../../../src/main/resources/i18n/en.json'), 'utf8'));
+  const extra = JSON.parse(await fs.readFile(path.resolve(__dirname, '../../ui/assets/native-en.json'), 'utf8'));
+  const aliases = JSON.parse(await fs.readFile(path.resolve(__dirname, '../../ui/assets/native-aliases.json'), 'utf8'));
+  const english = { ...extra, ...dictionary };
+  for (const [alias, canonical] of Object.entries(aliases)) if (!(alias in english) && english[canonical]) english[alias] = english[canonical];
   const imageData =
     "data:image/png;base64," +
     (await fs.readFile(path.join(root, "assets/icons/cube.png"))).toString(
       "base64",
     );
   await page.addInitScript(
-    ({ imageData }) => {
+    ({ imageData, english }) => {
       const snapshot = {
         version: "1.0.50",
         totalMemory: 16384,
@@ -210,12 +215,15 @@ beforeEach(async () => {
             return structuredClone(snapshot.accounts);
           }
           if (r.op === "launch") { if(window.rejectLaunch) throw "Не удалось запустить игру"; if(window.deferLaunch) await new Promise(resolve => window.finishLaunch = resolve); return { pid: 123, message: "Игра запущена" }; }
-          if (r.op === "content") {
-            if (window.deferContent)
+          if (r.op === "installedProjects") return r.target === "build:one" ? [{project:"sodium",kind:"mod",enabled:true}] : [];
+          if (r.op === "project") return {project:{body:"Описание"},versions:[]};
+          if (r.op === "content" || r.op === "contentLocal") {
+            if (r.op === "content" && window.rejectContent) throw Error("Нет связи с каталогом");
+            if (r.op === "content" && window.deferContent)
               await new Promise((resolve) => (window.finishContent = resolve));
             return [
               {
-                title: "Sodium",
+                title: r.op === "content" && window.enrichContentTitle ? "Sodium enriched" : "Sodium",
                 file: "mods/sodium.jar",
                 kind: "mod",
                 enabled: true,
@@ -263,10 +271,13 @@ beforeEach(async () => {
           return [];
         }
         if (command === "image_data") return imageData;
-        if (command === "translate_text")
+        if (command === "translate_text") {
+          if (window.deferFriendStatusTranslation && args.values.includes('Ожидание подключения друга'))
+            await new Promise(resolve => window.finishFriendStatusTranslation = resolve);
           return args.values.map((v) =>
-            args.language === "ES" ? "ES: " + v : v,
+            args.language === "ES" ? "ES: " + v : args.language === "EN" ? english[v] || v : v,
           );
+        }
         if (command === "search")
           return {
             hits: [
@@ -285,6 +296,10 @@ beforeEach(async () => {
             ],
             total_hits: 1,
           };
+        if (command === "world_status") return window.friendStatus || {active: true, peers: [{pingMs: 42, route: "direct"}]};
+        if (command === "host_world") return "AWD1-test-invite";
+        if (command === "join_world") return "127.0.0.1:45678";
+        if (command === "stop_world") return null;
         if (command === "running_games") return [];
       };
       window.windowMaximized = false;
@@ -307,7 +322,7 @@ beforeEach(async () => {
         },
       };
     },
-    { imageData },
+    { imageData, english },
   );
   await page.goto(url);
   await page.getByRole("heading", { name: "Играть", exact: true }).waitFor();
@@ -430,6 +445,28 @@ test("запоздалое чтение галереи не заменяет э�
     .waitFor();
   assert.equal(await page.locator(".gallery").count(), 0);
 });
+test("иконка сборки и кнопки не перекрываются на разных размерах окна", async () => {
+  for (const width of [600, 760, 815, 900, 1050, 1280, 1920]) {
+    await page.setViewportSize({ width, height: 630 });
+    const hero = page.locator('.hero');
+    const icon = hero.locator('.hero-art .build-icon');
+    assert.equal(await icon.isVisible(), true, `icon missing at ${width}px`);
+    const bounds = await hero.boundingBox();
+    const picture = await icon.boundingBox();
+    const edit = await hero.locator('.hero-art button').boundingBox();
+    for (const button of await hero.locator('.hero-middle > .grow > .row > button').all()) {
+      const b = await button.boundingBox();
+      assert.ok(b.x >= bounds.x - 1 && b.x + b.width <= bounds.x + bounds.width + 1, `button outside card at ${width}px`);
+      assert.ok(b.y >= bounds.y - 1 && b.y + b.height <= bounds.y + bounds.height + 1, `button outside card vertically at ${width}px`);
+      const overlaps = b.x < picture.x + picture.width && b.x + b.width > picture.x && b.y < picture.y + picture.height && b.y + b.height > picture.y;
+      assert.equal(overlaps, false, `button overlaps icon at ${width}px`);
+      const overlapsEdit = b.x < edit.x + edit.width && b.x + b.width > edit.x && b.y < edit.y + edit.height && b.y + b.height > edit.y;
+      assert.equal(overlapsEdit, false, `button overlaps icon editor at ${width}px`);
+    }
+    assert.ok(picture.x >= bounds.x && picture.x + picture.width <= bounds.x + bounds.width, `icon outside card at ${width}px`);
+  }
+});
+
 test("галерея и настройки укладываются в широкое и минимальное окно", async () => {
   for (const viewport of [
     { width: 1920, height: 1040 },
@@ -818,6 +855,11 @@ test("смена языка не оставляет старый перевод 
   await page.waitForFunction(() =>
     document.getElementById("game-status").textContent.startsWith("ES:"),
   );
+  await page.waitForTimeout(250);
+  const before = await page.evaluate(() => window.calls.filter(call => call.command === 'translate_text').length);
+  await page.waitForTimeout(300);
+  const after = await page.evaluate(() => window.calls.filter(call => call.command === 'translate_text').length);
+  assert.ok(after - before <= 2, 'translation updates should not create an observer loop');
   await page.locator("[data-action=language][data-id=RU]").click();
   await page.waitForFunction(
     () =>
@@ -826,12 +868,77 @@ test("смена языка не оставляет старый перевод 
   );
 });
 
-test("шапка сборки доступна до окончания чтения модов", async () => {
+test("английский применяется к кнопкам, подсказкам и динамическим статусам", async () => {
+  await page.evaluate(async () => {
+    state.data.builds[0].name = 'Содержимое';
+    state.data.builds[0].lastPlayed = Date.UTC(2026, 9, 31);
+    state.data.settings.language = 'EN';
+    translationVersion++;
+    await render({refresh:true});
+    await translateVisible(document.body);
+  });
+  assert.equal(await page.locator('.hero h2').textContent(), 'Содержимое');
+  assert.match(await page.locator('.hero-middle p').textContent(), /Oct/);
+  await page.locator('.hero [data-action="import-pack"]').getByText('Import modpack').waitFor();
+  await page.locator('.hero [data-action="import-profile"]').getByText('Import profile').waitFor();
+  await page.evaluate(() => {
+    const button = document.createElement('button');
+    button.id = 'translation-dynamic-test';
+    button.textContent = 'Проверяю…';
+    button.setAttribute('title', 'Установлен, но отключён в сборке');
+    document.querySelector('#main').append(button);
+    const input = document.createElement('input');
+    input.id = 'translation-placeholder-test';
+    input.placeholder = 'Найти проект…';
+    input.value = 'Содержимое';
+    document.querySelector('#main').append(input);
+  });
+  await page.locator('#translation-dynamic-test').getByText('Checking…').waitFor();
+  await page.waitForFunction(() => document.querySelector('#translation-dynamic-test')?.title === 'Installed but disabled in this instance');
+  await page.waitForFunction(() => document.querySelector('#translation-placeholder-test')?.placeholder === 'Find a project…');
+  assert.equal(await page.locator('#translation-placeholder-test').inputValue(), 'Содержимое');
+  await page.locator('#translation-dynamic-test').evaluate(el => el.textContent = 'Установлен');
+  await page.locator('#translation-dynamic-test').getByText('Installed', { exact: true }).waitFor();
+  await page.evaluate(async () => {
+    state.data.settings.language = 'RU';
+    translationVersion++;
+    await translateVisible(document.body);
+  });
+  await page.locator('#translation-dynamic-test').getByText('Установлен', { exact: true }).waitFor();
+  assert.equal(await page.locator('#translation-dynamic-test').getAttribute('title'), 'Установлен, но отключён в сборке');
+  assert.equal(await page.locator('#translation-placeholder-test').getAttribute('placeholder'), 'Найти проект…');
+});
+
+test("ошибка сетевой проверки не скрывает локальные моды", async () => {
+  await page.evaluate(() => { window.rejectContent = true; });
+  await openBuild();
+  await page.locator('#content-enrichment').getByText('Не удалось получить дополнительные сведения').waitFor();
+  assert.equal(await page.locator('[data-content-index="0"] strong').textContent(), 'Sodium');
+  assert.equal(await page.locator('[data-action="toggle-content"]').isEnabled(), true);
+  assert.equal(await page.locator('[data-action="update-all"]').isDisabled(), true);
+});
+
+test("сведения загружаются в фоне без потери выделения", async () => {
+  await page.evaluate(() => { window.deferContent = true; window.enrichContentTitle = true; });
+  await openBuild();
+  const row = page.locator('[data-content-index="0"]');
+  await row.evaluate(el => el.dataset.sentinel = 'same');
+  await row.locator('[data-select]').check();
+  await page.waitForFunction(() => !!window.finishContent);
+  await page.evaluate(() => window.finishContent());
+  await row.locator('strong').getByText('Sodium enriched').waitFor();
+  assert.equal(await page.locator('[data-action="update-all"]').isEnabled(), true);
+  assert.equal(await row.getAttribute('data-sentinel'), 'same');
+  assert.equal(await row.locator('[data-select]').isChecked(), true);
+});
+
+test("локальный список доступен до окончания сетевой проверки контента", async () => {
   await page.evaluate(() => (window.deferContent = true));
   await page.locator("#navigation [data-page=library]").click();
   await page.locator(".open-build").first().click();
   await page.locator(".instance-header").waitFor();
-  assert.equal(await page.locator(".content-table").count(), 0);
+  await page.locator(".content-table").waitFor();
+  assert.equal(await page.locator('[data-content-index="0"] strong').textContent(), "Sodium");
   await page.locator("#main [data-tab=screenshots]").click();
   await page.locator("#shot-content").waitFor();
   await page.waitForFunction(() => !!window.finishContent);
@@ -1180,4 +1287,96 @@ test('Microsoft sign-in displays its code while downloads are paused', async () 
   assert.equal(await page.evaluate(() => state.queue.length), 0);
   await page.evaluate(() => window.finishMicrosoftLogin());
   await page.locator('#modal').waitFor({ state: 'hidden' });
+});
+
+
+test("каталог отмечает мод установленным только в выбранной сборке", async () => {
+  await page.locator('#navigation [data-page="catalog"]').click();
+  assert.equal(await page.locator('#catalog-target').inputValue(), 'build:one');
+  await page.locator('[data-action="catalog-kind"][data-kind="mod"]').click();
+  await page.locator('#catalog-target').selectOption('build:one');
+  const button = page.locator('[data-catalog-project="sodium"]');
+  await page.waitForFunction(() => document.querySelector('[data-catalog-project="sodium"]')?.textContent === 'Установлен');
+  assert.equal(await button.isDisabled(), true);
+  await page.locator('.project-title').click();
+  await page.waitForFunction(() => document.querySelector('[data-project-installed]')?.textContent === 'Установлен');
+  assert.equal(await page.locator('[data-project-installed]').isDisabled(), true);
+  await page.locator('#back').click();
+  await page.locator('#catalog-target').waitFor();
+  await page.locator('#catalog-target').selectOption('build:two');
+  await page.waitForFunction(() => document.querySelector('[data-catalog-project="sodium"]')?.textContent === 'Установить');
+  assert.equal(await button.isEnabled(), true);
+});
+
+test("раздел друзей сохраняет ровную компоновку на разных размерах окна", async () => {
+  await page.locator('#navigation [data-page="friends"]').click();
+  await page.locator('.friends-page').waitFor();
+  assert.doesNotMatch(await page.locator('.friends-page').innerText(), /тест|test/i);
+  for (const width of [600, 760, 950, 1280, 1920]) {
+    await page.setViewportSize({width, height: 800});
+    assert.ok(await page.locator('#main').evaluate(el => el.scrollWidth <= el.clientWidth + 1), `horizontal overflow at ${width}px`);
+    const cards = await page.locator('.friend-card').all();
+    const first = await cards[0].boundingBox(), second = await cards[1].boundingBox();
+    if (Math.abs(first.y - second.y) < 2) {
+      const a = await cards[0].locator('.friends-actions button').boundingBox();
+      const b = await cards[1].locator('.friends-actions button').boundingBox();
+      assert.ok(Math.abs(a.y - b.y) < 2, `buttons are not aligned at ${width}px`);
+    }
+  }
+});
+
+test("кнопка отключения доступна только при активном соединении", async () => {
+  await page.evaluate(() => { window.friendStatus = {active:false, peers:[]}; });
+  await page.locator('#navigation [data-page="friends"]').click();
+  await page.waitForFunction(() => window.calls.some(call => call.command === 'world_status'));
+  assert.equal(await page.locator('[data-action="friend-stop"]').isDisabled(), true);
+  await page.evaluate(async () => { window.friendStatus = {active:true, peers:[{pingMs:42,route:'direct'}]}; await updateFriendNetworkStatus(); });
+  assert.equal(await page.locator('.friends-status').getAttribute('data-state'), 'connected');
+  assert.equal(await page.locator('[data-action="friend-stop"]').isEnabled(), true);
+});
+
+test("статус друга не мигает русским при обновлении английского интерфейса", async () => {
+  await page.evaluate(() => { window.friendStatus = {active:false, peers:[]}; state.data.settings.language = 'EN'; translationVersion++; });
+  await page.locator('#navigation [data-page="friends"]').click();
+  const status = page.locator('#friend-network-status');
+  await status.getByText('No active connection', {exact:true}).waitFor();
+  await page.evaluate(() => {
+    window.friendStatusMutations = 0;
+    new MutationObserver(records => { window.friendStatusMutations += records.length; }).observe(document.querySelector('#friend-network-status'), {childList:true, characterData:true, subtree:true});
+  });
+  await page.evaluate(async () => { await updateFriendNetworkStatus(); await updateFriendNetworkStatus(); });
+  assert.equal(await page.evaluate(() => window.friendStatusMutations), 0);
+  await page.evaluate(() => { window.friendStatus = {active:true, peers:[]}; window.deferFriendStatusTranslation = true; updateFriendNetworkStatus(); });
+  await page.waitForFunction(() => !!window.finishFriendStatusTranslation);
+  assert.equal(await status.textContent(), 'No active connection');
+  await page.evaluate(() => window.finishFriendStatusTranslation());
+  await status.getByText('Waiting for a friend to connect', {exact:true}).waitFor();
+  await page.evaluate(async () => { state.data.settings.language = 'RU'; translationVersion++; await updateFriendNetworkStatus(); });
+  assert.equal(await status.textContent(), 'Ожидание подключения друга');
+});
+
+test("обновлённый раздел друзей переводится на английский", async () => {
+  await page.evaluate(() => { window.friendStatus = {active:false, peers:[]}; state.data.settings.language = 'EN'; translationVersion++; });
+  await page.locator('#navigation [data-page="friends"]').click();
+  await page.getByText('Play with friends in your worlds').waitFor();
+  await page.getByRole('heading', {name:'Invite to world'}).waitFor();
+  await page.getByText('About this connection', {exact:true}).waitFor();
+  assert.equal(await page.locator('[data-action="friend-stop"]').isDisabled(), true);
+});
+
+test("приглашение запускает сетевой туннель и показывает адрес для Minecraft", async () => {
+  await page.locator('#navigation [data-page="friends"]').click();
+  await page.getByText('42 мс · напрямую').waitFor();
+  await page.locator('#friend-host-port').fill('54321');
+  await page.locator('[data-action="friend-create"]').click();
+  await page.getByText('Приглашение готово. Передай его другу.').waitFor();
+  assert.equal(await page.locator('#friend-copy [data-code]').getAttribute('data-code'), 'AWD1-test-invite');
+  await page.locator('#friend-invite').fill('AWD1-test-invite');
+  await page.locator('[data-action="friend-check"]').click();
+  await page.getByText(/127\.0\.0\.1:45678/).waitFor();
+  const calls = await page.evaluate(() => window.calls);
+  assert.deepEqual(calls.filter(c => c.command === 'host_world')[0].args, {port: 54321});
+  assert.deepEqual(calls.filter(c => c.command === 'join_world')[0].args, {ticket: 'AWD1-test-invite'});
+  await page.locator('[data-action="friend-stop"]').click();
+  assert.ok((await page.evaluate(() => window.calls)).some(c => c.command === 'stop_world'));
 });

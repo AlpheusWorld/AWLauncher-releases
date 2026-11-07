@@ -1,4 +1,4 @@
-#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+#![cfg_attr(not(test), windows_subsystem = "windows")]
 #[path = "../../ui/src/activity.rs"]
 mod activity;
 #[path = "../../ui/src/backend.rs"]
@@ -65,6 +65,8 @@ async fn open_url(url: String) -> Result<(), String> {
         .map_err(|e| e.to_string())
 }
 
+mod friends;
+
 fn home_dir() -> Option<PathBuf> {
     std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" }).map(PathBuf::from)
 }
@@ -77,6 +79,8 @@ fn running_games(pids: Vec<u32>) -> Vec<u32> {
 #[derive(Default)]
 struct State {
     discord: discord::Presence,
+    friends: Mutex<Option<tokio::task::JoinHandle<()>>>,
+    friend_status: Arc<Mutex<friends::ConnectionStatus>>,
     startup_target: Mutex<Option<String>>,
     profiles: Mutex<HashMap<String, Value>>,
     tasks: Mutex<HashMap<String, Arc<std::sync::atomic::AtomicBool>>>,
@@ -430,7 +434,11 @@ fn main() {
             search,
             translate_text,
             open_url,
-            running_games
+            running_games,
+            friends::host_world,
+            friends::join_world,
+            friends::stop_world,
+            friends::world_status
         ])
         .on_window_event(|window, event| {
             if matches!(event, tauri::WindowEvent::Destroyed) {

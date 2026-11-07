@@ -13,6 +13,7 @@ const btn = (text, action, cls = "", data = "") =>
   `<button class="${cls}" data-action="${action}" ${data}>${text}</button>`;
 const searchField = (id, hint) =>
   `<div class="search">${icon("search")}<input id="${id}" type="search" placeholder="${esc(hint)}" aria-label="${esc(hint)}"></div>`;
+const uiLocale = () => state.languages.find(item => item.id === state.data.settings.language)?.tag || (state.data.settings.language === "RU" ? "ru-RU" : "en-US");
 const ms = (value) => {
   const minutes = Math.floor((value || 0) / 60000);
   return minutes >= 60
@@ -21,12 +22,13 @@ const ms = (value) => {
 };
 const date = (value) =>
   value
-    ? new Intl.DateTimeFormat("ru", { day: "numeric", month: "short" }).format(
+    ? new Intl.DateTimeFormat(uiLocale(), { day: "numeric", month: "short" }).format(
         value,
       )
     : "Ещё не запускалась";
 const names = {
   home: "Играть",
+  friends: "Друзья",
   skins: "Скины",
   library: "Сборки",
   catalog: "Каталог",
@@ -208,9 +210,10 @@ function renderChrome() {
       .map(([page, i, label]) =>
         page === "caption"
           ? '<span class="caption">ДРУГОЕ</span>'
-          : `<button data-page="${page}" class="${page === (state.route.page === "instance" ? "library" : state.route.page === "project" ? "catalog" : state.route.page) ? "active" : ""}" ${page === "friends" ? 'disabled' : ""}>${icon(i)}<span>${label}</span></button>`,
+          : `<button data-page="${page}" class="${page === (state.route.page === "instance" ? "library" : state.route.page === "project" ? "catalog" : state.route.page) ? "active" : ""}" >${icon(i)}<span>${label}</span></button>`,
       )
       .join("");
+  $("#crumb").toggleAttribute("data-native-text", state.route.page === "instance");
   $("#crumb").textContent =
     state.route.page === "instance"
       ? selected()?.name || "Сборка"
@@ -273,6 +276,9 @@ async function render({ refresh: force = false } = {}) {
     main.scrollTop = view.scroll || 0;
     view.used = Date.now();
     finishView(view.node);
+    if (state.route.page === "instance" && (state.route.tab || "content") === "content") enrichContent(view.node, state.route.target);
+    if (state.route.page === "catalog") updateCatalogInstalled(view.node);
+    if (state.route.page === "project") updateProjectInstalled(view.node);
     animateView(view.node);
     return;
   }
@@ -290,6 +296,7 @@ async function render({ refresh: force = false } = {}) {
     const html = await {
       skins: () => '<section class="skin-screen" id="skin-page"></section>',
       home: homePage,
+      friends: friendsPage,
       library: libraryPage,
       catalog: catalogPage,
       downloads: downloadsPage,
@@ -313,7 +320,11 @@ async function render({ refresh: force = false } = {}) {
       screenViews.delete(oldest[0]);
     }
     bindPage();
+    if (state.route.page === "catalog") updateCatalogInstalled(node);
+    if (state.route.page === "project") updateProjectInstalled(node);
+    if (state.route.page === "friends") updateFriendNetworkStatus();
     finishView(node);
+    if (state.route.page === "instance" && (state.route.tab || "content") === "content") enrichContent(node, state.route.target);
     animateView(node);
   } catch (error) {
     if (epoch !== state.epoch) return;
@@ -356,6 +367,8 @@ function captureViewData() {
 function invalidateViews(target = "") {
   if (target) contentReads.delete(target);
   else contentReads.clear();
+  if (target) installedProjectReads.delete(target);
+  else installedProjectReads.clear();
   for (const [key] of screenViews) {
     if (
       !target ||
@@ -367,6 +380,12 @@ function invalidateViews(target = "") {
       if (view) disposeImages(view.node);
       screenViews.delete(key);
     }
+  }
+  if ((!target || target === state.catalog.target) && ["catalog", "project"].includes(state.route.page)) {
+    queueMicrotask(() => {
+      if (state.route.page === "catalog") updateCatalogInstalled(activeView?.node || $("#main"));
+      if (state.route.page === "project") updateProjectInstalled(activeView?.node || $("#main"));
+    });
   }
 }
 function animateView(node) {
@@ -476,7 +495,7 @@ async function homePage() {
   const pending = state.queue.filter((x) =>
     ["waiting", "running"].includes(x.status),
   );
-  return `<section class="home constrained"><div class="row spread"><h1>Играть</h1>${btn("Все сборки　→", "library", "link")}</div><div class="home-grid"><article class="hero"><div class="row spread"><small>Выбранная сборка</small><small>${b ? (b.ready ? "Готова к игре" : "Не установлена") : ""}</small></div><div class="hero-middle"><div class="grow"><h2>${esc(b?.name || "Начни новую игру")}</h2><p>${b ? (b.lastPlayed ? "Последний запуск: " + date(b.lastPlayed) : "Ещё не запускалась") : "Создай сборку или выбери модпак из каталога"}</p><div class="row">${b ? btn(icon("play") + (b.ready ? "Играть" : "Установить и играть"), "launch", "primary", `data-target="${esc(b.key)}"`) + btn("Настроить", "build-settings", "", `data-target="${esc(b.key)}"`) : btn("Новая сборка", "create-build", "primary")}${btn("Импорт модпака", "import-pack")}${btn("Импорт профиля", "import-profile")}</div></div>${b ? `<div class="hero-art">${buildIcon(b)}${btn("Изменить иконку", "icon-editor", "", `data-target="${esc(b.key)}"`)}</div>` : ""}</div>${b ? `<div class="hero-meta"><div><small>Версия</small>${esc(b.version)}</div><div><small>Загрузчик</small>${esc(b.loader)}</div><div><small>Содержимое</small>Проектов: ${b.contentCount ?? b.options.catalogMods?.length ?? 0}</div>${btn("›", "open-build", "quiet", `data-target="${esc(b.key)}"`)}</div>` : ""}</article><aside class="home-side"><div class="panel"><div class="row spread"><h3>Загрузки</h3>${btn(icon("download"), "downloads", "icon-button")}</div><p>${pending.length ? `В очереди: ${pending.length}` : "Загрузок пока нет"}</p>${pending[0] ? `<div class="track"><i style="width:${(pending[0].fraction || 0) * 100}%"></i></div>` : ""}</div><div class="panel activity-card" id="home-activity" role="button" tabindex="0" data-action="activity" aria-label="Открыть активность"><small>Время в игре</small><h2 style="margin:6px 0">${stats ? ms(stats.week_ms) : "…"}</h2><small>Эта неделя</small>${stats ? miniBars(stats) : ""}</div></aside></div><div class="row spread"><h2>Мои сборки</h2>${btn("Все сборки　→", "library", "link")}</div><div class="home-builds">${
+  return `<section class="home constrained"><div class="row spread"><h1>Играть</h1>${btn("Все сборки　→", "library", "link")}</div><div class="home-grid"><article class="hero"><div class="row spread"><small>Выбранная сборка</small><small>${b ? (b.ready ? "Готова к игре" : "Не установлена") : ""}</small></div><div class="hero-middle"><div class="grow"><h2 ${b ? "data-native-text" : ""}>${esc(b?.name || "Начни новую игру")}</h2><p>${b ? (b.lastPlayed ? "Последний запуск: " + date(b.lastPlayed) : "Ещё не запускалась") : "Создай сборку или выбери модпак из каталога"}</p><div class="row">${b ? btn(icon("play") + (b.ready ? "Играть" : "Установить и играть"), "launch", "primary", `data-target="${esc(b.key)}"`) + btn("Настроить", "build-settings", "", `data-target="${esc(b.key)}"`) : btn("Новая сборка", "create-build", "primary")}${btn("Импорт модпака", "import-pack")}${btn("Импорт профиля", "import-profile")}</div></div>${b ? `<div class="hero-art">${buildIcon(b)}${btn("Изменить иконку", "icon-editor", "", `data-target="${esc(b.key)}"`)}</div>` : ""}</div>${b ? `<div class="hero-meta"><div><small>Версия</small>${esc(b.version)}</div><div><small>Загрузчик</small>${esc(b.loader)}</div><div><small>Содержимое</small>Проектов: ${b.contentCount ?? b.options.catalogMods?.length ?? 0}</div>${btn("›", "open-build", "quiet", `data-target="${esc(b.key)}"`)}</div>` : ""}</article><aside class="home-side"><div class="panel"><div class="row spread"><h3>Загрузки</h3>${btn(icon("download"), "downloads", "icon-button")}</div><p>${pending.length ? `В очереди: ${pending.length}` : "Загрузок пока нет"}</p>${pending[0] ? `<div class="track"><i style="width:${(pending[0].fraction || 0) * 100}%"></i></div>` : ""}</div><div class="panel activity-card" id="home-activity" role="button" tabindex="0" data-action="activity" aria-label="Открыть активность"><small>Время в игре</small><h2 style="margin:6px 0">${stats ? ms(stats.week_ms) : "…"}</h2><small>Эта неделя</small>${stats ? miniBars(stats) : ""}</div></aside></div><div class="row spread"><h2>Мои сборки</h2>${btn("Все сборки　→", "library", "link")}</div><div class="home-builds">${
     state.data.builds
       .slice(0, 3)
       .map((b) => buildRow(b, true))
@@ -561,7 +580,7 @@ async function catalogPage() {
             .map((x) => `<span class="badge">${esc(x)}</span>`)
             .join(
               "",
-            )}</div><small>↓ ${new Intl.NumberFormat("ru", { notation: "compact", maximumFractionDigits: 1 }).format(h.downloads || 0)}</small><div class="install">${btn(h.build ? "Открыть" : "Установить", h.build ? "open-build" : "install", "primary", h.build ? `data-target="${esc(h.build)}"` : `data-index="${i}"`)}</div></article>`,
+            )}</div><small>↓ ${new Intl.NumberFormat(uiLocale(), { notation: "compact", maximumFractionDigits: 1 }).format(h.downloads || 0)}</small><div class="install">${btn(h.build ? "Открыть" : b && ["mod", "shader", "resourcepack"].includes(c.kind) ? "Проверяю…" : "Установить", h.build ? "open-build" : "install", "primary", h.build ? `data-target="${esc(h.build)}"` : `data-index="${i}" data-catalog-project="${esc(h.project_id)}" ${b && ["mod", "shader", "resourcepack"].includes(c.kind) ? "disabled" : ""}`)}</div></article>`,
       )
       .join("") ||
     '<div class="empty"><h2>Ничего не найдено</h2><p>Попробуй другой запрос или выбери другую сборку</p></div>'
@@ -619,6 +638,7 @@ async function updateCatalog() {
     ).textContent;
     if (activeView) activeView.data = captureViewData();
     finishView(grid);
+    updateCatalogInstalled(grid);
     animateView(grid);
   } catch (error) {
     if (epoch === state.epoch && sequence === catalogSequence) {
@@ -633,7 +653,7 @@ async function updateCatalog() {
   }
 }
 function instanceHeader(b, tab = state.route.tab || "content") {
-  return `<section class="instance-header row">${buildIcon(b)}<div class="grow"><h1>${esc(b.name)}</h1><p>${esc(b.loader)} ${esc(b.version)} · ${ms(b.playTime)}</p><p>Последний запуск: ${date(b.lastPlayed)}</p></div>${btn(icon("play") + "Играть", "launch", "primary", `data-target="${esc(b.key)}"`)}${btn(icon("settings"), "build-settings", "icon-button", `data-target="${esc(b.key)}" aria-label="Настройки сборки"`)}${btn("⋮", "build-menu", "icon-button", `data-target="${esc(b.key)}" aria-label="Действия"`)}</section><div class="tabs">${Object.entries(
+  return `<section class="instance-header row">${buildIcon(b)}<div class="grow"><h1 data-native-text>${esc(b.name)}</h1><p>${esc(b.loader)} ${esc(b.version)} · ${ms(b.playTime)}</p><p>Последний запуск: ${date(b.lastPlayed)}</p></div>${btn(icon("play") + "Играть", "launch", "primary", `data-target="${esc(b.key)}"`)}${btn(icon("settings"), "build-settings", "icon-button", `data-target="${esc(b.key)}" aria-label="Настройки сборки"`)}${btn("⋮", "build-menu", "icon-button", `data-target="${esc(b.key)}" aria-label="Действия"`)}</section><div class="tabs">${Object.entries(
     tabs,
   )
     .map(([key, label]) =>
@@ -663,6 +683,69 @@ async function instancePage() {
   return header + body;
 }
 const contentReads = new Map();
+const contentEnrichRuns = new WeakMap();
+const installedProjectReads = new Map();
+function readInstalledProjects(target) {
+  let request = installedProjectReads.get(target);
+  if (!request) {
+    request = contentReads.get(target) || rpc({ op: "installedProjects", target });
+    installedProjectReads.set(target, request);
+    request.catch(() => {
+      if (installedProjectReads.get(target) === request) installedProjectReads.delete(target);
+    });
+    while (installedProjectReads.size > 8)
+      installedProjectReads.delete(installedProjectReads.keys().next().value);
+  }
+  return request;
+}
+async function updateCatalogInstalled(root) {
+  const target = state.catalog.target, kind = state.catalog.kind;
+  if (!target || state.catalog.installed || !["mod", "shader", "resourcepack"].includes(kind)) return;
+  const buttons = [...root.querySelectorAll("[data-catalog-project]")];
+  if (!buttons.length) return;
+  for (const button of buttons) { button.disabled = true; button.textContent = "Проверяю…"; }
+  const request = readInstalledProjects(target);
+  try {
+    const items = await request;
+    if (installedProjectReads.get(target) !== request || state.route.page !== "catalog" || state.catalog.target !== target || state.catalog.kind !== kind) return;
+    const installed = new Map(items.filter(item => item.kind === kind && item.project).map(item => [String(item.project), item]));
+    for (const button of buttons) {
+      if (!button.isConnected) continue;
+      const item = installed.get(button.dataset.catalogProject);
+      button.disabled = !!item;
+      button.textContent = item ? "Установлен" : "Установить";
+      button.title = item && !item.enabled ? "Установлен, но отключён в сборке" : "";
+    }
+  } catch {
+    if (installedProjectReads.get(target) !== request || state.route.page !== "catalog" || state.catalog.target !== target || state.catalog.kind !== kind) return;
+    for (const button of buttons) if (button.isConnected) {
+      button.disabled = false;
+      button.textContent = "Установить";
+      button.title = "Не удалось проверить установленное содержимое";
+    }
+  }
+}
+async function updateProjectInstalled(root) {
+  const target = state.catalog.target, kind = state.catalog.kind, project = state.projectHit?.project_id;
+  const button = root.querySelector("[data-project-installed]");
+  if (!button || !target || !project || !["mod", "shader", "resourcepack"].includes(kind)) return;
+  button.disabled = true;
+  button.textContent = "Проверяю…";
+  const request = readInstalledProjects(target);
+  try {
+    const items = await request;
+    if (!button.isConnected || state.route.page !== "project" || state.catalog.target !== target || state.projectHit?.project_id !== project || installedProjectReads.get(target) !== request) return;
+    const item = items.find(item => item.kind === kind && String(item.project) === String(project));
+    button.disabled = !!item;
+    button.textContent = item ? "Установлен" : "Установить";
+    button.title = item && !item.enabled ? "Установлен, но отключён в сборке" : "";
+  } catch {
+    if (!button.isConnected || state.route.page !== "project" || state.projectHit?.project_id !== project || installedProjectReads.get(target) !== request) return;
+    button.disabled = false;
+    button.textContent = "Установить";
+    button.title = "Не удалось проверить установленное содержимое";
+  }
+}
 function readContent(target, force = false) {
   if (force) contentReads.delete(target);
   const old = contentReads.get(target);
@@ -676,10 +759,67 @@ function readContent(target, force = false) {
     contentReads.delete(contentReads.keys().next().value);
   return request;
 }
+function enrichContent(root, target) {
+  if (!root?.querySelector("#content-rows") || !target) return;
+  const request = readContent(target);
+  if (contentEnrichRuns.get(root) === request) return;
+  contentEnrichRuns.set(root, request);
+  const updateAll = root.querySelector('[data-action="update-all"]');
+  if (updateAll) updateAll.disabled = true;
+  const loadingStatus = root.querySelector("#content-enrichment");
+  if (loadingStatus) { loadingStatus.hidden = false; loadingStatus.textContent = "Проверяю сведения и обновления…"; }
+  const current = () => root.isConnected && activeView?.node === root &&
+    state.route.page === "instance" && state.route.target === target &&
+    (state.route.tab || "content") === "content" && contentReads.get(target) === request;
+  request.then(items => {
+    if (!current()) return;
+    const byFile = new Map(items.map(item => [item.file, item]));
+    state.content.forEach((item, index) => {
+      const fresh = byFile.get(item.file);
+      const row = root.querySelector(`[data-content-index="${index}"]`);
+      if (!fresh || !row || row.querySelector('[aria-busy="true"]')) return;
+      Object.assign(item, {
+        title: fresh.title, version: fresh.version, project: fresh.project,
+        versionId: fresh.versionId, sha1: fresh.sha1, update: fresh.update,
+        icon: fresh.icon || item.icon,
+      });
+      row.querySelector(".content-name strong").textContent = item.title || item.file;
+      row.querySelector(".version-cell").firstChild.textContent = item.version || "Неизвестно";
+      row.querySelector("[data-select]").setAttribute("aria-label", `Выбрать ${item.title}`);
+      row.querySelector('[data-action="toggle-content"]').setAttribute("aria-label", `${item.enabled ? "Выключить" : "Включить"} ${item.title}`);
+      const image = row.querySelector(".content-name > img");
+      if (image && item.icon) { image.src = item.icon; image.className = "item-icon"; }
+      const actions = row.querySelector(".content-actions");
+      const old = actions.firstElementChild;
+      if (!!item.update !== (old?.dataset.action === "update-item")) {
+        const template = document.createElement("template");
+        template.innerHTML = item.update
+          ? btn(icon("download"), "update-item", "icon-button", `data-index="${index}" aria-label="Обновить" title="Обновить проект"`)
+          : '<span class="action-placeholder" aria-hidden="true"></span>';
+        old.replaceWith(template.content.firstElementChild);
+      }
+    });
+    const status = root.querySelector("#content-enrichment");
+    if (status) status.hidden = true;
+    if (updateAll) updateAll.disabled = false;
+    filterContent();
+    finishView(root.querySelector("#content-rows"));
+    if (activeView?.node === root) activeView.data = captureViewData();
+  }).catch(() => {
+    const latest = contentReads.get(target);
+    if (!root.isConnected || activeView?.node !== root || state.route.page !== "instance" ||
+        state.route.target !== target || (state.route.tab || "content") !== "content" ||
+        (latest && latest !== request)) return;
+    const status = root.querySelector("#content-enrichment");
+    if (status) status.textContent = "Не удалось получить дополнительные сведения";
+  }).finally(() => {
+    if (contentEnrichRuns.get(root) === request) contentEnrichRuns.delete(root);
+  });
+}
 async function contentPage(b) {
-  state.content = await guarded(readContent(b.key));
+  state.content = await guarded(rpc({ op: "contentLocal", target: b.key }));
   state.selectedContent.clear();
-  return `<section class="stack"><div class="toolbar">${searchField("content-query", "Поиск контента…")}${btn(icon("folder") + "Добавить файлы", "import-files")}${btn("Найти проекты", "find-content", "primary")}</div><div class="row spread"><div class="chips">${[
+  return `<section class="stack"><div class="toolbar">${searchField("content-query", "Поиск контента…")}${btn(icon("folder") + "Добавить файлы", "import-files")}${btn("Найти проекты", "find-content", "primary")}</div><small id="content-enrichment" aria-live="polite">Проверяю сведения и обновления…</small><div class="row spread"><div class="chips">${[
     ["", "Всё"],
     ["mod", "Моды"],
     ["shader", "Шейдеры"],
@@ -696,7 +836,7 @@ async function contentPage(b) {
     )
     .join(
       "",
-    )}</div><div class="row">${btn(icon("download"), "update-all", "icon-button", 'aria-label="Обновить выбранные проекты"')}${btn(icon("refresh"), "reload", "icon-button", 'aria-label="Обновить список"')}</div></div><div id="selection-actions" class="toolbar" hidden>${btn("Включить", "enable-selected")}${btn("Выключить", "disable-selected")}${btn("Удалить", "remove-selected", "danger")}</div><div class="content-table"><div class="content-row table-head"><input id="select-all" type="checkbox" aria-label="Выбрать все"><span id="content-count">Проекты (${state.content.length})</span><span class="version-cell">Версия</span><span>Действия</span></div><div id="content-rows">${contentRows()}</div></div></section>`;
+    )}</div><div class="row">${btn(icon("download"), "update-all", "icon-button", 'aria-label="Обновить выбранные проекты" disabled')}${btn(icon("refresh"), "reload", "icon-button", 'aria-label="Обновить список"')}</div></div><div id="selection-actions" class="toolbar" hidden>${btn("Включить", "enable-selected")}${btn("Выключить", "disable-selected")}${btn("Удалить", "remove-selected", "danger")}</div><div class="content-table"><div class="content-row table-head"><input id="select-all" type="checkbox" aria-label="Выбрать все"><span id="content-count">Проекты (${state.content.length})</span><span class="version-cell">Версия</span><span>Действия</span></div><div id="content-rows">${contentRows()}</div></div></section>`;
 }
 function contentRows() {
   return (
@@ -751,7 +891,7 @@ async function filesPage(b, worlds = false) {
     target: b.key,
     relative: state.filePath,
   });
-  return `<section class="stack"><div class="toolbar">${searchField("file-query", worlds ? "Поиск миров…" : "Поиск файлов…")}${btn(icon("folder") + "Открыть папку", "open-folder", "", `data-target="${esc(b.key)}" data-relative="${worlds ? "saves" : esc(state.filePath)}"`)}${btn(icon("refresh"), "reload", "icon-button")}</div><div class="row"><p>${worlds ? "Миры сборки" : esc(state.filePath || "Папка сборки")}</p>${state.filePath ? btn("← Назад", "file-back", "quiet") : ""}</div><div id="file-rows">${state.fileEntries.map((x, i) => `<div class="file-row" data-file-name="${esc(x.name.toLowerCase())}">${icon(x.directory ? "folder" : "file")}<span class="grow">${esc(x.name)}</span><small>${x.directory ? "Папка" : new Intl.NumberFormat("ru", { notation: "compact" }).format(x.bytes) + " Б"}</small>${x.directory ? btn("Открыть", "file-open", "", `data-index="${i}"`) : ""}</div>`).join("") || '<div class="empty"><h3>Папка пуста</h3></div>'}</div></section>`;
+  return `<section class="stack"><div class="toolbar">${searchField("file-query", worlds ? "Поиск миров…" : "Поиск файлов…")}${btn(icon("folder") + "Открыть папку", "open-folder", "", `data-target="${esc(b.key)}" data-relative="${worlds ? "saves" : esc(state.filePath)}"`)}${btn(icon("refresh"), "reload", "icon-button")}</div><div class="row"><p>${worlds ? "Миры сборки" : esc(state.filePath || "Папка сборки")}</p>${state.filePath ? btn("← Назад", "file-back", "quiet") : ""}</div><div id="file-rows">${state.fileEntries.map((x, i) => `<div class="file-row" data-file-name="${esc(x.name.toLowerCase())}">${icon(x.directory ? "folder" : "file")}<span class="grow">${esc(x.name)}</span><small>${x.directory ? "Папка" : new Intl.NumberFormat(uiLocale(), { notation: "compact" }).format(x.bytes) + " Б"}</small>${x.directory ? btn("Открыть", "file-open", "", `data-index="${i}"`) : ""}</div>`).join("") || '<div class="empty"><h3>Папка пуста</h3></div>'}</div></section>`;
 }
 async function logPage(b) {
   state.log = await guarded(
@@ -827,7 +967,7 @@ function shotCards() {
     visibleShots()
       .map(
         ({ s, i }) =>
-          `<button class="shot" data-action="view-shot" data-index="${i}"><span class="shot-media media-loading"><img data-image-target="${esc(s.target)}" data-image-file="${esc(s.file)}" data-image-revision="${s.modified}" alt="${esc(s.name)}"><span class="media-message">Не удалось загрузить снимок<br>Нажми, чтобы повторить</span></span><span class="shot-caption"><strong>${esc(s.name)}</strong><small>${esc(s.title)}</small><small>${new Intl.DateTimeFormat("ru", { dateStyle: "medium", timeStyle: "short" }).format(s.modified)}</small></span></button>`,
+          `<button class="shot" data-action="view-shot" data-index="${i}"><span class="shot-media media-loading"><img data-image-target="${esc(s.target)}" data-image-file="${esc(s.file)}" data-image-revision="${s.modified}" alt="${esc(s.name)}"><span class="media-message">Не удалось загрузить снимок<br>Нажми, чтобы повторить</span></span><span class="shot-caption"><strong>${esc(s.name)}</strong><small>${esc(s.title)}</small><small>${new Intl.DateTimeFormat(uiLocale(), { dateStyle: "medium", timeStyle: "short" }).format(s.modified)}</small></span></button>`,
       )
       .join("") ||
     '<div class="empty"><h3>Скриншотов пока нет</h3><p>Снимки, сделанные в Minecraft, появятся здесь</p></div>'
@@ -917,7 +1057,7 @@ async function activityPage(target = "") {
       .slice(0, target ? 4 : 10)
       .map(
         (session) =>
-          `<div class="session"><span>${date(session.start)}, ${new Intl.DateTimeFormat("ru", { hour: "2-digit", minute: "2-digit" }).format(session.start)}</span><span class="badge">${esc(session.buildName || session.instance)}</span><strong>${ms(session.end - session.start)}</strong></div>`,
+          `<div class="session"><span>${date(session.start)}, ${new Intl.DateTimeFormat(uiLocale(), { hour: "2-digit", minute: "2-digit" }).format(session.start)}</span><span class="badge">${esc(session.buildName || session.instance)}</span><strong>${ms(session.end - session.start)}</strong></div>`,
       )
       .join("") ||
     '<div class="empty"><p>После игры здесь появятся твои сессии</p></div>'
@@ -940,7 +1080,7 @@ function activityCalendar(stats) {
     if (monday.getMonth() !== previousMonth) {
       if (week > 0 || monday.getDate() < 8)
         months.push(
-          `<span style="grid-column:${week + 1}/span ${Math.min(4, 53 - week)}">${new Intl.DateTimeFormat("ru", { month: "short" }).format(monday).replace(".", "")}</span>`,
+          `<span style="grid-column:${week + 1}/span ${Math.min(4, 53 - week)}">${new Intl.DateTimeFormat(uiLocale(), { month: "short" }).format(monday).replace(".", "")}</span>`,
         );
       previousMonth = monday.getMonth();
     }
@@ -967,7 +1107,7 @@ function weekRange(offset = 0) {
   const end = new Date(start); end.setDate(start.getDate() + 6);
   const options = { day: "numeric", month: "short" };
   if (start.getFullYear() !== end.getFullYear() || start.getFullYear() !== new Date().getFullYear()) options.year = "numeric";
-  const format = new Intl.DateTimeFormat("ru", options);
+  const format = new Intl.DateTimeFormat(uiLocale(), options);
   return `${format.format(start)} — ${format.format(end)}`;
 }
 function localDate(d) {
@@ -1003,7 +1143,7 @@ function noticesPage() {
 }
 async function historyPage(b) {
   state.history = await guarded(rpc({ op: "history", target: b.key }));
-  return `<section class="stack"><h3>Состояния до изменений</h3><p>Снимки сохраняют моды, настройки и другой контент перед обновлениями и массовыми изменениями</p><div class="toolbar">${btn("Вернуть рабочее состояние", "restore-latest", "primary", state.history.length ? "" : "disabled")}${btn("Сохранить состояние", "snapshot")}</div>${switchRow("Сохранять миры в новых снимках", "historyIncludeWorlds", b.options.historyIncludeWorlds, "Миры не копируются и при обычном откате сохраняют текущий прогресс", true)}${state.history.map((x, i) => `<article class="panel stack"><h3>${esc(x.reason || x.title || "Сохранённое состояние")}</h3><p>${date(x.createdAt || x.at)} · Minecraft ${esc(x.gameVersion)} · ${esc(x.loader)}</p><small>${x.includesWorlds ? "Снимок с мирами" : "Снимок без миров"} · ${new Intl.NumberFormat("ru", { notation: "compact" }).format(x.sizeBytes || 0)} Б</small><div class="toolbar">${btn("Восстановить", "restore", "", `data-index="${i}"`)}${btn("Показать изменения", "history-changes", "", `data-index="${i}"`)}</div></article>`).join("") || '<div class="empty"><h3>Снимков пока нет</h3><p>Сохрани состояние сборки, чтобы вернуться к нему после изменений</p></div>'}</section>`;
+  return `<section class="stack"><h3>Состояния до изменений</h3><p>Снимки сохраняют моды, настройки и другой контент перед обновлениями и массовыми изменениями</p><div class="toolbar">${btn("Вернуть рабочее состояние", "restore-latest", "primary", state.history.length ? "" : "disabled")}${btn("Сохранить состояние", "snapshot")}</div>${switchRow("Сохранять миры в новых снимках", "historyIncludeWorlds", b.options.historyIncludeWorlds, "Миры не копируются и при обычном откате сохраняют текущий прогресс", true)}${state.history.map((x, i) => `<article class="panel stack"><h3>${esc(x.reason || x.title || "Сохранённое состояние")}</h3><p>${date(x.createdAt || x.at)} · Minecraft ${esc(x.gameVersion)} · ${esc(x.loader)}</p><small>${x.includesWorlds ? "Снимок с мирами" : "Снимок без миров"} · ${new Intl.NumberFormat(uiLocale(), { notation: "compact" }).format(x.sizeBytes || 0)} Б</small><div class="toolbar">${btn("Восстановить", "restore", "", `data-index="${i}"`)}${btn("Показать изменения", "history-changes", "", `data-index="${i}"`)}</div></article>`).join("") || '<div class="empty"><h3>Снимков пока нет</h3><p>Сохрани состояние сборки, чтобы вернуться к нему после изменений</p></div>'}</section>`;
 }
 async function projectPage() {
   const h = state.projectHit;
@@ -1018,7 +1158,7 @@ async function projectPage() {
     }),
   );
   const p = state.projectData.project;
-  return `<section class="constrained stack"><div class="row">${h.icon_url ? `<img class="build-icon" src="${esc(h.icon_url)}" alt="">` : ""}<div class="grow"><h1>${esc(h.title)}</h1><p>${esc(h.author)}</p></div>${btn("Установить", "install-project", "primary")}</div><p>${esc(h.description)}</p><div class="tabs">${btn("Описание", "project-description", "active")}${btn("Версии", "project-versions")}</div><article class="panel" id="project-body" style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(p.body || p.description || h.description)}</article></section>`;
+  return `<section class="constrained stack"><div class="row">${h.icon_url ? `<img class="build-icon" src="${esc(h.icon_url)}" alt="">` : ""}<div class="grow"><h1 data-native-text>${esc(h.title)}</h1><p data-native-text>${esc(h.author)}</p></div>${btn(c.target && ["mod", "shader", "resourcepack"].includes(c.kind) ? "Проверяю…" : "Установить", "install-project", "primary", `data-project-installed ${c.target && ["mod", "shader", "resourcepack"].includes(c.kind) ? "disabled" : ""}`)}</div><p data-native-text>${esc(h.description)}</p><div class="tabs">${btn("Описание", "project-description", "active")}${btn("Версии", "project-versions")}</div><article class="panel" id="project-body" style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(p.body || p.description || h.description)}</article></section>`;
 }
 const imageCache = new Map(),
   imageJobs = new Map(),
@@ -1209,6 +1349,54 @@ function renderLaunchControls(root = document) {
     }
   });
 }
+function friendsPage() {
+  return `<section class="constrained friends-page">
+    <header class="friends-header"><div><h1>Друзья</h1><p>Играй с друзьями в своих мирах</p></div></header>
+    <div class="friends-grid">
+      <article class="panel friend-card"><div class="friend-card-heading"><span class="friend-card-icon">${icon("add")}</span><div><h2>Пригласить в мир</h2><p>Открой мир в Minecraft для локальной сети и укажи порт из сообщения игры.</p></div></div><label class="friend-field" for="friend-host-port">Порт мира<input id="friend-host-port" inputmode="numeric" placeholder="Например, 54321" maxlength="5"></label><div class="friends-actions">${btn("Создать приглашение", "friend-create", "primary")}</div><p id="friend-host-result" class="friend-result" aria-live="polite"></p><div id="friend-copy" class="friend-followup"></div></article>
+      <article class="panel friend-card"><div class="friend-card-heading"><span class="friend-card-icon">${icon("play")}</span><div><h2>Присоединиться</h2><p>Вставь приглашение друга, чтобы создать защищённое соединение.</p></div></div><label class="friend-field" for="friend-invite">Приглашение<input id="friend-invite" placeholder="AWD1-…" autocomplete="off"></label><div class="friends-actions">${btn("Подключиться", "friend-check", "primary")}</div><p id="friend-check-result" class="friend-result" aria-live="polite"></p><div id="friend-address-copy" class="friend-followup"></div></article>
+    </div>
+    <section class="panel friends-status" data-state="idle"><div class="friends-status-main"><span class="friends-status-dot" aria-hidden="true"></span><div><h2>Качество соединения</h2><p id="friend-network-status" data-native-text aria-live="polite">…</p><small>Задержка прямого соединения; в Minecraft значение может отличаться.</small></div></div>${btn("Остановить соединение", "friend-stop", "friend-stop", "disabled")}</section>
+    <aside class="friends-note"><span class="friends-note-icon">${icon("notices")}</span><div><strong>О подключении</strong><p>Хозяину нужны UPnP и публичный IP. Версии игры и модов должны совпадать. Приглашение содержит твой IP-адрес и ключ доступа — отправляй его только тем, кому доверяешь.</p></div></aside>
+  </section>`;
+}
+let friendStatusSequence = 0;
+async function updateFriendNetworkStatus() {
+  const node = $("#friend-network-status");
+  if (!node || state.route.page !== "friends" || !T) return;
+  const sequence = ++friendStatusSequence;
+  const language = state.data.settings.language || "RU";
+  let message;
+  try {
+    const status = await invoke("world_status");
+    if (!node.isConnected || sequence !== friendStatusSequence) return;
+    const panel = node.closest(".friends-status"), stop = panel?.querySelector('[data-action="friend-stop"]');
+    if (stop) stop.disabled = !status.active;
+    if (panel) panel.dataset.state = !status.active ? "idle" : status.peers?.length ? "connected" : "waiting";
+    if (!status.active) message = "Нет активного соединения";
+    else if (!status.peers?.length) message = "Ожидание подключения друга";
+    else message = status.peers.map((peer, index) => {
+      const route = peer.route === "direct" ? "напрямую" : peer.route === "relay" ? "через сервер" : "определяю маршрут";
+      const ping = Number.isFinite(peer.pingMs) ? `${peer.pingMs} мс` : "друг подключён";
+      return `${status.peers.length > 1 ? `Игрок ${index + 1}: ` : ""}${ping} · ${route}`;
+    }).join(" | ");
+  } catch {
+    if (!node.isConnected || sequence !== friendStatusSequence) return;
+    node.closest(".friends-status").dataset.state = "error";
+    message = "Не удалось получить состояние соединения";
+  }
+  const key = `${language}\0${message}`;
+  if (node._friendStatusKey === key) return;
+  let translated = message;
+  if (language !== "RU") {
+    try { translated = (await invoke("translate_text", {language, values:[message]}))[0] || message; }
+    catch { return; }
+  }
+  if (!node.isConnected || state.route.page !== "friends" || sequence !== friendStatusSequence || language !== (state.data.settings.language || "RU")) return;
+  node._friendStatusKey = key;
+  if (node.textContent !== translated) node.textContent = translated;
+}
+setInterval(updateFriendNetworkStatus, 2000);
 async function launchGame(target) {
   if (state.launching.has(target)) return;
   const pending = {stage: "Подготовка к запуску…"};
@@ -1275,6 +1463,10 @@ async function pump() {
     );
     await refresh();
     invalidateViews(item.request.target || "");
+    if (state.route.page === "catalog" && state.catalog.target === item.request.target)
+      updateCatalogInstalled(activeView?.node || $("#main"));
+    if (state.route.page === "project" && state.catalog.target === item.request.target)
+      updateProjectInstalled(activeView?.node || $("#main"));
     await item.callbacks?.onSuccess?.(item.result);
     if (
       state.route.page === "instance" &&
@@ -1974,6 +2166,35 @@ const actions = {
     const item = state.queue.find((x) => x.id === el.dataset.id);
     return enqueue(item.title, item.request, item.callbacks);
   },
+  "friend-create": async (el) => {
+    const port = $("#friend-host-port").value.trim();
+    if (!/^\d{1,5}$/.test(port) || +port < 1 || +port > 65535) throw Error("Укажи порт от 1 до 65535");
+    el.disabled = true;
+    $("#friend-host-result").classList.remove("error");
+    $("#friend-copy").innerHTML = "";
+    $("#friend-host-result").textContent = "Создаю соединение…";
+    try {
+      const invite = await invoke("host_world", { port: +port });
+      $("#friend-host-result").textContent = "Приглашение готово. Передай его другу.";
+      updateFriendNetworkStatus();
+      $("#friend-copy").innerHTML = btn("Скопировать приглашение", "copy-code", "", `data-code="${esc(invite)}"`);
+    } catch (error) { $("#friend-host-result").classList.add("error"); $("#friend-host-result").textContent = String(error?.message || error); } finally { el.disabled = false; }
+  },
+  "friend-check": async (el) => {
+    const ticket = $("#friend-invite").value.trim();
+    if (!ticket.startsWith("AWD1-")) throw Error("Некорректное приглашение");
+    el.disabled = true;
+    $("#friend-check-result").classList.remove("error");
+    $("#friend-address-copy").innerHTML = "";
+    $("#friend-check-result").textContent = "Подключаюсь…";
+    try {
+      const address = await invoke("join_world", { ticket });
+      updateFriendNetworkStatus();
+      $("#friend-check-result").textContent = `Соединение готово. В Minecraft выбери «Сетевая игра» → «По адресу» и введи ${address}.`;
+      $("#friend-address-copy").innerHTML = btn("Скопировать адрес", "copy-code", "", `data-code="${esc(address)}"`);
+    } catch (error) { $("#friend-check-result").classList.add("error"); $("#friend-check-result").textContent = String(error?.message || error); } finally { el.disabled = false; }
+  },
+  "friend-stop": async () => { await invoke("stop_world"); toast("Соединение остановлено"); await render({refresh:true}); },
   "copy-code": (el) =>
     navigator.clipboard
       .writeText(el.dataset.code)
@@ -2001,7 +2222,12 @@ const actions = {
         options: { returnItem: true },
       });
       Object.assign(x, result);
-      if (selected()?.key === target) patchContentRow(index);
+      contentReads.delete(target);
+      installedProjectReads.delete(target);
+      if (selected()?.key === target) {
+        patchContentRow(index);
+        if (activeView?.node) enrichContent(activeView.node, target);
+      }
     } catch (error) {
       Object.assign(x, old);
       if (selected()?.key === target) patchContentRow(index);
@@ -2214,6 +2440,7 @@ const actions = {
     await saveSetting("language", el.dataset.id);
     translationVersion++;
     await translateVisible(document.body);
+    if (state.route.page === "friends") updateFriendNetworkStatus();
     renderLanguages();
   },
   "reset-cache": () =>
@@ -2368,6 +2595,8 @@ async function installHit(hit, version = null) {
 document.addEventListener("click", (event) => {
   const nav = event.target.closest("#navigation [data-page]");
   if (nav) {
+    if (nav.dataset.page === "catalog" && !state.catalog.target)
+      state.catalog.target = current()?.key || "";
     navigate(nav.dataset.page);
     return;
   }
@@ -2671,42 +2900,94 @@ for (const dialog of document.querySelectorAll("dialog"))
 // Translate existing UI text with the launcher's shared dictionaries.
 
 const originalText = new WeakMap();
+const originalAttributes = new WeakMap();
+const translationWrites = new WeakMap();
 let translationVersion = 0;
+const translationExcluded = "script,style,input,textarea,.name,.project-title,.shot-caption,.project-description,.log-scroll,.content-name strong,.account strong,[data-native-text]";
+function markTranslationWrite(node, key, value) {
+  let writes = translationWrites.get(node);
+  if (!writes) translationWrites.set(node, writes = new Map());
+  writes.set(key, value);
+}
 async function translateVisible(root = document.body) {
-  const language = state.data.settings.language || "RU",
-    version = translationVersion,
-    walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT),
-    nodes = [];
+  const language = state.data.settings.language || "RU", version = translationVersion;
+  const jobs = [];
+  const remember = (node, key, current, record) => {
+    if (!record) record = { source: current, last: current, language: null };
+    else if (current !== record.last && current !== record.source) {
+      record.source = current;
+      record.last = current;
+      record.language = null;
+    }
+    if (!/[А-Яа-яЁё]/.test(record.source)) return record;
+    if (record.language === language && current === record.last) return record;
+    if (language === "RU") {
+      if (current !== record.source) {
+        markTranslationWrite(node, key, record.source);
+        if (key === "#text") node.textContent = record.source;
+        else node.setAttribute(key, record.source);
+      }
+      record.last = record.source;
+      record.language = language;
+    } else jobs.push({ node, key, record, before: current, source: record.source });
+    return record;
+  };
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   let node;
   while ((node = walker.nextNode())) {
-    if (
-      node.parentElement?.closest(
-        "script,style,input,textarea,.name,.project-title,.shot-caption,.project-description,.log-scroll,.content-name,.account strong,[data-native-text]",
-      )
-    )
-      continue;
-    const original = originalText.get(node) || node.textContent;
-    if (!/[А-Яа-яЁё]/.test(original)) continue;
-    originalText.set(node, original);
-    if (language === "RU") node.textContent = original;
-    else nodes.push({ node, original });
+    if (node.parentElement?.closest(translationExcluded)) continue;
+    originalText.set(node, remember(node, "#text", node.textContent, originalText.get(node)));
   }
-  for (let start = 0; start < nodes.length; start += 256) {
-    const batch = nodes.slice(start, start + 256),
-      values = await invoke("translate_text", {
-        language,
-        values: batch.map((x) => x.original),
-      });
-    if (
-      version !== translationVersion ||
-      language !== state.data.settings.language
-    )
-      return;
-    batch.forEach((x, i) => {
-      if (x.node.isConnected && values[i]) x.node.textContent = values[i];
+  const elements = [...(root instanceof Element ? [root] : []), ...root.querySelectorAll("[title],[placeholder],[aria-label]")];
+  for (const element of elements) {
+    if (element.closest(".name,.project-title,.shot-caption,.project-description,.log-scroll,[data-native-text]")) continue;
+    let records = originalAttributes.get(element);
+    for (const key of ["title", "placeholder", "aria-label"]) {
+      if (!element.hasAttribute(key)) continue;
+      const value = element.getAttribute(key);
+      if (!records && !/[А-Яа-яЁё]/.test(value)) continue;
+      if (!records) originalAttributes.set(element, records = new Map());
+      records.set(key, remember(element, key, value, records.get(key)));
+    }
+  }
+  for (let start = 0; start < jobs.length; start += 256) {
+    const batch = jobs.slice(start, start + 256);
+    const values = await invoke("translate_text", { language, values: batch.map(item => item.source) });
+    if (version !== translationVersion || language !== (state.data.settings.language || "RU")) return;
+    batch.forEach((item, index) => {
+      const value = values[index];
+      const current = item.key === "#text" ? item.node.textContent : item.node.getAttribute(item.key);
+      if (!item.node.isConnected || !value || item.record.source !== item.source || current !== item.before) return;
+      if (current !== value) {
+        markTranslationWrite(item.node, item.key, value);
+        if (item.key === "#text") item.node.textContent = value;
+        else item.node.setAttribute(item.key, value);
+      }
+      item.record.last = value;
+      item.record.language = language;
     });
   }
 }
+const pendingTranslations = new Set();
+let translationTimer = null;
+const translationObserver = new MutationObserver(records => {
+  for (const record of records) {
+    const key = record.type === "attributes" ? record.attributeName : record.type === "characterData" ? "#text" : null;
+    const writes = key && translationWrites.get(record.target);
+    const current = key === "#text" ? record.target.textContent : key ? record.target.getAttribute(key) : null;
+    if (writes?.get(key) === current) { writes.delete(key); continue; }
+    const root = record.target instanceof Element ? record.target : record.target.parentElement;
+    if (root?.isConnected && !root.closest("script,style")) pendingTranslations.add(root);
+  }
+  if (pendingTranslations.size && !translationTimer) translationTimer = setTimeout(() => {
+    translationTimer = null;
+    const roots = [...pendingTranslations].filter(root => root.isConnected);
+    pendingTranslations.clear();
+    const unique = roots.filter(root => !roots.some(other => other !== root && other.contains(root)));
+    for (const root of unique.length > 20 ? [document.body] : unique) translateVisible(root).catch(() => {});
+  }, 50);
+});
+translationObserver.observe(document.body, { subtree:true, childList:true, characterData:true, attributes:true, attributeFilter:["title", "placeholder", "aria-label"] });
 setInterval(async () => {
   try {
     const old = state.games || [];

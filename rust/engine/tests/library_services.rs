@@ -29,6 +29,23 @@ fn profile(dir: &std::path::Path) -> Value {
     json!({"dir":dir,"version":"1.21.1","loader":"Vanilla","loaderVersion":null})
 }
 #[test]
+fn local_content_list_is_available_without_catalog_or_archive_parsing() {
+    let tmp = Temp::new();
+    let dir = tmp.0.join("game");
+    write_bytes(&dir.join("mods/example.jar.disabled"), b"not a zip").unwrap();
+    write_json(&dir.join("aw-instance.json"), &json!({"catalogMods":[{
+        "fileName":"mods/example.jar", "projectId":"project-1", "title":"Example",
+        "versionNumber":"1.2", "iconUrl":"https://cdn.example/icon.png"
+    }]})).unwrap();
+    let items = content::scan_local(&tmp.cx(), &profile(&dir)).unwrap();
+    assert_eq!(items.len(), 1);
+    assert_eq!(items[0]["title"], "Example");
+    assert_eq!(items[0]["project"], "project-1");
+    assert_eq!(items[0]["icon"], "https://cdn.example/icon.png");
+    assert_eq!(items[0]["enabled"], false);
+    assert_eq!(items[0]["update"], "");
+}
+#[test]
 fn state_preserves_legacy_directories_and_never_exposes_secrets() {
     let tmp = Temp::new();
     let cx = tmp.cx();

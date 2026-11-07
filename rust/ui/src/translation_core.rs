@@ -253,6 +253,19 @@ mod tests {
         assert_eq!(translate("EN", "Проекты ({0})"), "Projects ({0})");
     }
     #[test]
+    fn newer_launcher_labels_have_english_translations() {
+        assert_eq!(translate("EN", "Импорт модпака"), "Import modpack");
+        assert_eq!(translate("EN", "Импорт профиля"), "Import profile");
+        assert_eq!(translate("EN", "Проверяю сведения и обновления…"), "Checking details and updates…");
+        assert_eq!(translate("EN", "Пригласить в мир"), "Invite to world");
+        assert_eq!(translate("EN", "Играй с друзьями в своих мирах"), "Play with friends in your worlds");
+        assert_eq!(translate("EN", "О подключении"), "About this connection");
+        assert_eq!(translate("EN", "Подготовка файлов: 42%"), "Preparing files: 42%");
+        assert_eq!(translate("EN", "200 мс · напрямую"), "200 ms · direct");
+        assert_eq!(translate("EN", "Lithium требует mixinextras >=0.5.5"), "Lithium requires mixinextras >=0.5.5");
+        assert_eq!(translate("EN", "Сервер загрузки: HTTP 404"), "Download server: HTTP 404");
+    }
+    #[test]
     fn formats_counts_units_and_dates() {
         assert_eq!(
             translate("EN", "Последний запуск: 30 окт"),

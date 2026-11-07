@@ -16,6 +16,8 @@ pub fn read_only(op: &str) -> bool {
         "launcherState"
             | "ping"
             | "content"
+            | "contentLocal"
+            | "installedProjects"
             | "history"
             | "project"
             | "versions"
@@ -218,7 +220,7 @@ pub fn execute(cx: &Context, r: &Value) -> Result<Value> {
     let op = r["op"].as_str().ok_or("Нет операции")?;
     let key = r["target"].as_str().unwrap_or("");
     match op {
-        "ping" => return Ok(json!({"protocol":1,"version":"1.0.55"})),
+        "ping" => return Ok(json!({"protocol":1,"version":"1.0.56"})),
         "launcherState" => return builds::state(cx),
         "versions" => return crate::versions::list(cx),
         "checkUpdate" | "installUpdate" => return crate::updater::execute(cx, r),
@@ -269,6 +271,8 @@ pub fn execute(cx: &Context, r: &Value) -> Result<Value> {
         "buildLoaderVersions" => return crate::versions::loaders(cx, &p),
         "buildVersions" => return crate::versions::migration_versions(cx, &p),
         "content" => return Ok(json!(content::scan_display(cx, &p)?)),
+        "contentLocal" => return Ok(json!(content::scan_local(cx, &p)?)),
+        "installedProjects" => return Ok(json!(content::scan(cx, &p, false, true)?)),
         "history" => return history::list(&d),
         "buildEditor" => {
             let (total, recommended) = builds::memory();
